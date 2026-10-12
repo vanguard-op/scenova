@@ -1,0 +1,69 @@
+# Secrets and real-value environment files — never committed (NFR-024).
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+service-account*.json
+application_default_credentials.json
+
+# Coordination scratch (never shared between roles).
+.delivery/
+.scratch/
+
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+.coverage.*
+dist/
+build/
+
+# Flutter / Dart
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.iml
+.idea/
+.vscode/
+android/local.properties
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/ephemeral/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+**/Generated.xcconfig
+**/flutter_export_environment.sh
+*.g.dart
+*.freezed.dart
+coverage/
+
+# Cloud / CI artifacts
+.gcloud/
+*.log

@@ -1,0 +1,39 @@
+# Local development dependencies only. The application services are run by
+# `make boot` / `make run`, not here. Cloud equivalents (Cloud SQL, Memorystore)
+# are provisioned by infra/terraform; this file mirrors them for local work so
+# the same environment variables (DATABASE_URL, REDIS_URL) apply in both places.
+#
+#   docker compose up -d
+#
+name: scenova
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-scenova}
+      POSTGRES_USER: ${DB_USER:-scenova}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-scenova}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-scenova}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:

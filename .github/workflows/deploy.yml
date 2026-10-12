@@ -1,0 +1,72 @@
+# Deploy services to an environment (release.md "Deployment model": canary for
+# services). Authenticates to Google Cloud with Workload Identity Federation, so
+# no long-lived key is stored in the repository (NFR-024).
+#
+# Required repository configuration (values, not secrets):
+#   vars.GCP_WORKLOAD_IDENTITY_PROVIDER  projects/<n>/locations/global/workloadIdentityPools/<pool>/providers/<provider>
+#   vars.GCP_DEPLOY_SERVICE_ACCOUNT      the deploy service account email
+#
+# `make deploy` pushes images and shifts 5% of traffic to the candidate revision;
+# promotion to 100% is a separate, deliberate run of `make promote`.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        type: choice
+        options: [dev, staging, prod]
+        required: true
+      promote:
+        description: Promote the canary to 100% after deploy
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-${{ github.event.inputs.environment || 'prod' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'prod' }}
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${{ vars.GCP_REGION }}-docker.pkg.dev" --quiet
+
+      - name: Install toolchain
+        run: make setup
+
+      - name: Deploy canary
+        env:
+          GIT_SHA: ${{ github.sha }}
+        run: make deploy ENV=${{ github.event.inputs.environment || 'prod' }}
+
+      - name: Promote to 100%
+        if: ${{ github.event.inputs.promote == true }}
+        run: make promote ENV=${{ github.event.inputs.environment || 'prod' }}

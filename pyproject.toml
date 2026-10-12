@@ -1,0 +1,54 @@
+# Root Python workspace configuration.
+#
+# This file configures the shared tooling (ruff, black, mypy, pytest) for every
+# Python workspace — `services/**` and `ai/**`. It is not a package itself.
+# Each service keeps its own `pyproject.toml`/`requirements.txt` for its runtime
+# dependencies; the rules below apply repo-wide so `ruff check .` and `pytest`
+# from the root are the same checks CI runs (`make lint`, `make test`).
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = [".venv", "build", "dist", "**/migrations/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC", "S", "RUF"]
+ignore = [
+  "S101",  # asserts are expected in tests
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "B"]
+"**/test_*.py" = ["S", "B"]
+"**/conftest.py" = ["S"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+extend-exclude = '''
+/(\.venv|build|dist|migrations/versions)/
+'''
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+warn_redundant_casts = true
+no_implicit_reexport = true
+exclude = ["(\\.venv|build|dist|migrations/versions)"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["services", "ai"]
+addopts = "-ra --strict-markers --strict-config"
+filterwarnings = ["error"]
+markers = [
+  "unit: fast unit tests (engineer-owned)",
+  "integration: cross-component tests (qa-owned)",
+  "acceptance: acceptance criteria (qa-owned)",
+  "model: exercises a model provider (opt-in, network)",
+]

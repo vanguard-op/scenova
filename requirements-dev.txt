@@ -1,0 +1,11 @@
+# Pinned developer and CI tooling for the Python workspace.
+# Runtime dependencies live with each service (services/<name>/requirements.txt,
+# ai/requirements.txt); this file is the shared lint/type/test toolchain.
+# Pinned exactly for reproducible CI and a clean dependency scan (NFR-028).
+
+ruff==0.17.0
+black==26.10.1
+mypy==2.4.0
+pytest==9.1.1
+pytest-asyncio==1.4.0
+pip-audit==2.10.1
