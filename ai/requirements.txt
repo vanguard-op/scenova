@@ -1,0 +1,7 @@
+# Runtime dependencies for the model-serving layer (ai/).
+# Pinned exactly for reproducible builds (NFR-028).
+fastapi==0.143.0
+uvicorn==0.54.0
+pydantic==2.14.1
+google-genai==2.29.0
+httpx==0.28.1
