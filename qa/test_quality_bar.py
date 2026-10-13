@@ -1,9 +1,13 @@
 """Gate checks for the model quality bar (nfr.md, NFR-050 to NFR-053).
 
 These do not judge model output themselves — a judged bar is measured by running
-the golden set against the pinned model. They assert the inputs that measurement
-requires are present, so a release cannot be declared green on a bar that was
-never run. When an input is missing the failure names the doc gap.
+the golden set against the capability's pinned model. They assert the inputs that
+measurement requires are present, so a release cannot be declared green on a bar
+that was never run. When an input is missing the failure names the doc gap.
+
+Each bar carries its own pinned model (nfr.md, Model Quality & Cost): the gloss
+phrase is a text capability measured on the text model, and the clips are video
+capabilities measured on the video model, so the two never collapse onto one.
 """
 
 from __future__ import annotations
@@ -11,23 +15,63 @@ from __future__ import annotations
 import os
 
 import pytest
+from app.config import CLIP_MODEL_PIN as SERVED_CLIP_PIN
+from app.config import PHRASE_MODEL_PIN as SERVED_PHRASE_PIN
 
-from qa.quality_bar import BARS, MODEL_PIN, Bar, GoldenSetMissing, load_golden_set
+from qa.quality_bar import (
+    BARS,
+    CLIP_MODEL_PIN,
+    PHRASE_MODEL_PIN,
+    Bar,
+    GoldenSetMissing,
+    load_golden_set,
+)
 
 pytestmark = [pytest.mark.acceptance, pytest.mark.model]
 
 _GOLDEN_BARS = [bar for bar in BARS if bar.golden_file is not None]
 
+# The pin nfr.md fixes per capability: the gloss phrase (text) on the text model,
+# every clip capability (video) on the video model.
+_DOCUMENTED_PINS = {
+    "NFR-050": PHRASE_MODEL_PIN,
+    "NFR-051": CLIP_MODEL_PIN,
+    "NFR-052": CLIP_MODEL_PIN,
+    "NFR-053": CLIP_MODEL_PIN,
+}
+
 
 def test_the_quality_bar_is_declared() -> None:
     # nfr.md's Model Quality & Cost section fixes a metric and a threshold per
-    # capability, measured against the pinned model version.
+    # capability, measured against the capability's pinned model version.
     declared = {bar.nfr_id for bar in BARS}
     assert declared == {"NFR-050", "NFR-051", "NFR-052", "NFR-053"}
-    assert MODEL_PIN == "gemini-omni-1.1-flash"
     for bar in BARS:
         assert bar.metric
         assert 0.0 < bar.threshold <= 1.0
+
+
+@pytest.mark.parametrize("bar", BARS, ids=[bar.nfr_id for bar in BARS])
+def test_each_bar_carries_its_own_pinned_model(bar: Bar) -> None:
+    # The gloss phrase and the clips are separate model-backed capabilities, each
+    # against its own pinned model (nfr.md; architecture.md "Model Version &
+    # Fallback"). A bar that carries no pin, or the wrong one, cannot be measured.
+    assert bar.model_pin, f"{bar.nfr_id} carries no pinned model"
+    assert bar.model_pin == _DOCUMENTED_PINS[bar.nfr_id]
+
+
+def test_the_two_pins_are_distinct_and_both_used() -> None:
+    assert PHRASE_MODEL_PIN == "gemini-3.5-flash-lite"
+    assert CLIP_MODEL_PIN == "gemini-omni-1.1-flash"
+    assert PHRASE_MODEL_PIN != CLIP_MODEL_PIN
+    assert {bar.model_pin for bar in BARS} == {PHRASE_MODEL_PIN, CLIP_MODEL_PIN}
+
+
+def test_each_bar_is_measured_against_the_model_the_step_serves() -> None:
+    # The pin a bar carries is the pin the generation step actually serves; if the
+    # two drift, the run measures a model the product does not use.
+    assert PHRASE_MODEL_PIN == SERVED_PHRASE_PIN
+    assert CLIP_MODEL_PIN == SERVED_CLIP_PIN
 
 
 @pytest.mark.parametrize("bar", _GOLDEN_BARS, ids=[bar.nfr_id for bar in _GOLDEN_BARS])
@@ -45,12 +89,12 @@ def test_the_golden_set_a_bar_needs_is_present(bar: Bar) -> None:
     assert len(items) >= bar.minimum_items
 
 
-def test_the_pinned_model_is_reachable_for_a_judged_run() -> None:
+def test_the_pinned_models_are_reachable_for_a_judged_run() -> None:
     # A judged run needs the pinned model provider configured; without it no
     # output can be produced and the bar cannot be measured.
     if not os.environ.get("GEMINI_API_KEY"):
         pytest.fail(
             "GEMINI_API_KEY is not configured, so the NFR-050/051/053 golden-set "
-            f"evaluation against {MODEL_PIN} cannot run. Configure the pinned "
-            "model credential (or a recorded replay) before the gate."
+            f"evaluation against {PHRASE_MODEL_PIN} and {CLIP_MODEL_PIN} cannot run. "
+            "Configure the pinned model credential (or a recorded replay) before the gate."
         )

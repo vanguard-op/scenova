@@ -22,7 +22,7 @@ from pathlib import Path
 import pytest
 from quality.__main__ import main as quality_main
 
-from qa.quality_bar import BARS, MODEL_PIN, Bar
+from qa.quality_bar import BARS, Bar
 
 pytestmark = [pytest.mark.acceptance, pytest.mark.model]
 
@@ -51,7 +51,7 @@ def test_the_golden_set_evaluation_meets_the_bar(bar: Bar, tmp_path: Path) -> No
 
     if not replay.exists() and not os.environ.get("GEMINI_API_KEY"):
         pytest.fail(
-            f"{bar.nfr_id}: the golden set cannot be produced against {MODEL_PIN} — "
+            f"{bar.nfr_id}: the golden set cannot be produced against {bar.model_pin} — "
             f"there is no recorded run at {replay} and GEMINI_API_KEY is not set. A "
             "credential or a recorded replay is a judged-run input (nfr.md, Model "
             "Quality & Cost)."
@@ -74,6 +74,11 @@ def test_the_golden_set_evaluation_meets_the_bar(bar: Bar, tmp_path: Path) -> No
     assert code == 0, f"{bar.nfr_id}: the evaluation run did not complete (exit {code})"
     report = json.loads(report_path.read_text(encoding="utf-8"))
     assert report["sampleSize"] >= bar.minimum_items
+    assert report["modelPin"] == bar.model_pin, (
+        f"{bar.nfr_id} was measured against {report['modelPin']}, but the bar pins "
+        f"{bar.model_pin}: the run did not measure the capability's pinned model "
+        "(nfr.md, Model Quality & Cost)."
+    )
     assert report["meetsBar"] is True, (
         f"{bar.nfr_id} measured {report['rate']:.3f} "
         f"({report['passed']}/{report['sampleSize']}) against the "

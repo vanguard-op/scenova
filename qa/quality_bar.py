@@ -1,11 +1,13 @@
 """Quality-bar harness for the model-backed capabilities (nfr.md, NFR-050 to NFR-053).
 
 The bar for each model-backed capability is judged, not asserted: a fixed golden
-set is run against the pinned model and the share that passes is compared to the
-threshold. This module holds the bar's definition and the loader the evaluation
-runs on. It deliberately does not fabricate a golden set or a judge — those are
-the evaluation inputs the bar requires, and their absence is a doc gap reported
-by `test_quality_bar.py`, not something to paper over.
+set is run against the capability's own pinned model and the share that passes is
+compared to the threshold. Each bar carries the pin it was measured against, so
+the gloss phrase (a text capability) and the clips (video capabilities) never
+collapse back onto one model. This module holds the bar's definition and the
+loader the evaluation runs on. It deliberately does not fabricate a golden set or
+a judge — those are the evaluation inputs the bar requires, and their absence is
+a doc gap reported by `test_quality_bar.py`, not something to paper over.
 
 Golden-set files live in `qa/golden/` as one JSON object per line:
 
@@ -27,8 +29,12 @@ from pathlib import Path
 
 GOLDEN_DIR = Path(__file__).resolve().parent / "golden"
 
-# The pinned model every evaluation is measured against (D-007).
-MODEL_PIN = "gemini-omni-1.1-flash"
+# The two pinned models the bars are measured against (nfr.md, Model Quality &
+# Cost; architecture.md, "Model Version & Fallback"). The gloss phrase is a text
+# capability pinned to the text model; the clips are video capabilities pinned to
+# the video model. Each bar carries the one its capability was measured on.
+PHRASE_MODEL_PIN = "gemini-3.5-flash-lite"
+CLIP_MODEL_PIN = "gemini-omni-1.1-flash"
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,6 +48,9 @@ class Bar:
     metric: str
     threshold: float
     cost_ceiling: str
+    # The pinned model this capability is measured against. Every bar declared in
+    # `BARS` sets it; a bar that carries none cannot be measured (nfr.md).
+    model_pin: str = ""
 
 
 BARS: tuple[Bar, ...] = (
@@ -54,6 +63,7 @@ BARS: tuple[Bar, ...] = (
         "one clear meaning)",
         threshold=0.90,
         cost_ceiling="$0.01 per request",
+        model_pin=PHRASE_MODEL_PIN,
     ),
     Bar(
         nfr_id="NFR-051",
@@ -63,6 +73,7 @@ BARS: tuple[Bar, ...] = (
         metric="Share of clips a rater judges to depict the phrase's meaning",
         threshold=0.80,
         cost_ceiling="$0.15 per generated clip",
+        model_pin=CLIP_MODEL_PIN,
     ),
     Bar(
         nfr_id="NFR-052",
@@ -72,6 +83,7 @@ BARS: tuple[Bar, ...] = (
         metric="Share of served clips a reader marks as helpful",
         threshold=0.70,
         cost_ceiling="Not applicable",
+        model_pin=CLIP_MODEL_PIN,
     ),
     Bar(
         nfr_id="NFR-053",
@@ -81,6 +93,7 @@ BARS: tuple[Bar, ...] = (
         metric="Share of clips a rater judges to depict the phrase's meaning",
         threshold=0.75,
         cost_ceiling="$0.15 per generated clip",
+        model_pin=CLIP_MODEL_PIN,
     ),
 )
 
