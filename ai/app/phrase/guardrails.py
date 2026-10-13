@@ -52,6 +52,8 @@ def _base_forms(token: str) -> list[str]:
         forms.append(token[:-2])
     if token.endswith("ies") and len(token) > 4:
         forms.append(token[:-3] + "y")
+    if token.endswith("ied") and len(token) > 4:
+        forms.append(token[:-3] + "y")
     if token.endswith("es"):
         forms.append(token[:-2])
     if token.endswith("s"):
@@ -67,7 +69,26 @@ def _base_forms(token: str) -> list[str]:
             forms.append(stem[:-1])
     if token.endswith("d") and len(token) > 2:
         forms.append(token[:-1])
+    # Common derivations: an everyday adverb or adjective is usually the base
+    # word plus a suffix ("quietly" from "quiet", "careful" from "care"), so
+    # membership is checked against the stripped base as well.
+    if token.endswith("ly") and len(token) > 4:
+        forms.append(_to_y_stem(token[:-2]))
+    if token.endswith("ful") and len(token) > 4:
+        forms.append(token[:-3])
+    if token.endswith("less") and len(token) > 5:
+        forms.append(_to_y_stem(token[:-4]))
+    if token.endswith("ness") and len(token) > 5:
+        forms.append(_to_y_stem(token[:-4]))
     return forms
+
+
+def _to_y_stem(stem: str) -> str:
+    """Resolve an ``-i`` stem back to its ``-y`` base ("happi" -> "happy")."""
+
+    if stem.endswith("i") and len(stem) > 1:
+        return stem[:-1] + "y"
+    return stem
 
 
 def _allowed_words(lemma: str | None) -> set[str]:

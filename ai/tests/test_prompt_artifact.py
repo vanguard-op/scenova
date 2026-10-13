@@ -11,8 +11,9 @@ from app.prompt import load_prompt
 def test_loads_the_versioned_artifact() -> None:
     prompt = load_prompt()
 
-    assert prompt.version == "gloss-phrase-v1"
+    assert prompt.version == "gloss-phrase-v2"
     assert "common" in prompt.system
+    assert "six words" in prompt.system
     assert "{lemma}" in prompt.user
 
 

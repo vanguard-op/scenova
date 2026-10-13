@@ -1,7 +1,7 @@
 """Loader for the versioned gloss-phrase prompt artifact.
 
 The prompt is a behaviour artifact, not a string in a handler: it lives in
-`ai/prompts/gloss_phrase.v1.txt`, carries its own version, and is loaded and
+`ai/prompts/gloss_phrase.v2.txt`, carries its own version, and is loaded and
 parsed here. A change to the prompt is a new versioned file, so the phrase
 behaviour can be diffed and rolled back like code.
 """
@@ -12,7 +12,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 PROMPT_DIR = Path(__file__).resolve().parent.parent / "prompts"
-DEFAULT_PROMPT_PATH = PROMPT_DIR / "gloss_phrase.v1.txt"
+# The pinned gloss-phrase behaviour is the artifact the quality bar is measured
+# on (NFR-050). A change to it is a new versioned file; the previous version is
+# kept so the pin can be diffed and rolled back.
+DEFAULT_PROMPT_PATH = PROMPT_DIR / "gloss_phrase.v2.txt"
 DEFAULT_CLIP_PROMPT_PATH = PROMPT_DIR / "word_clip.v1.txt"
 
 _SYSTEM_MARKER = "[system]"

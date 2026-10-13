@@ -17,6 +17,12 @@ def test_the_bundled_vocabulary_covers_everyday_words() -> None:
     assert {"key", "door", "spoon", "ladder", "cage", "fence"} <= words
 
 
+def test_the_bundled_vocabulary_covers_the_everyday_supplement() -> None:
+    words = load_common_words()
+
+    assert {"mug", "cereal", "turtle", "sunny", "broke", "cannot", "spaghetti"} <= words
+
+
 def check(
     text: str,
     *,
@@ -130,6 +136,48 @@ def test_accepts_a_past_tense_of_a_known_base() -> None:
 
 def test_rejects_a_word_with_no_common_base() -> None:
     assert check("a key in the perambulator").reason is not None
+
+
+def test_accepts_a_common_adverb_of_a_known_base() -> None:
+    words = frozenset({"she", "read", "a", "book", "quiet"})
+
+    result = is_usable(
+        "she reads a book quietly",
+        lemma=None,
+        common_words=words,
+        max_words=6,
+        max_chars=120,
+    )
+
+    assert result.ok is True
+
+
+def test_accepts_a_common_adjective_of_a_known_base() -> None:
+    words = frozenset({"be", "care", "with", "the", "glass"})
+
+    result = is_usable(
+        "be careful with the glass",
+        lemma=None,
+        common_words=words,
+        max_words=6,
+        max_chars=120,
+    )
+
+    assert result.ok is True
+
+
+def test_accepts_a_y_derived_form_of_a_known_base() -> None:
+    words = frozenset({"the", "baby", "cry"})
+
+    result = is_usable(
+        "the baby cried",
+        lemma=None,
+        common_words=words,
+        max_words=6,
+        max_chars=120,
+    )
+
+    assert result.ok is True
 
 
 def test_normalize_phrase_is_stable() -> None:
