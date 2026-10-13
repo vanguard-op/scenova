@@ -15,6 +15,11 @@ FEAT-006 is wired here too. The shared library is read on the fast path: an
 active entry is served without a generation, a held or retired one is a miss
 whose id seeds the replacement, and an unreachable library falls back to
 generation rather than failing the reader.
+
+FEAT-007's `enable_phrase_clip` release flag is honoured here: when it is off, a
+short phrase is not routed to the phrase path and falls back to the word path, so
+the reader still gets the phrase as a word lookup and no phrase clip is started
+(release.md "Rollout Phases & Feature Flags").
 """
 
 from __future__ import annotations
@@ -124,6 +129,7 @@ class LookupService:
         generation: GenerationClient,
         clip_model_pin: str = CLIP_MODEL_PIN,
         generation_target_duration_seconds: float = CLIP_TARGET_SECONDS,
+        enable_phrase_clip: bool = True,
     ) -> None:
         self._inventory = inventory
         self._store = store
@@ -131,6 +137,7 @@ class LookupService:
         self._generation = generation
         self._clip_model_pin = clip_model_pin
         self._target_duration = generation_target_duration_seconds
+        self._enable_phrase_clip = enable_phrase_clip
         # Serialises the idempotency check and the write, so a duplicate
         # clientLookupId is replayed rather than recorded twice.
         self._write_lock = asyncio.Lock()
@@ -181,7 +188,13 @@ class LookupService:
             )
         if len(tokens) == 1:
             return await self._word_lookup(request, raw_selection, tokens[0])
-        return await self._phrase_lookup(request, raw_selection, " ".join(tokens))
+        phrase = " ".join(tokens)
+        if not self._enable_phrase_clip:
+            # The phrase-clip kill switch is off: no phrase job is started and the
+            # phrase falls back to the word path, where it is looked up as a
+            # single key (release.md "Rollout Phases & Feature Flags").
+            return await self._word_lookup(request, raw_selection, phrase)
+        return await self._phrase_lookup(request, raw_selection, phrase)
 
     async def _word_lookup(
         self, request: CreateLookupRequest, raw_selection: str, token: str
@@ -445,6 +458,7 @@ def build_default_service(settings: Settings | None = None) -> LookupService:
         ),
         clip_model_pin=resolved.clip_model_pin,
         generation_target_duration_seconds=resolved.generation_target_duration_seconds,
+        enable_phrase_clip=resolved.enable_phrase_clip,
     )
 
 

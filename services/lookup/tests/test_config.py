@@ -22,3 +22,14 @@ def test_the_clip_pin_ignores_the_shared_model_key() -> None:
     settings = Settings.from_env({"GEMINI_MODEL": "gemini-3.5-flash-lite"})
 
     assert settings.clip_model_pin == "gemini-omni-1.1-flash"
+
+
+def test_the_phrase_clip_flag_defaults_on() -> None:
+    # A missing variable must not silently disable the feature; the rollout value
+    # is supplied per environment (release.md "Rollout Phases & Feature Flags").
+    assert Settings.from_env({}).enable_phrase_clip is True
+
+
+def test_the_phrase_clip_flag_is_read_from_its_env_key() -> None:
+    assert Settings.from_env({"FLAG_ENABLE_PHRASE_CLIP": "false"}).enable_phrase_clip is False
+    assert Settings.from_env({"FLAG_ENABLE_PHRASE_CLIP": "true"}).enable_phrase_clip is True

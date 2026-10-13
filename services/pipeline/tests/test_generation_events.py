@@ -128,6 +128,18 @@ async def test_the_kill_switch_records_no_generation_event() -> None:
 
 
 @pytest.mark.asyncio
+async def test_the_phrase_clip_switch_records_no_generation_event() -> None:
+    # A phrase stopped by the phrase-clip flag was never attempted, so like the
+    # generation switch it must not count against the generation-failure rate.
+    test_rig = rig(enable_phrase_clip=False)
+    await test_rig.service.submit(request(kind=Kind.PHRASE, lemma=None, phrase="kick the bucket"))
+
+    await test_rig.service.run("job-1")
+
+    assert test_rig.events.events == []
+
+
+@pytest.mark.asyncio
 async def test_an_exhausted_budget_records_no_generation_event() -> None:
     test_rig = rig(budget=1.0)
     await test_rig.service.submit(request("job-1"))

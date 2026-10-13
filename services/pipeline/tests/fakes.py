@@ -242,6 +242,7 @@ def rig(
     library: InMemoryLibraryWriter | None = None,
     budget: float = 0.0,
     enable_generation: bool = True,
+    enable_phrase_clip: bool = True,
     library_retry_delay_seconds: float = 0.0,
     clock: Clock | None = None,
 ) -> Rig:
@@ -260,6 +261,7 @@ def rig(
         settings=Settings(
             generation_budget_units=budget,
             enable_generation=enable_generation,
+            enable_phrase_clip=enable_phrase_clip,
             library_store_retry_delay_seconds=library_retry_delay_seconds,
         ),
         spawner=NullSpawner(),

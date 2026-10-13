@@ -9,10 +9,11 @@ and the job runs in the background.
 
 A decline, a timeout, an unavailable provider, a clip outside the three-to-four-
 second range, an exhausted generation budget, or the `enable_generation` kill
-switch being off leaves no clip stored, so the caller shows the fallback. The
-phrase step never fails the job: the model layer's own fallback arrives as a
-normal result, and an unreachable model layer is substituted with the fixed
-template.
+switch being off leaves no clip stored, so the caller shows the fallback. A
+phrase job is also stopped by the `enable_phrase_clip` kill switch, which
+disables phrase clips while the word path keeps generating. The phrase step never
+fails the job: the model layer's own fallback arrives as a normal result, and an
+unreachable model layer is substituted with the fixed template.
 
 Every job records the two pinned models the generation path depends on: the text
 model that produced the gloss phrase and the video model the clip is generated
@@ -214,6 +215,15 @@ class GenerationService:
             # generation event is recorded: generation was never attempted, so
             # the stop must not count against the generation-failure rate.
             logger.info("generation is disabled; job %s stopped without a clip", running.id)
+            return await self._finish(running, JobStatus.FAILED, 0.0)
+
+        if running.kind is Kind.PHRASE and not self._settings.enable_phrase_clip:
+            # The phrase-clip kill switch is off: a phrase job stops before any
+            # provider call, so it ends without a clip and the lookup resolves to
+            # the fallback (release.md "Rollout Phases & Feature Flags"). The
+            # word path is unaffected. No generation event is recorded, for the
+            # same reason as the generation switch.
+            logger.info("phrase clips are disabled; job %s stopped without a clip", running.id)
             return await self._finish(running, JobStatus.FAILED, 0.0)
 
         if not await self._admit():

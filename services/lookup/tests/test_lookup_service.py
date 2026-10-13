@@ -66,6 +66,7 @@ def _service(
     library: LibraryPort | None = None,
     generation: RecordingGenerationClient | None = None,
     clip_model_pin: str = CLIP_MODEL_PIN,
+    enable_phrase_clip: bool = True,
 ) -> LookupService:
     return LookupService(
         inventory=inventory if inventory is not None else build_default_inventory(),
@@ -73,6 +74,7 @@ def _service(
         library=library if library is not None else InMemoryLibrary(),
         generation=generation if generation is not None else RecordingGenerationClient(),
         clip_model_pin=clip_model_pin,
+        enable_phrase_clip=enable_phrase_clip,
     )
 
 
@@ -464,6 +466,40 @@ async def test_a_phrase_selection_is_handed_to_the_phrase_path() -> None:
     assert job.phrase == "kick the bucket"
     assert job.sense_label == PHRASE_SENSE_LABEL
     assert job.part_of_speech == PartOfSpeech.OTHER
+
+
+@pytest.mark.asyncio
+async def test_with_the_phrase_clip_flag_off_a_phrase_falls_back_to_the_word_path() -> None:
+    # release.md "Rollout Phases & Feature Flags": the enable_phrase_clip kill
+    # switch disables phrase clips, so a short phrase is not handed to the phrase
+    # path; it falls back to the word path and is looked up as a single key.
+    generation = RecordingGenerationClient()
+
+    response = await _service(generation=generation, enable_phrase_clip=False).create_lookup(
+        _request("kick the bucket"), "corr"
+    )
+
+    assert response.kind == Kind.WORD
+    assert response.normalisedLemma == "kick the bucket"
+    assert response.notice == BEST_GUESS_NOTICE
+    assert len(generation.jobs) == 1
+    job = generation.jobs[0]
+    assert job.kind == Kind.WORD
+    assert job.lemma == "kick the bucket"
+    # A word job leaves the phrase null; the pipeline generates the gloss phrase
+    # via C-004 (C-003).
+    assert job.phrase is None
+
+
+@pytest.mark.asyncio
+async def test_with_the_phrase_clip_flag_off_no_phrase_job_is_started() -> None:
+    generation = RecordingGenerationClient()
+
+    await _service(generation=generation, enable_phrase_clip=False).create_lookup(
+        _request("kick the bucket"), "corr"
+    )
+
+    assert all(job.kind is Kind.WORD for job in generation.jobs)
 
 
 @pytest.mark.asyncio

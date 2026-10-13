@@ -30,6 +30,12 @@ DEFAULT_LIBRARY_TIMEOUT_SECONDS = 3.0
 CLIP_MODEL_PIN = "gemini-omni-1.1-flash"
 # Clips are capped at four seconds, so a generation targets the cap.
 DEFAULT_GENERATION_TARGET_SECONDS = 4.0
+# The `enable_phrase_clip` release flag (release.md "Rollout Phases & Feature
+# Flags"): when off, a short phrase is not routed to the phrase path and falls
+# back to the word path. It defaults on here so a missing variable never silently
+# disables the feature; every environment supplies its rollout value (off until
+# the phase rolls out) through `FLAG_ENABLE_PHRASE_CLIP`.
+DEFAULT_ENABLE_PHRASE_CLIP = True
 
 
 @dataclass(frozen=True)
@@ -45,6 +51,8 @@ class Settings:
     library_timeout_seconds: float = DEFAULT_LIBRARY_TIMEOUT_SECONDS
     clip_model_pin: str = CLIP_MODEL_PIN
     generation_target_duration_seconds: float = DEFAULT_GENERATION_TARGET_SECONDS
+    # The phrase-clip kill switch; when off, a short phrase routes to the word path.
+    enable_phrase_clip: bool = DEFAULT_ENABLE_PHRASE_CLIP
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Settings:
@@ -78,6 +86,9 @@ class Settings:
                 source,
                 "LOOKUP_GENERATION_TARGET_SECONDS",
                 DEFAULT_GENERATION_TARGET_SECONDS,
+            ),
+            enable_phrase_clip=_env_bool(
+                source, "FLAG_ENABLE_PHRASE_CLIP", DEFAULT_ENABLE_PHRASE_CLIP
             ),
         )
 

@@ -58,6 +58,13 @@ CLIP_MAX_DURATION_SECONDS = 4.0
 # variable never silently disables the feature; every environment supplies its
 # rollout value (off until the phase rolls out) through `FLAG_ENABLE_GENERATION`.
 DEFAULT_ENABLE_GENERATION = True
+# The `enable_phrase_clip` release flag (release.md "Rollout Phases & Feature
+# Flags"): the runtime kill switch that disables phrase clips, so a phrase job
+# stops without a clip and the lookup falls back to the word path. Like the
+# generation switch it defaults on here, so a missing variable never silently
+# disables the feature; every environment supplies its rollout value through
+# `FLAG_ENABLE_PHRASE_CLIP`.
+DEFAULT_ENABLE_PHRASE_CLIP = True
 
 
 @dataclass(frozen=True)
@@ -87,6 +94,8 @@ class Settings:
     generation_budget_units: float = 0.0
     # The generation kill switch; when off, a job stops before any provider call.
     enable_generation: bool = DEFAULT_ENABLE_GENERATION
+    # The phrase-clip kill switch; when off, a phrase job stops before any provider call.
+    enable_phrase_clip: bool = DEFAULT_ENABLE_PHRASE_CLIP
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Settings:
@@ -144,6 +153,9 @@ class Settings:
             generation_budget_units=_env_float(source, "PIPELINE_GENERATION_BUDGET_UNITS", 0.0),
             enable_generation=_env_bool(
                 source, "FLAG_ENABLE_GENERATION", DEFAULT_ENABLE_GENERATION
+            ),
+            enable_phrase_clip=_env_bool(
+                source, "FLAG_ENABLE_PHRASE_CLIP", DEFAULT_ENABLE_PHRASE_CLIP
             ),
         )
 
