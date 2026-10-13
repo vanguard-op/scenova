@@ -1,0 +1,448 @@
+{
+  "nfrId": "NFR-050",
+  "capability": "Gloss phrase generation",
+  "metric": "Share of phrases that pass the rubric (fewer than seven words, common words, one clear meaning)",
+  "threshold": 0.9,
+  "costCeiling": "$0.01 per request",
+  "modelPin": "gemini-3.5-flash-lite",
+  "sampleSize": 200,
+  "passed": 173,
+  "rate": 0.865,
+  "meetsBar": false,
+  "judgedBy": "rubric and raters",
+  "failures": [
+    {
+      "key": "candle|noun|a stick of wax that burns with a small flame",
+      "item": {
+        "lemma": "candle",
+        "partOfSpeech": "noun",
+        "senseHint": "a stick of wax that burns with a small flame"
+      },
+      "reason": "fallback phrase",
+      "output": {
+        "phrase": "a candle",
+        "source": "fallback",
+        "bestGuess": true,
+        "failed": false,
+        "reason": null
+      }
+    },
+    {
+      "key": "box|noun|a stiff container with straight sides and a lid",
+      "item": {
+        "lemma": "box",
+        "partOfSpeech": "noun",
+        "senseHint": "a stiff container with straight sides and a lid"
+      },
+      "reason": "fallback phrase",
+      "output": {
+        "phrase": "a box",
+        "source": "fallback",
+        "bestGuess": true,
+        "failed": false,
+        "reason": null
+      }
+    },
+    {
+      "key": "rope|noun|a thick cord used to tie or pull things",
+      "item": {
+        "lemma": "rope",
+        "partOfSpeech": "noun",
+        "senseHint": "a thick cord used to tie or pull things"
+      },
+      "reason": "fallback phrase",
+      "output": {
+        "phrase": "a rope",
+        "source": "fallback",
+        "bestGuess": true,
+        "failed": false,
+        "reason": null
+      }
+    },
+    {
+      "key": "phone|noun|a device you use to call or send messages",
+      "item": {
+        "lemma": "phone",
+        "partOfSpeech": "noun",
+        "senseHint": "a device you use to call or send messages"
+      },
+      "reason": "rater rejected",
+      "output": {
+        "phrase": "Talk to your friend.",
+        "source": "generated",
+        "bestGuess": false,
+        "failed": false,
+        "reason": null
+      }
+    },
+    {
+      "key": "pen|noun|a thin tool with ink for writing",
+      "item": {
+        "lemma": "pen",
+        "partOfSpeech": "noun",
+        "senseHint": "a thin tool with ink for writing"
+      },
+      "reason": "fallback phrase",
+      "output": {
+        "phrase": "a pen",
+        "source": "fallback",
+        "bestGuess": true,
+        "failed": false,
+        "reason": null
+      }
+    },
+    {
+      "key": "ticket|noun|a small card that lets you travel or enter",
+      "item": {
+        "lemma": "ticket",
+        "partOfSpeech": "noun",
+        "senseHint": "a small card that lets you travel or enter"
+      },
+      "reason": "rater rejected",
+      "output": {
+        "phrase": "A train ride card.",
+        "source": "generated",
+        "bestGuess": false,
+        "failed": false,
+        "reason": null
+      }
+    },
+    {
+      "key": "hope|noun|the feeling that something good may happen",
+      "item": {
+        "lemma": "hope",
+        "partOfSpeech": "noun",
+        "senseHint": "the feeling that something good may happen"
+      },
+      "reason": "fallback phrase",
+      "output": {
+        "phrase": "a hope",
+        "source": "fallback",
+        "bestGuess": true,
+        "failed": false,
+        "reason": null
+      }
+    },
+    {
+      "key": "patience|noun|the calm ability to wait without getting upset",
+      "item": {
+        "lemma": "patience",
+        "partOfSpeech": "noun",
+        "senseHint": "the calm ability to wait without getting upset"
+      },
+      "reason": "fallback phrase",
+      "output": {
+        "phrase": "a patience",
+        "source": "fallback",
+        "bestGuess": true,
+        "failed": false,
+        "reason": null
+      }
+    },
+    {
+      "key": "memory|noun|the ability to remember things you saw",
+      "item": {
+        "lemma": "memory",
+        "partOfSpeech": "noun",
+        "senseHint": "the ability to remember things you saw"
+      },
+      "reason": "rater rejected",
+      "output": {
+        "phrase": "I see my old school.",
+        "source": "generated",
+        "bestGuess": false,
+        "failed": false,
+        "reason": null
+      }
+    },
+    {
+      "key": "safety|noun|the state of being free from harm",
+      "item": {
+        "lemma": "safety",
+        "partOfSpeech": "noun",
+        "senseHint": "the state of being free from harm"
+      },
+      "reason": "fallback phrase",
+      "output": {
+        "phrase": "a safety",
+        "source": "fallback",
+        "bestGuess": true,
+        "failed": false,
+        "reason": null
+      }
+    },
+    {
+      "key": "wealth|noun|a large amount of money and property",
+      "item": {
+        "lemma": "wealth",
+        "partOfSpeech": "noun",
+        "senseHint": "a large amount of money and property"
+      },
+      "reason": "fallback phrase",
+      "output": {
+        "phrase": "a wealth",
+        "source": "fallback",
+        "bestGuess": true,
+        "failed": false,
+        "reason": null
+      }
+    },
+    {
+      "key": "time|noun|the passing of minutes, hours, and days",
+      "item": {
+        "lemma": "time",
+        "partOfSpeech": "noun",
+        "senseHint": "the passing of minutes, hours, and days"
+      },
+      "reason": "fallback phrase",
+      "output": {
+        "phrase": "a time",
+        "source": "fallback",
+        "bestGuess": true,
+        "failed": false,
+        "reason": null
+      }
+    },
+    {
+      "key": "change|noun|the act of becoming different",
+      "item": {
+        "lemma": "change",
+        "partOfSpeech": "noun",
+        "senseHint": "the act of becoming different"
+      },
+      "reason": "fallback phrase",
+      "output": {
+        "phrase": "a change",
+        "source": "fallback",
+        "bestGuess": true,
+        "failed": false,
+        "reason": null
+      }
+    },
+    {
+      "key": "fix|verb|to make a broken thing work again",
+      "item": {
+        "lemma": "fix",
+        "partOfSpeech": "verb",
+        "senseHint": "to make a broken thing work again"
+      },
+      "reason": "fallback phrase",
+      "output": {
+        "phrase": "a fix",
+        "source": "fallback",
+        "bestGuess": true,
+        "failed": false,
+        "reason": null
+      }
+    },
+    {
+      "key": "plant|verb|to put a seed in the ground to grow",
+      "item": {
+        "lemma": "plant",
+        "partOfSpeech": "verb",
+        "senseHint": "to put a seed in the ground to grow"
+      },
+      "reason": "fallback phrase",
+      "output": {
+        "phrase": "a plant",
+        "source": "fallback",
+        "bestGuess": true,
+        "failed": false,
+        "reason": null
+      }
+    },
+    {
+      "key": "shout|verb|to say something very loudly",
+      "item": {
+        "lemma": "shout",
+        "partOfSpeech": "verb",
+        "senseHint": "to say something very loudly"
+      },
+      "reason": "fallback phrase",
+      "output": {
+        "phrase": "a shout",
+        "source": "fallback",
+        "bestGuess": true,
+        "failed": false,
+        "reason": null
+      }
+    },
+    {
+      "key": "whisper|verb|to speak very softly so only one person hears",
+      "item": {
+        "lemma": "whisper",
+        "partOfSpeech": "verb",
+        "senseHint": "to speak very softly so only one person hears"
+      },
+      "reason": "fallback phrase",
+      "output": {
+        "phrase": "a whisper",
+        "source": "fallback",
+        "bestGuess": true,
+        "failed": false,
+        "reason": null
+      }
+    },
+    {
+      "key": "draw|verb|to make a picture with a pen or pencil",
+      "item": {
+        "lemma": "draw",
+        "partOfSpeech": "verb",
+        "senseHint": "to make a picture with a pen or pencil"
+      },
+      "reason": "fallback phrase",
+      "output": {
+        "phrase": "a draw",
+        "source": "fallback",
+        "bestGuess": true,
+        "failed": false,
+        "reason": null
+      }
+    },
+    {
+      "key": "lose|verb|to no longer know where something is",
+      "item": {
+        "lemma": "lose",
+        "partOfSpeech": "verb",
+        "senseHint": "to no longer know where something is"
+      },
+      "reason": "fallback phrase",
+      "output": {
+        "phrase": "a lose",
+        "source": "fallback",
+        "bestGuess": true,
+        "failed": false,
+        "reason": null
+      }
+    },
+    {
+      "key": "slow|adjective|moving without speed",
+      "item": {
+        "lemma": "slow",
+        "partOfSpeech": "adjective",
+        "senseHint": "moving without speed"
+      },
+      "reason": "fallback phrase",
+      "output": {
+        "phrase": "a slow",
+        "source": "fallback",
+        "bestGuess": true,
+        "failed": false,
+        "reason": null
+      }
+    },
+    {
+      "key": "weak|adjective|having little power in the body",
+      "item": {
+        "lemma": "weak",
+        "partOfSpeech": "adjective",
+        "senseHint": "having little power in the body"
+      },
+      "reason": "fallback phrase",
+      "output": {
+        "phrase": "a weak",
+        "source": "fallback",
+        "bestGuess": true,
+        "failed": false,
+        "reason": null
+      }
+    },
+    {
+      "key": "brave|adjective|not showing fear in danger",
+      "item": {
+        "lemma": "brave",
+        "partOfSpeech": "adjective",
+        "senseHint": "not showing fear in danger"
+      },
+      "reason": "fallback phrase",
+      "output": {
+        "phrase": "a brave",
+        "source": "fallback",
+        "bestGuess": true,
+        "failed": false,
+        "reason": null
+      }
+    },
+    {
+      "key": "calm|adjective|quiet and not excited or upset",
+      "item": {
+        "lemma": "calm",
+        "partOfSpeech": "adjective",
+        "senseHint": "quiet and not excited or upset"
+      },
+      "reason": "fallback phrase",
+      "output": {
+        "phrase": "a calm",
+        "source": "fallback",
+        "bestGuess": true,
+        "failed": false,
+        "reason": null
+      }
+    },
+    {
+      "key": "slowly|adverb|at a low speed",
+      "item": {
+        "lemma": "slowly",
+        "partOfSpeech": "adverb",
+        "senseHint": "at a low speed"
+      },
+      "reason": "fallback phrase",
+      "output": {
+        "phrase": "a slowly",
+        "source": "fallback",
+        "bestGuess": true,
+        "failed": false,
+        "reason": null
+      }
+    },
+    {
+      "key": "quietly|adverb|with very little sound",
+      "item": {
+        "lemma": "quietly",
+        "partOfSpeech": "adverb",
+        "senseHint": "with very little sound"
+      },
+      "reason": "rater rejected",
+      "output": {
+        "phrase": "Read a book in bed.",
+        "source": "generated",
+        "bestGuess": false,
+        "failed": false,
+        "reason": null
+      }
+    },
+    {
+      "key": "again|adverb|one more time",
+      "item": {
+        "lemma": "again",
+        "partOfSpeech": "adverb",
+        "senseHint": "one more time"
+      },
+      "reason": "rater rejected",
+      "output": {
+        "phrase": "Say the word one time.",
+        "source": "generated",
+        "bestGuess": false,
+        "failed": false,
+        "reason": null
+      }
+    },
+    {
+      "key": "almost|adverb|not quite, but very nearly",
+      "item": {
+        "lemma": "almost",
+        "partOfSpeech": "adverb",
+        "senseHint": "not quite, but very nearly"
+      },
+      "reason": "fallback phrase",
+      "output": {
+        "phrase": "an almost",
+        "source": "fallback",
+        "bestGuess": true,
+        "failed": false,
+        "reason": null
+      }
+    }
+  ],
+  "generatedAt": "2026-10-13T14:09:46.052947+00:00"
+}

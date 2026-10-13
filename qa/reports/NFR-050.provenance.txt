@@ -1,0 +1,37 @@
+NFR-050 gloss-phrase measured run — provenance
+
+Bar       docs/Scenova/nfr.md, NFR-050 (FEAT-004). Metric: share of phrases that pass
+          the rubric (fewer than seven words, common words, one clear meaning).
+          Threshold >= 0.90. Cost ceiling <= $0.01 per request.
+          Golden set: qa/golden/gloss_phrase.jsonl (200 word-sense items).
+Model     gemini-3.5-flash-lite — the pinned text model for the gloss phrase
+          (nfr.md "Model Quality & Cost"; architecture.md "Model Version & Fallback").
+Run date  2026-10-13.
+
+Artifacts
+- qa/replay/NFR-050.jsonl   The recorded run: one produced outcome per golden item, keyed
+                            by item identity. Produced live through the shipped phrase path
+                            (ai/app/phrase, C-004) against the pinned model, then replayed
+                            offline so the score is reproducible without a credential.
+- qa/ratings/NFR-050.json   The rater judgement, keyed by item identity (booleans).
+- qa/reports/NFR-050.json   The judged report: metric, sample size, rate, and failures.
+
+Result
+- Mechanical pre-screen: 178/200 = 0.890.
+- Judged (rubric and raters): 173/200 = 0.865.
+- Both are below the 0.90 bar. Release of the generation path is blocked (nfr.md).
+
+Rater provenance (caveat)
+nfr.md specifies two trained raters with a third as adjudicator. No separate trained raters
+were available in this environment; the judgement in qa/ratings/NFR-050.json is a single QA
+rater pass applying the "one clear meaning" rubric, standing in for that process input.
+It does not decide the verdict: the mechanical pre-screen alone (178/200 = 0.890) is already
+below the bar, and the rater check can only lower it.
+
+Root cause of the misses
+All 22 mechanical misses are the capability's fallback path (FEAT-004): the pinned model's
+candidate was rejected by the shipped guardrail (ai/app/phrase/guardrails.py) as "uncommon
+words" or "too many words" after regeneration, so the fixed template was substituted. The
+rejections are dominated by common-word vocabulary misses (for example "sunny", "quietly",
+"dirt", "cannot", "turtle") and by inflections the light suffix stripping does not resolve
+(for example "drank", "dropped").
