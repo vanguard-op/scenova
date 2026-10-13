@@ -1,0 +1,198 @@
+"""Generation-service tests: the FEAT-005 acceptance criteria and edge cases.
+
+Covers the clip cap, the background outcome for a decline, a timeout, an
+unavailable provider, the one-job-per-word dedupe, and the generation budget.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from pipeline.app.clip_client import ClipDeclinedError, ClipTimeoutError, ClipUnavailableError
+from pipeline.app.errors import (
+    InvalidRequestError,
+    JobAlreadyEnqueuedError,
+    MissingPhraseError,
+    QueueUnavailableError,
+    TargetDurationError,
+)
+from pipeline.app.models import JobStatus, Kind, PartOfSpeech
+from pipeline.tests.fakes import (
+    FailingQueue,
+    FakeClipGenerator,
+    clip,
+    request,
+    rig,
+)
+
+
+@pytest.mark.asyncio
+async def test_submit_enqueues_the_job_and_returns_queued() -> None:
+    test_rig = rig()
+
+    response = await test_rig.service.submit(request())
+
+    assert response.jobId == "job-1"
+    assert response.status == "queued"
+    stored = await test_rig.queue.get("job-1")
+    assert stored is not None
+    assert stored.status == JobStatus.QUEUED
+
+
+@pytest.mark.asyncio
+async def test_a_word_job_stores_a_clip_and_notifies_the_reader() -> None:
+    test_rig = rig()
+    await test_rig.service.submit(request())
+
+    job = await test_rig.service.run("job-1")
+
+    assert job.status == JobStatus.SUCCEEDED
+    assert job.cost_units == 1.0
+    assert job.completed_at is not None
+    assert len(test_rig.generator.calls) == 1
+    assert test_rig.generator.calls[0].phrase == "a key in the door"
+    assert test_rig.generator.calls[0].model_pin == "gemini-omni-1.1-flash"
+    stored = test_rig.library.find("key", "door_opener", PartOfSpeech.NOUN)
+    assert stored is not None
+    assert stored.entry.gloss_phrase == "a key in the door"
+    assert stored.entry.clip_asset_id == stored.asset.id
+    assert stored.asset.duration_seconds == 3.0
+    assert len(test_rig.notifier.ready) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_phrase_job_is_never_written_to_the_shared_library() -> None:
+    test_rig = rig()
+    await test_rig.service.submit(request(kind=Kind.PHRASE, lemma=None, phrase="kick the bucket"))
+
+    job = await test_rig.service.run("job-1")
+
+    assert job.status == JobStatus.SUCCEEDED
+    assert test_rig.library.all() == ()
+    assert len(test_rig.notifier.ready) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_blank_phrase_is_rejected_before_any_generation() -> None:
+    test_rig = rig()
+
+    with pytest.raises(MissingPhraseError):
+        await test_rig.service.submit(request(phrase="   "))
+
+    assert test_rig.generator.calls == []
+
+
+@pytest.mark.asyncio
+async def test_a_target_over_four_seconds_is_rejected() -> None:
+    test_rig = rig()
+
+    with pytest.raises(TargetDurationError):
+        await test_rig.service.submit(request(duration=5.0))
+
+
+@pytest.mark.asyncio
+async def test_a_non_positive_target_is_rejected() -> None:
+    test_rig = rig()
+
+    with pytest.raises(TargetDurationError):
+        await test_rig.service.submit(request(duration=0.0))
+
+
+@pytest.mark.asyncio
+async def test_a_repeated_job_id_runs_one_generation() -> None:
+    test_rig = rig()
+    await test_rig.service.submit(request("job-1"))
+
+    with pytest.raises(JobAlreadyEnqueuedError):
+        await test_rig.service.submit(request("job-1", phrase="a key in the door"))
+
+    assert len(test_rig.library.all()) == 0  # nothing ran yet
+    assert test_rig.generator.calls == []
+
+
+@pytest.mark.asyncio
+async def test_an_unavailable_queue_is_reported() -> None:
+    test_rig = rig(queue=FailingQueue())
+
+    with pytest.raises(QueueUnavailableError):
+        await test_rig.service.submit(request())
+
+
+@pytest.mark.asyncio
+async def test_a_declined_phrase_withholds_the_clip() -> None:
+    test_rig = rig(generator=FakeClipGenerator(error=ClipDeclinedError("declined")))
+    await test_rig.service.submit(request())
+
+    job = await test_rig.service.run("job-1")
+
+    assert job.status == JobStatus.DECLINED
+    assert job.cost_units == 1.0
+    assert test_rig.library.all() == ()
+    assert test_rig.notifier.ready == []
+
+
+@pytest.mark.asyncio
+async def test_a_timeout_withholds_the_clip() -> None:
+    test_rig = rig(generator=FakeClipGenerator(error=ClipTimeoutError("timeout")))
+    await test_rig.service.submit(request())
+
+    job = await test_rig.service.run("job-1")
+
+    assert job.status == JobStatus.FAILED
+    assert test_rig.library.all() == ()
+
+
+@pytest.mark.asyncio
+async def test_an_unavailable_provider_withholds_the_clip() -> None:
+    test_rig = rig(generator=FakeClipGenerator(error=ClipUnavailableError("down")))
+    await test_rig.service.submit(request())
+
+    job = await test_rig.service.run("job-1")
+
+    assert job.status == JobStatus.FAILED
+    assert test_rig.library.all() == ()
+
+
+@pytest.mark.asyncio
+async def test_a_clip_over_the_four_second_cap_is_withheld() -> None:
+    test_rig = rig(generator=FakeClipGenerator(result=clip(duration_seconds=4.5)))
+    await test_rig.service.submit(request())
+
+    job = await test_rig.service.run("job-1")
+
+    assert job.status == JobStatus.FAILED
+    assert test_rig.library.all() == ()
+    assert test_rig.notifier.ready == []
+
+
+@pytest.mark.asyncio
+async def test_a_clip_at_the_cap_is_kept() -> None:
+    test_rig = rig(generator=FakeClipGenerator(result=clip(duration_seconds=4.0)))
+    await test_rig.service.submit(request(duration=4.0))
+
+    job = await test_rig.service.run("job-1")
+
+    assert job.status == JobStatus.SUCCEEDED
+    assert len(test_rig.library.all()) == 1
+
+
+@pytest.mark.asyncio
+async def test_the_generation_budget_cap_stops_further_generation() -> None:
+    test_rig = rig(budget=1.0)
+    await test_rig.service.submit(request("job-1"))
+    await test_rig.service.submit(request("job-2", lookup_id="lk_2"))
+
+    first = await test_rig.service.run("job-1")
+    second = await test_rig.service.run("job-2")
+
+    assert first.status == JobStatus.SUCCEEDED
+    assert second.status == JobStatus.FAILED
+    assert second.cost_units == 0.0
+    assert len(test_rig.generator.calls) == 1
+    assert len(test_rig.library.all()) == 1
+
+
+@pytest.mark.asyncio
+async def test_running_an_unknown_job_is_an_invalid_request() -> None:
+    with pytest.raises(InvalidRequestError):
+        await rig().service.run("job-missing")
