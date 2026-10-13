@@ -120,13 +120,20 @@ module "cdn" {
 locals {
   cdn_base_url = var.cdn_domain == "" ? "" : "https://${var.cdn_domain}"
 
+  # The two model pins the generation path uses and no others (architecture
+  # "Model Version & Fallback"): the text model for the gloss phrase and the
+  # video model for the clip. Product-wide constants, so they are the same in
+  # every environment; an upgrade is a new pin after a fresh evaluation.
   common_env = {
     ENVIRONMENT                   = var.environment
     GCP_PROJECT_ID                = var.project_id
     GCP_REGION                    = var.region
     CLIP_BUCKET                   = module.data.bucket_name
     CLIP_CDN_BASE_URL             = local.cdn_base_url
-    GEMINI_MODEL                  = "gemini-omni-1.1-flash"
+    PHRASE_MODEL_PIN              = "gemini-3.5-flash-lite"
+    CLIP_MODEL_PIN                = "gemini-omni-1.1-flash"
+    PHRASE_MODEL_PINNED_AT        = "2026-10-12T00:00:00+00:00"
+    CLIP_MODEL_PINNED_AT          = "2026-10-12T00:00:00+00:00"
     INTERNAL_AUDIENCE             = var.internal_audience
     TASKS_PROJECT                 = var.project_id
     TASKS_LOCATION                = var.region
