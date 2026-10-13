@@ -1,0 +1,115 @@
+import 'package:flutter/material.dart';
+
+import 'app_router.dart';
+import 'screens/home_screen.dart';
+import 'screens/placeholder_screen.dart';
+import 'services/app_services.dart';
+import 'theme/app_theme.dart';
+import 'theme/tokens.dart';
+
+/// The app shell: theme resolution, the navigation map, and the entry gate.
+///
+/// The theme is rebuilt when the device class changes (the 600px breakpoint) or
+/// the platform brightness changes, and the platform reduce-motion setting is
+/// pushed into the reader's settings so the clip view can hold on a still
+/// frame.
+class ScenovaApp extends StatefulWidget {
+  const ScenovaApp({super.key, required this.services});
+
+  final ScenovaServices services;
+
+  @override
+  State<ScenovaApp> createState() => _ScenovaAppState();
+}
+
+class _ScenovaAppState extends State<ScenovaApp> with WidgetsBindingObserver {
+  late final AppRouter _router = AppRouter(services: widget.services);
+  late DeviceClass _deviceClass = _resolveDeviceClass();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _syncPlatformAccessibility();
+    _listenForCaptures();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _router.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() => _refreshDeviceClass();
+
+  @override
+  void didChangeAccessibilityFeatures() => _syncPlatformAccessibility();
+
+  void _listenForCaptures() {
+    widget.services.captureChannel.selections.listen((selection) {
+      _router.openSelection(selection);
+    });
+    widget.services.captureChannel.start();
+  }
+
+  void _syncPlatformAccessibility() {
+    widget.services.settings.platformReduceMotion = WidgetsBinding
+        .instance
+        .platformDispatcher
+        .accessibilityFeatures
+        .disableAnimations;
+  }
+
+  void _refreshDeviceClass() {
+    final next = _resolveDeviceClass();
+    if (next != _deviceClass) setState(() => _deviceClass = next);
+  }
+
+  DeviceClass _resolveDeviceClass() {
+    final view = WidgetsBinding.instance.platformDispatcher.views.first;
+    return DeviceClass.fromWidth(
+      view.physicalSize.width / view.devicePixelRatio,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ScenovaScope(
+      services: widget.services,
+      child: MaterialApp(
+        title: 'Scenova',
+        debugShowCheckedModeBanner: false,
+        navigatorKey: _router.navigatorKey,
+        theme: AppTheme.build(
+          brightness: Brightness.light,
+          deviceClass: _deviceClass,
+        ),
+        darkTheme: AppTheme.build(
+          brightness: Brightness.dark,
+          deviceClass: _deviceClass,
+        ),
+        themeMode: ThemeMode.system,
+        home: HomeScreen(router: _router),
+        routes: <String, WidgetBuilder>{
+          AppRoutes.history: (_) => const PlaceholderScreen(
+            title: 'History',
+            message:
+                'Saved lookups and their clips appear here in a later phase.',
+          ),
+          AppRoutes.preferences: (_) => const PlaceholderScreen(
+            title: 'Preferences',
+            message:
+                'Clip sound, reduce motion, the action label, and clearing '
+                'history arrive in a later phase.',
+          ),
+          AppRoutes.account: (_) => const PlaceholderScreen(
+            title: 'Account',
+            message: 'Your plan and allowance arrive with the account phase.',
+          ),
+        },
+      ),
+    );
+  }
+}

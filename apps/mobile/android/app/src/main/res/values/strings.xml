@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The product name, shown under the launcher icon. -->
+    <string name="app_name">Scenova</string>
+    <!--
+      The label a reader sees inside another app's text-selection menu. It is
+      translatable content, not a fixed brand term, so it is externalized and
+      falls back to this English string where no translation exists.
+    -->
+    <string name="selection_action_label">Scenova</string>
+</resources>
