@@ -16,6 +16,17 @@ import '../widgets/states.dart';
 import '../widgets/word_phrase_header.dart';
 import 'clip_controller.dart';
 
+/// How the clip view is presented.
+enum ClipPresentation {
+  /// A full page inside the app, reached from Home or History.
+  page,
+
+  /// A card inside the iOS share extension, over the reading app. The backdrop
+  /// is transparent so the reading page stays visible behind the card, and the
+  /// copy speaks to closing the extension rather than returning to Home.
+  extension,
+}
+
 /// Screen 3: Clip View (`docs/Scenova/screens/03-clip-view.md`).
 ///
 /// Shows the selected word or phrase with its clip, in place over the reading
@@ -30,11 +41,16 @@ class ClipViewScreen extends StatefulWidget {
   const ClipViewScreen({
     super.key,
     required this.controller,
+    this.presentation = ClipPresentation.page,
     this.onDismiss,
     this.onOpenHistory,
   });
 
   final ClipViewController controller;
+
+  /// Where the view is being shown; the extension presentation drops the
+  /// opaque backdrop and adapts the copy.
+  final ClipPresentation presentation;
   final VoidCallback? onDismiss;
   final VoidCallback? onOpenHistory;
 
@@ -110,10 +126,14 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
     final colors = ScenovaColors.of(context);
     final tokens = ScenovaTokens.of(context);
     final centered = tokens.deviceClass.isTablet;
+    final inExtension = widget.presentation == ClipPresentation.extension;
 
     return ScaffoldMessenger(
       key: _messengerKey,
       child: Scaffold(
+        // The extension sits over the reading app, so only the card is painted;
+        // the page shows through everywhere else.
+        backgroundColor: inExtension ? ScenovaPalette.transparent : null,
         body: SafeArea(
           child: Align(
             alignment: centered ? Alignment.center : Alignment.topCenter,
@@ -143,6 +163,7 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
 
   Widget _content(BuildContext context) {
     final tokens = ScenovaTokens.of(context);
+    final inExtension = widget.presentation == ClipPresentation.extension;
     switch (_controller.phase) {
       case ClipPhase.loading:
         return Column(
@@ -163,8 +184,10 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
         return EmptyState(
           icon: AppIcons.search,
           headline: 'Nothing to look up',
-          body: 'Select a word in a reading app, or type one on Home.',
-          actionLabel: 'Back to Home',
+          body: inExtension
+              ? 'Select a word in a reading app and choose Scenova.'
+              : 'Select a word in a reading app, or type one on Home.',
+          actionLabel: inExtension ? 'Close' : 'Back to Home',
           onAction: widget.onDismiss,
         );
 
@@ -181,11 +204,12 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
             EmptyState(
               icon: AppIcons.offline,
               headline: 'This word is not saved on this device',
-              body:
-                  'Look it up again when you are back online, or browse the '
-                  'lookups you have saved.',
-              actionLabel: 'Open History',
-              onAction: widget.onOpenHistory,
+              body: inExtension
+                  ? 'Look it up again when you are back online.'
+                  : 'Look it up again when you are back online, or browse the '
+                        'lookups you have saved.',
+              actionLabel: inExtension ? 'Close' : 'Open History',
+              onAction: inExtension ? widget.onDismiss : widget.onOpenHistory,
             ),
           ],
         );
@@ -406,11 +430,14 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
                     'marking the clip not helpful still records your view.',
               ),
             ),
-            ScenovaButton(
-              label: 'History',
-              variant: ScenovaButtonVariant.ghost,
-              onPressed: widget.onOpenHistory,
-            ),
+            // History is an app destination; the extension presentation has
+            // nowhere to open it, so the action is left out there.
+            if (widget.presentation != ClipPresentation.extension)
+              ScenovaButton(
+                label: 'History',
+                variant: ScenovaButtonVariant.ghost,
+                onPressed: widget.onOpenHistory,
+              ),
           ],
         ),
         if (feedback != null) ...<Widget>[

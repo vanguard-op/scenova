@@ -170,6 +170,13 @@ List<(String, Widget)> _frames() {
       'Clip — over-limit selection',
       _clip('the quick brown fox jumps over the lazy dog'),
     ),
+    (
+      'Extension — serving from library (card over the page)',
+      _extensionClip('come'),
+    ),
+    ('Extension — generating', _extensionClip('xylograph')),
+    ('Extension — empty selection', _extensionClip('   ')),
+    ('Extension — offline', _extensionClip('quixotic', online: false)),
   ];
 }
 
@@ -195,6 +202,7 @@ Widget _clip(
   bool online = true,
   Entitlement entitlement = Entitlement.unmeteredGuest,
   SettingsController? settings,
+  ClipPresentation presentation = ClipPresentation.page,
 }) {
   final services = _services(
     api: api,
@@ -204,8 +212,63 @@ Widget _clip(
   );
   return ScenovaScope(
     services: services,
-    child: _PreviewClip(services: services, selection: selection),
+    child: _PreviewClip(
+      services: services,
+      selection: selection,
+      presentation: presentation,
+    ),
   );
+}
+
+/// The clip view as the iOS share extension presents it: the compact card over
+/// a reading page, with the page visible around and behind it.
+Widget _extensionClip(String selection, {bool online = true}) {
+  return Stack(
+    children: <Widget>[
+      const _ReadingPage(),
+      _clip(
+        selection,
+        online: online,
+        presentation: ClipPresentation.extension,
+      ),
+    ],
+  );
+}
+
+/// A stand-in for the reading app behind the extension sheet. Tooling only.
+class _ReadingPage extends StatelessWidget {
+  const _ReadingPage();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = ScenovaColors.of(context);
+    final tokens = ScenovaTokens.of(context);
+    return ColoredBox(
+      color: colors.surfaceSecondary,
+      child: Padding(
+        padding: EdgeInsets.all(tokens.spacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            for (final width in <double>[0.9, 1.0, 0.95, 1.0, 0.6])
+              Padding(
+                padding: EdgeInsets.only(bottom: tokens.spacing.md),
+                child: FractionallySizedBox(
+                  widthFactor: width,
+                  child: Container(
+                    height: tokens.spacing.sm,
+                    decoration: BoxDecoration(
+                      color: colors.border,
+                      borderRadius: BorderRadius.circular(ScenovaRadius.sm),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 ScenovaServices _services({
@@ -249,10 +312,15 @@ List<HistoryEntry> _seed() {
 }
 
 class _PreviewClip extends StatefulWidget {
-  const _PreviewClip({required this.services, required this.selection});
+  const _PreviewClip({
+    required this.services,
+    required this.selection,
+    this.presentation = ClipPresentation.page,
+  });
 
   final ScenovaServices services;
   final String selection;
+  final ClipPresentation presentation;
 
   @override
   State<_PreviewClip> createState() => _PreviewClipState();
@@ -271,7 +339,17 @@ class _PreviewClipState extends State<_PreviewClip> {
   }
 
   @override
-  Widget build(BuildContext context) => ClipViewScreen(controller: _controller);
+  Widget build(BuildContext context) {
+    final isExtension = widget.presentation == ClipPresentation.extension;
+    return ClipViewScreen(
+      controller: _controller,
+      presentation: widget.presentation,
+      // The app wires these to the router; the preview only needs the controls
+      // to render, so they are inert here.
+      onDismiss: () {},
+      onOpenHistory: isExtension ? null : () {},
+    );
+  }
 }
 
 class _ThrowingApi implements LookupApi {

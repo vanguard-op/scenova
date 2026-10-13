@@ -353,6 +353,19 @@ void main() {
     await teardown(tester);
   });
 
+  testWidgets('the page presentation keeps the History action', (tester) async {
+    final services = buildServices(api: MockLookupApi());
+    final controller = controllerFor(services, 'come');
+    addTearDown(controller.dispose);
+
+    await pumpClipView(tester, services, controller, onOpenHistory: () {});
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('History'), findsOneWidget);
+    await teardown(tester);
+  });
+
   testWidgets('a second selection reuses the open clip view', (tester) async {
     final harness = await pumpHarness(tester, api: MockLookupApi());
     await tester.pump();

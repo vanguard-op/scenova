@@ -75,7 +75,11 @@ class AppRouter {
     _activeClip = controller;
     await navigator.push(
       MaterialPageRoute<void>(
-        builder: (_) => ClipViewScreen(controller: controller),
+        builder: (_) => ClipViewScreen(
+          controller: controller,
+          onDismiss: dismissClip,
+          onOpenHistory: openHistory,
+        ),
       ),
     );
     _activeClip = null;

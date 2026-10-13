@@ -1,39 +1,125 @@
+import Flutter
 import UIKit
 import UniformTypeIdentifiers
 
-/// The iOS share extension for word capture (FEAT-002).
+/// The iOS share extension for word capture (`FEAT-002`).
 ///
-/// A reader who selects a word in a reading app and picks Scenova here gets the
-/// in-context clip view. The extension is a separate process with its own memory
-/// budget, so it reads only the shared text, writes it to the shared App Group
-/// container, and opens the app; the app presents the clip view. Nothing else
-/// from the reading page is read or forwarded.
+/// A reader who selects a word in a reading app and picks Scenova gets the
+/// in-context clip view here, over the reading page, and returns to their page
+/// when the view is dismissed. The clip view is the app's own Flutter screen
+/// (`ClipExtensionApp`), hosted in the extension's sheet, so it opens with the
+/// reading page visible behind the card and shares one presentation with the
+/// app.
 ///
-/// The selection is resolved by the same entry gate as the Android action: an
-/// empty or non-text selection starts no lookup, and a selection over the
-/// six-word limit is held to the limit with a notice.
+/// The extension reads only the shared text — never the page — and hands it to
+/// Flutter over the capture channel. The same entry gate as the Android action
+/// resolves it: an empty or non-text selection starts no lookup and shows the
+/// empty state, and a selection over the six-word limit is held to the limit
+/// with a notice.
 final class ShareViewController: UIViewController {
 
-  private let appGroup = "group.app.scenova.scenova"
-  private let pendingSelectionKey = "pendingSelection"
+  /// The channel the Flutter clip view listens on for the selection.
+  private static let captureChannelName = "app.scenova/capture"
 
-  /// Guards against handling the same selection more than once.
-  private var hasHandled = false
+  /// The channel the clip view uses to ask for the extension to close.
+  private static let extensionChannelName = "app.scenova/extension"
+
+  private static let methodCapture = "capture"
+  private static let methodReady = "ready"
+  private static let methodPendingSelection = "pendingSelection"
+  private static let methodDismiss = "dismiss"
+
+  private var engine: FlutterEngine?
+  private var captureChannel: FlutterMethodChannel?
+
+  /// The selection read from the share sheet, held until Flutter asks for it or
+  /// is ready to receive it.
+  private var pendingSelection: String?
+
+  private var isReady = false
+  private var isFinished = false
 
   override func viewDidLoad() {
     super.viewDidLoad()
     view.backgroundColor = .clear
-  }
-
-  override func viewDidAppear(_ animated: Bool) {
-    super.viewDidAppear(animated)
-    guard !hasHandled else { return }
-    hasHandled = true
+    startFlutter()
     readSelection { [weak self] text in
       guard let self else { return }
-      self.store(text)
-      self.openContainingApp()
+      // A non-text selection is handed over empty, so no lookup starts.
+      self.pendingSelection = text ?? ""
+      self.deliverPendingSelection()
     }
+  }
+
+  override func viewDidDisappear(_ animated: Bool) {
+    super.viewDidDisappear(animated)
+    // The reader swiped the sheet away rather than tapping Close.
+    finish()
+  }
+
+  /// Runs the clip view in this process and hosts it in the extension's sheet.
+  private func startFlutter() {
+    let engine = FlutterEngine(name: "scenova-clip-extension")
+    engine.run(withEntrypoint: "clipExtensionMain")
+    self.engine = engine
+
+    let capture = FlutterMethodChannel(
+      name: Self.captureChannelName,
+      binaryMessenger: engine.binaryMessenger
+    )
+    capture.setMethodCallHandler { [weak self] call, result in
+      guard let self else {
+        result(nil)
+        return
+      }
+      switch call.method {
+      case Self.methodPendingSelection:
+        let selection = self.pendingSelection
+        self.pendingSelection = nil
+        result(selection)
+      case Self.methodReady:
+        self.isReady = true
+        self.deliverPendingSelection()
+        result(nil)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+    captureChannel = capture
+
+    let host = FlutterMethodChannel(
+      name: Self.extensionChannelName,
+      binaryMessenger: engine.binaryMessenger
+    )
+    host.setMethodCallHandler { [weak self] call, result in
+      if call.method == Self.methodDismiss {
+        self?.finish()
+        result(nil)
+      } else {
+        result(FlutterMethodNotImplemented)
+      }
+    }
+
+    let flutter = FlutterViewController(engine: engine, nibName: nil, bundle: nil)
+    // The reading page shows through everywhere the card does not paint.
+    flutter.view.backgroundColor = .clear
+    flutter.view.isOpaque = false
+    flutter.modalPresentationStyle = .overCurrentContext
+
+    addChild(flutter)
+    view.addSubview(flutter.view)
+    flutter.view.frame = view.bounds
+    flutter.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+    flutter.didMove(toParent: self)
+  }
+
+  /// Pushes a selection that arrived before Flutter asked for it, once it is
+  /// listening.
+  private func deliverPendingSelection() {
+    guard isReady, let channel = captureChannel, let text = pendingSelection
+    else { return }
+    pendingSelection = nil
+    channel.invokeMethod(Self.methodCapture, arguments: ["text": text])
   }
 
   /// Reads only the text of the shared item, when one is offered.
@@ -72,48 +158,11 @@ final class ShareViewController: UIViewController {
     }
   }
 
-  /// Leaves the selection where the app can read it. An empty or non-text
-  /// selection is stored empty, so the app opens its empty state and starts no
-  /// lookup.
-  private func store(_ text: String?) {
-    guard let defaults = UserDefaults(suiteName: appGroup) else { return }
-    defaults.set(text ?? "", forKey: pendingSelectionKey)
-  }
-
-  /// Opens the containing app so it can show the clip view.
-  private func openContainingApp() {
-    guard let url = URL(string: "scenova://capture") else {
-      finish()
-      return
-    }
-    guard let context = extensionContext else {
-      openViaApplication(url)
-      finish()
-      return
-    }
-    context.open(url) { [weak self] opened in
-      if !opened { self?.openViaApplication(url) }
-      self?.finish()
-    }
-  }
-
-  /// Opens the containing app through the shared application. On iOS 18 and
-  /// later `extensionContext.open` can refuse the app's own URL scheme, so this
-  /// is the fallback path.
-  private func openViaApplication(_ url: URL) {
-    var responder: UIResponder? = self
-    while let current = responder {
-      if let application = current as? UIApplication {
-        application.open(url, options: [:], completionHandler: nil)
-        return
-      }
-      responder = current.next
-    }
-  }
-
-  /// Completes the request, which returns the reader to the reading app with
-  /// their place unchanged.
+  /// Completes the request, which closes the sheet and returns the reader to the
+  /// reading app with their place unchanged.
   private func finish() {
+    guard !isFinished else { return }
+    isFinished = true
     extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
   }
 }

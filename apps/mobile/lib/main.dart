@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import 'app.dart';
 import 'config.dart';
+import 'extension/clip_extension_app.dart';
 import 'models/history_entry.dart';
 import 'models/lookup.dart';
 import 'services/app_services.dart';
+import 'services/extension_channel.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,6 +18,25 @@ void main() {
         locale: locale,
         history: _seedHistory(),
       ),
+    ),
+  );
+}
+
+/// The iOS share extension's entrypoint (`FEAT-002`).
+///
+/// The extension hosts this in its own sheet so the clip view opens over the
+/// reading app and returns the reader to their page when dismissed. It runs the
+/// clip view alone — no Home, no router — for the selection the extension hands
+/// over the capture channel.
+@pragma('vm:entry-point')
+void clipExtensionMain() {
+  WidgetsFlutterBinding.ensureInitialized();
+  final locale = WidgetsBinding.instance.platformDispatcher.locale
+      .toLanguageTag();
+  runApp(
+    ClipExtensionApp(
+      services: ScenovaServices.development(locale: locale),
+      extensionChannel: ExtensionChannel(),
     ),
   );
 }
