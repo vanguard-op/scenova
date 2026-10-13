@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/analytics_event.dart';
@@ -95,7 +97,9 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         _noticeQueued = false;
-        _showGeneratingNotice();
+        // The clip may have become ready between the change and this frame; the
+        // notice is only raised while generation is still past the threshold.
+        if (_controller.shouldShowGeneratingNotice) _showGeneratingNotice();
       });
     }
   }
@@ -116,10 +120,23 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
           ),
           action: SnackBarAction(
             label: 'Notify me',
-            onPressed: _controller.requestNotification,
+            onPressed: () => unawaited(_notifyWhenReady()),
           ),
         ),
       );
+    _controller.markGeneratingNoticeShown();
+  }
+
+  /// Registers the device for the clip-ready notice and tells the reader
+  /// whether it was set up.
+  Future<void> _notifyWhenReady() async {
+    final registered = await _controller.notifyWhenReady();
+    if (!mounted) return;
+    _showMessage(
+      registered
+          ? "We'll let you know when your clip is ready."
+          : 'We could not set up the notice. Try again when you are online.',
+    );
   }
 
   @override
@@ -280,7 +297,11 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
         return _withHeaderAndActions(
           context,
           player: ClipPlayer(
-            status: ClipPlayerStatus.generating,
+            // Past the wait threshold the progress state gives way to the
+            // still "still being made" surface.
+            status: _controller.pastWaitThreshold
+                ? ClipPlayerStatus.stillGenerating
+                : ClipPlayerStatus.generating,
             caption: _controller.word,
           ),
         );

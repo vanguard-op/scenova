@@ -25,6 +25,14 @@ abstract final class AppConfig {
     defaultValue: true,
   );
 
+  /// The push-registrations intake (`C-008`) is not live yet, so the app records
+  /// registrations in memory rather than posting them. Flip with
+  /// `--dart-define=SCENOVA_USE_MOCK_PUSH=false`.
+  static const bool useMockPushApi = bool.fromEnvironment(
+    'SCENOVA_USE_MOCK_PUSH',
+    defaultValue: true,
+  );
+
   /// The app version reported on every event (`C-007`, `appVersion`).
   ///
   /// It mirrors the build's version; wiring it to the platform's package info is

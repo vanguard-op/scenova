@@ -71,7 +71,8 @@ class ClipViewController extends ChangeNotifier {
 
   bool _playing = false;
   bool _willNotify = false;
-  bool _noticeShown = false;
+  bool _pastThreshold = false;
+  bool _noticeDismissed = false;
   bool _fromHistory = false;
   FeedbackMark? _feedback;
 
@@ -109,8 +110,22 @@ class ClipViewController extends ChangeNotifier {
       (_result?.senses.isEmpty ?? true) ? null : _result!.senses.first;
 
   /// Whether the notice SnackBar should be raised for this change.
+  ///
+  /// It is raised once: [markGeneratingNoticeShown] records that it has been
+  /// shown, and taking the notice with [notifyWhenReady] settles it.
   bool get shouldShowGeneratingNotice =>
-      _noticeShown && _phase == ClipPhase.generating && !_willNotify;
+      _pastThreshold &&
+      _phase == ClipPhase.generating &&
+      !_willNotify &&
+      !_noticeDismissed;
+
+  /// Whether generation has run past the wait threshold.
+  ///
+  /// The clip surface settles on a still message while this holds; the reader
+  /// is no longer shown a spinner once the wait is long enough to be worth
+  /// explaining.
+  bool get pastWaitThreshold =>
+      _pastThreshold && _phase == ClipPhase.generating;
 
   /// Loads the selection. Called on mount and on reuse.
   ///
@@ -121,7 +136,8 @@ class ClipViewController extends ChangeNotifier {
     _playing = false;
     _feedback = null;
     _willNotify = false;
-    _noticeShown = false;
+    _pastThreshold = false;
+    _noticeDismissed = false;
     _fromHistory = false;
     _errorMessage = null;
     _chosenSense = null;
@@ -197,16 +213,19 @@ class ClipViewController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void dismissGeneratingNotice() {
-    _noticeShown = false;
-    notifyListeners();
-  }
+  /// Records that the generating notice has been raised, so it is shown once.
+  void markGeneratingNoticeShown() => _noticeDismissed = true;
 
   /// The reader asked to be told when the clip is ready.
-  void requestNotification() {
+  ///
+  /// This registers the device with the notice service (`C-008`) and returns
+  /// whether the registration reached it. The reader's choice stands either way;
+  /// a registration held for the connection is retried when it returns.
+  Future<bool> notifyWhenReady() async {
     _willNotify = true;
-    _noticeShown = false;
+    _noticeDismissed = true;
     notifyListeners();
+    return services.pushRegistrar.requestClipReadyNotice();
   }
 
   Future<void> _requestLookup() async {
@@ -315,8 +334,8 @@ class ClipViewController extends ChangeNotifier {
     // clock and reproducible in tests.
     _generatingPolls++;
     final elapsed = _pollInterval * _generatingPolls;
-    if (elapsed >= _noticeThreshold && !_noticeShown && !_willNotify) {
-      _noticeShown = true;
+    if (elapsed >= _noticeThreshold && !_pastThreshold) {
+      _pastThreshold = true;
       notifyListeners();
     }
     if (elapsed >= _pollTimeout) {

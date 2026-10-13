@@ -11,6 +11,7 @@ import 'package:scenova/services/app_services.dart';
 import 'package:scenova/services/capture_intake.dart';
 import 'package:scenova/services/history_store.dart';
 import 'package:scenova/services/lookup_api.dart';
+import 'package:scenova/services/push_registration_api.dart';
 import 'package:scenova/services/settings_controller.dart';
 import 'package:scenova/widgets/app_icons.dart';
 import 'package:scenova/widgets/clip_player.dart';
@@ -141,7 +142,11 @@ void main() {
   testWidgets('a slow generation tells the reader and offers to notify', (
     tester,
   ) async {
-    final services = buildServices(api: MockLookupApi(pollsUntilReady: 100));
+    final pushApi = MockPushRegistrationApi();
+    final services = buildServices(
+      api: MockLookupApi(pollsUntilReady: 100),
+      pushApi: pushApi,
+    );
     final controller = controllerFor(
       services,
       'xylograph',
@@ -160,6 +165,11 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
+    // The progress state gives way to a still message, and the notice offers to
+    // tell the reader when the clip is ready.
+    expect(find.text('Making your clip'), findsNothing);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.text('Still making your clip'), findsOneWidget);
     expect(
       find.text('Your clip is still being made. It will be here shortly.'),
       findsOneWidget,
@@ -169,6 +179,8 @@ void main() {
     await tester.tap(find.text('Notify me'));
     await tester.pump();
     expect(controller.willNotify, isTrue);
+    // Taking the notice registers the device for the clip-ready push (C-008).
+    expect(pushApi.tokens, hasLength(1));
 
     // Left generating past the timeout, the lookup is reported with a retry
     // rather than polling forever.
@@ -176,6 +188,49 @@ void main() {
     await tester.pump();
     expect(controller.phase, ClipPhase.error);
     expect(find.text('That lookup did not finish'), findsOneWidget);
+    await teardown(tester);
+  });
+
+  testWidgets('a notice that could not be set up says so', (tester) async {
+    final pushApi = MockPushRegistrationApi()..failStatus = 400;
+    final services = buildServices(
+      api: MockLookupApi(pollsUntilReady: 100),
+      pushApi: pushApi,
+    );
+    final controller = controllerFor(
+      services,
+      'xylograph',
+      pollInterval: const Duration(milliseconds: 100),
+      noticeThreshold: const Duration(milliseconds: 250),
+      pollTimeout: const Duration(milliseconds: 900),
+    );
+    addTearDown(controller.dispose);
+
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await tester.tap(find.text('Notify me'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(
+      find.text(
+        'We could not set up the notice. Try again when you are '
+        'online.',
+      ),
+      findsOneWidget,
+    );
+    expect(pushApi.tokens, isEmpty);
+
+    // Let the wait time out so the poll stops rather than outliving the test.
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
+    expect(controller.phase, ClipPhase.error);
     await teardown(tester);
   });
 

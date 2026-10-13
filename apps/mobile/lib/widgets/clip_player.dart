@@ -10,7 +10,13 @@ import 'brand_mark.dart';
 import 'scenova_button.dart';
 
 /// What the clip surface is doing.
-enum ClipPlayerStatus { loading, generating, ready, unavailable }
+enum ClipPlayerStatus {
+  loading,
+  generating,
+  stillGenerating,
+  ready,
+  unavailable,
+}
 
 /// The shared Clip Player (`docs/Scenova/screens.md`).
 ///
@@ -120,6 +126,12 @@ class _ClipPlayerState extends State<ClipPlayer>
             ClipPlayerStatus.generating => const _Message(
               label: 'Making your clip',
               showProgress: true,
+            ),
+            // Past the wait threshold the spinner gives way to a still message;
+            // the reader is told the clip is still being made and offered a
+            // notice when it is ready.
+            ClipPlayerStatus.stillGenerating => const _Message(
+              label: 'Still making your clip',
             ),
             ClipPlayerStatus.unavailable => _Unavailable(
               message: widget.unavailableMessage,

@@ -23,6 +23,9 @@ import 'package:scenova/services/entitlement_provider.dart';
 import 'package:scenova/services/history_store.dart';
 import 'package:scenova/services/identity.dart';
 import 'package:scenova/services/lookup_api.dart';
+import 'package:scenova/services/push_registration_api.dart';
+import 'package:scenova/services/push_registrar.dart';
+import 'package:scenova/services/push_tokens.dart';
 import 'package:scenova/services/settings_controller.dart';
 import 'package:scenova/theme/app_theme.dart';
 import 'package:scenova/theme/colors.dart';
@@ -166,6 +169,15 @@ List<(String, Widget)> _frames() {
       'Clip — generating',
       _clip('xylograph', api: MockLookupApi(pollsUntilReady: 100000)),
     ),
+    (
+      'Clip — still making (past the wait threshold)',
+      _clip(
+        'xylograph',
+        api: MockLookupApi(pollsUntilReady: 100000),
+        pollInterval: const Duration(milliseconds: 200),
+        noticeThreshold: const Duration(milliseconds: 200),
+      ),
+    ),
     ('Clip — fallback', _clip('quixotic')),
     ('Clip — offline', _clip('quixotic', online: false)),
     (
@@ -241,6 +253,8 @@ Widget _clip(
   Entitlement entitlement = Entitlement.unmeteredGuest,
   SettingsController? settings,
   ClipPresentation presentation = ClipPresentation.page,
+  Duration? pollInterval,
+  Duration? noticeThreshold,
 }) {
   final services = _services(
     api: api,
@@ -254,6 +268,8 @@ Widget _clip(
       services: services,
       selection: selection,
       presentation: presentation,
+      pollInterval: pollInterval,
+      noticeThreshold: noticeThreshold,
     ),
   );
 }
@@ -334,6 +350,11 @@ ScenovaServices _services({
       appVersion: 'preview',
       locale: 'en-GB',
     ),
+    pushRegistrar: PushRegistrar(
+      api: MockPushRegistrationApi(),
+      tokens: DevelopmentPushTokenProvider(token: 'preview-push'),
+      connectivity: connectivity,
+    ),
     locale: 'en-GB',
   );
 }
@@ -365,11 +386,15 @@ class _PreviewClip extends StatefulWidget {
     required this.services,
     required this.selection,
     this.presentation = ClipPresentation.page,
+    this.pollInterval,
+    this.noticeThreshold,
   });
 
   final ScenovaServices services;
   final String selection;
   final ClipPresentation presentation;
+  final Duration? pollInterval;
+  final Duration? noticeThreshold;
 
   @override
   State<_PreviewClip> createState() => _PreviewClipState();
@@ -379,6 +404,8 @@ class _PreviewClipState extends State<_PreviewClip> {
   late final ClipViewController _controller = ClipViewController(
     services: widget.services,
     selection: CaptureSelection.parse(widget.selection),
+    pollInterval: widget.pollInterval,
+    noticeThreshold: widget.noticeThreshold,
   );
 
   @override

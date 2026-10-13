@@ -20,6 +20,9 @@ import 'package:scenova/services/entitlement_provider.dart';
 import 'package:scenova/services/history_store.dart';
 import 'package:scenova/services/identity.dart';
 import 'package:scenova/services/lookup_api.dart';
+import 'package:scenova/services/push_registration_api.dart';
+import 'package:scenova/services/push_registrar.dart';
+import 'package:scenova/services/push_tokens.dart';
 import 'package:scenova/services/settings_controller.dart';
 import 'package:scenova/theme/app_theme.dart';
 import 'package:scenova/theme/tokens.dart';
@@ -34,6 +37,7 @@ ScenovaServices buildServices({
   Entitlement entitlement = Entitlement.unmeteredGuest,
   IdentityProvider? identity,
   AnalyticsApi? analyticsApi,
+  PushRegistrationApi? pushApi,
   String locale = 'en',
 }) {
   final connectivity = ManualConnectivity(online: online);
@@ -53,6 +57,11 @@ ScenovaServices buildServices({
       anonymousId: 'test-anonymous',
       appVersion: 'test',
       locale: locale,
+    ),
+    pushRegistrar: PushRegistrar(
+      api: pushApi ?? MockPushRegistrationApi(),
+      tokens: DevelopmentPushTokenProvider(token: 'test-push-token'),
+      connectivity: connectivity,
     ),
     locale: locale,
   );

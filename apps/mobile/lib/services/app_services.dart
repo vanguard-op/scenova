@@ -12,6 +12,9 @@ import 'entitlement_provider.dart';
 import 'history_store.dart';
 import 'identity.dart';
 import 'lookup_api.dart';
+import 'push_registration_api.dart';
+import 'push_registrar.dart';
+import 'push_tokens.dart';
 import 'settings_controller.dart';
 
 /// The collaborators the presentation layer reads.
@@ -28,6 +31,7 @@ class ScenovaServices {
     required this.entitlements,
     required this.captureChannel,
     required this.analytics,
+    required this.pushRegistrar,
     this.locale = 'en',
   });
 
@@ -44,6 +48,9 @@ class ScenovaServices {
 
   /// Emits the product's events (`C-007`).
   final AnalyticsClient analytics;
+
+  /// Registers the device for a clip-ready notice (`C-008`).
+  final PushRegistrar pushRegistrar;
 
   /// The reader's locale, sent with a lookup.
   final String locale;
@@ -98,6 +105,19 @@ class ScenovaServices {
         appVersion: AppConfig.appVersion,
         locale: locale,
       ),
+      pushRegistrar: PushRegistrar(
+        api: AppConfig.useMockPushApi
+            ? MockPushRegistrationApi()
+            : HttpPushRegistrationApi(
+                baseUrl: AppConfig.apiBaseUrl,
+                idTokenProvider: identity.idToken,
+              ),
+        // The platform messaging service that issues the real token is a build
+        // change still to land; the development provider stands in until it
+        // does.
+        tokens: DevelopmentPushTokenProvider(),
+        connectivity: connectivity,
+      ),
       locale: locale,
     );
   }
@@ -107,6 +127,7 @@ class ScenovaServices {
     settings.dispose();
     captureChannel.dispose();
     analytics.dispose();
+    pushRegistrar.dispose();
   }
 }
 
