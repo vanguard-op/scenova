@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 import pytest
+from app.data import load_common_words
 from app.phrase.guardrails import GuardrailResult, is_usable, normalize_phrase
 
 COMMON = frozenset(
     {"a", "an", "the", "key", "door", "old", "in", "on", "idea", "grew", "well", "known"}
 )
+
+
+def test_the_bundled_vocabulary_covers_everyday_words() -> None:
+    words = load_common_words()
+
+    assert {"key", "door", "spoon", "ladder", "cage", "fence"} <= words
 
 
 def check(
@@ -91,6 +98,38 @@ def test_rejects_over_the_character_cap() -> None:
 
 def test_hyphenated_words_are_checked_part_by_part() -> None:
     assert check("a well-known door").ok is True
+
+
+def test_accepts_a_common_inflection_of_a_known_base() -> None:
+    words = frozenset({"he", "the", "climb", "ladder"})
+
+    result = is_usable(
+        "he climbs the ladder",
+        lemma="ladder",
+        common_words=words,
+        max_words=6,
+        max_chars=120,
+    )
+
+    assert result.ok is True
+
+
+def test_accepts_a_past_tense_of_a_known_base() -> None:
+    words = frozenset({"she", "walk", "home"})
+
+    result = is_usable(
+        "she walked home",
+        lemma="walk",
+        common_words=words,
+        max_words=6,
+        max_chars=120,
+    )
+
+    assert result.ok is True
+
+
+def test_rejects_a_word_with_no_common_base() -> None:
+    assert check("a key in the perambulator").reason is not None
 
 
 def test_normalize_phrase_is_stable() -> None:

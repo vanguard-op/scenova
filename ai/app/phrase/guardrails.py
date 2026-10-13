@@ -38,17 +38,55 @@ def _tokens(text: str) -> list[str]:
     return _TOKEN_RE.findall(text.lower())
 
 
+def _base_forms(token: str) -> list[str]:
+    """Light suffix stripping so common inflections are not treated as uncommon.
+
+    The vocabulary is a frequency list of base forms; a second-language phrase
+    often uses a plural or a past tense, so membership is checked against the
+    obvious base forms as well. This errs toward accepting a phrase, which is
+    the safe direction for a guardrail that otherwise forces a fallback.
+    """
+
+    forms = [token]
+    if token.endswith("'s"):
+        forms.append(token[:-2])
+    if token.endswith("ies") and len(token) > 4:
+        forms.append(token[:-3] + "y")
+    if token.endswith("es"):
+        forms.append(token[:-2])
+    if token.endswith("s"):
+        forms.append(token[:-1])
+    if token.endswith("ed"):
+        forms.append(token[:-2])
+        forms.append(token[:-1])
+    if token.endswith("ing") and len(token) > 5:
+        stem = token[:-3]
+        forms.append(stem)
+        forms.append(stem + "e")
+        if len(stem) >= 2 and stem[-1] == stem[-2]:
+            forms.append(stem[:-1])
+    if token.endswith("d") and len(token) > 2:
+        forms.append(token[:-1])
+    return forms
+
+
 def _allowed_words(lemma: str | None) -> set[str]:
     return set(_tokens(lemma)) if lemma else set()
+
+
+def _is_known(token: str, *, allowed: set[str], common_words: frozenset[str]) -> bool:
+    return any(form in allowed or form in common_words for form in _base_forms(token))
 
 
 def _unknown_words(phrase: str, *, allowed: set[str], common_words: frozenset[str]) -> list[str]:
     unknown: list[str] = []
     for token in _tokens(phrase):
-        if token in allowed or token in common_words:
+        if _is_known(token, allowed=allowed, common_words=common_words):
             continue
         parts = [part for part in _WORD_PART_RE.split(token) if part]
-        if parts and all(part in allowed or part in common_words for part in parts):
+        if parts and all(
+            _is_known(part, allowed=allowed, common_words=common_words) for part in parts
+        ):
             continue
         unknown.append(token)
     return unknown
