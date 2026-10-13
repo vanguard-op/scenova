@@ -60,6 +60,7 @@ async def test_a_word_job_stores_a_clip_and_notifies_the_reader() -> None:
     stored = test_rig.library.find("key", "door_opener", PartOfSpeech.NOUN)
     assert stored is not None
     assert stored.entry.gloss_phrase == "a key in the door"
+    assert stored.entry.gloss_phrase_is_fallback is False
     assert stored.entry.clip_asset_id == stored.asset.id
     assert stored.asset.duration_seconds == 3.0
     assert len(test_rig.notifier.ready) == 1
@@ -123,6 +124,7 @@ async def test_a_word_job_without_a_phrase_generates_one_via_c004() -> None:
     stored = test_rig.library.find("key", "door_opener", PartOfSpeech.NOUN)
     assert stored is not None
     assert stored.entry.gloss_phrase == "a key in the door"
+    assert stored.entry.gloss_phrase_is_fallback is False
 
 
 @pytest.mark.asyncio
@@ -152,19 +154,40 @@ async def test_an_unreachable_phrase_model_is_substituted_with_the_fallback() ->
     stored = test_rig.library.find("key", "door_opener", PartOfSpeech.NOUN)
     assert stored is not None
     assert stored.entry.gloss_phrase == "a key"
+    # The pipeline substituted its own fallback, so the stored phrase is
+    # recorded as the fallback for the view to mark as a best guess (FEAT-004).
+    assert stored.entry.gloss_phrase_is_fallback is True
 
 
 @pytest.mark.asyncio
 async def test_the_model_layers_own_fallback_phrase_is_used() -> None:
     # A refusal, a timeout, or an unusable phrase comes back as a normal 200 with
     # source=fallback, so the pipeline carries that phrase through rather than
-    # substituting its own.
+    # substituting its own — and records it as the fallback (FEAT-004).
     test_rig = rig(phrase_generator=FakePhraseGenerator(fallback_phrase_result("an ice")))
     await test_rig.service.submit(request(phrase=None, lemma="ice", sense_label="frozen_water"))
 
     await test_rig.service.run("job-1")
 
     assert test_rig.generator.calls[0].phrase == "an ice"
+    stored = test_rig.library.find("ice", "frozen_water", PartOfSpeech.NOUN)
+    assert stored is not None
+    assert stored.entry.gloss_phrase_is_fallback is True
+
+
+@pytest.mark.asyncio
+async def test_an_empty_phrase_from_the_model_becomes_a_recorded_fallback() -> None:
+    # An unusable output is the fallback path too (FEAT-004), so the pipeline
+    # substitutes the template and records it as the fallback.
+    test_rig = rig(phrase_generator=FakePhraseGenerator(phrase("   ")))
+    await test_rig.service.submit(request(phrase=None, lemma="key", sense_label="door_opener"))
+
+    await test_rig.service.run("job-1")
+
+    assert test_rig.generator.calls[0].phrase == "a key"
+    stored = test_rig.library.find("key", "door_opener", PartOfSpeech.NOUN)
+    assert stored is not None
+    assert stored.entry.gloss_phrase_is_fallback is True
 
 
 @pytest.mark.asyncio

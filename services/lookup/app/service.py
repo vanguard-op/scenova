@@ -67,6 +67,11 @@ GENERATION_UNAVAILABLE_NOTICE = (
     "We couldn't start a clip for this one. Please try again in a moment."
 )
 GENERATION_FAILED_NOTICE = "We couldn't make a clip for this one. Please try again."
+# A served phrase that is the fallback template is a best guess, and the
+# reader-facing advisory travels in `notice` (C-001 revision 1, FEAT-004).
+PHRASE_FALLBACK_NOTICE = (
+    "We couldn't make a phrase for this one, so the meaning shown is a best guess."
+)
 EMPTY_NOTICE = "There was nothing to look up in that selection."
 
 # The sense label shown for a word outside the sense inventory. It is a plain
@@ -169,7 +174,12 @@ class LookupService:
         else:
             lemma = resolved.lemma
             records = resolved.senses
-        senses = tuple([await self._sense(lemma, record) for record in records])
+        resolved_senses = [await self._sense(lemma, record) for record in records]
+        senses = tuple(sense for sense, _ in resolved_senses)
+        if any(is_fallback for _, is_fallback in resolved_senses):
+            # A served phrase that is the fallback template tells the reader the
+            # meaning is a best guess (FEAT-004, FEAT-008).
+            notice = PHRASE_FALLBACK_NOTICE
         status = _word_status(request.consentModelProcessing, senses)
         lookup_id = _new_id()
         job_ids: tuple[str, ...] = ()
@@ -243,17 +253,25 @@ class LookupService:
             GENERATION_UNAVAILABLE_NOTICE,
         )
 
-    async def _sense(self, lemma: str, record: SenseRecord) -> Sense:
+    async def _sense(self, lemma: str, record: SenseRecord) -> tuple[Sense, bool]:
+        """Resolve one sense and whether its phrase is the fallback template."""
+
         entry = await self._library.find(lemma, record.sense_label, record.part_of_speech)
         if entry is None:
-            return Sense(
-                senseLabel=record.sense_label,
-                partOfSpeech=record.part_of_speech,
-                glossPhrase=record.gloss_phrase,
-                entryId=None,
-                clip=None,
+            return (
+                Sense(
+                    senseLabel=record.sense_label,
+                    partOfSpeech=record.part_of_speech,
+                    glossPhrase=record.gloss_phrase,
+                    entryId=None,
+                    clip=None,
+                ),
+                False,
             )
-        return _served_sense(record.sense_label, record.part_of_speech, entry)
+        return (
+            _served_sense(record.sense_label, record.part_of_speech, entry),
+            entry.gloss_phrase_is_fallback,
+        )
 
     async def _enqueue(self, jobs: list[GenerationJob]) -> bool:
         """Hand jobs to the pipeline; False when one cannot be accepted."""
@@ -285,11 +303,25 @@ class LookupService:
 
     async def _refresh_word(self, stored: StoredLookup) -> StoredLookup:
         lemma = stored.normalised_lemma or stored.raw_selection
-        senses = tuple([await self._refresh_sense(lemma, sense) for sense in stored.senses])
+        refreshed = [await self._refresh_sense(lemma, sense) for sense in stored.senses]
+        senses = tuple(sense for sense, _ in refreshed)
+        # A phrase the library gained is marked as a best guess when it is the
+        # fallback template (FEAT-004); an already-served sense keeps the notice
+        # the lookup was first served with.
+        notice = (
+            PHRASE_FALLBACK_NOTICE
+            if any(is_fallback for _, is_fallback in refreshed)
+            else stored.notice
+        )
         if all(sense.clip is not None for sense in senses):
-            if senses == stored.senses and stored.status is LookupStatus.SERVED:
+            unchanged = (
+                senses == stored.senses
+                and stored.status is LookupStatus.SERVED
+                and notice == stored.notice
+            )
+            if unchanged:
                 return stored
-            return replace(stored, senses=senses, status=LookupStatus.SERVED)
+            return replace(stored, senses=senses, status=LookupStatus.SERVED, notice=notice)
         if stored.status is LookupStatus.GENERATING and await self._generation_stopped(
             stored.generation_job_ids
         ):
@@ -299,9 +331,9 @@ class LookupService:
                 status=LookupStatus.FALLBACK,
                 notice=GENERATION_FAILED_NOTICE,
             )
-        if senses == stored.senses:
+        if senses == stored.senses and notice == stored.notice:
             return stored
-        return replace(stored, senses=senses)
+        return replace(stored, senses=senses, notice=notice)
 
     async def _refresh_phrase(self, stored: StoredLookup) -> StoredLookup:
         if stored.status is LookupStatus.GENERATING and await self._generation_stopped(
@@ -330,13 +362,21 @@ class LookupService:
                 return False
         return stopped
 
-    async def _refresh_sense(self, lemma: str, sense: Sense) -> Sense:
+    async def _refresh_sense(self, lemma: str, sense: Sense) -> tuple[Sense, bool]:
+        """Re-resolve one sense and whether a gained entry's phrase is fallback.
+
+        An already-served sense is left as it is: its notice was fixed when it
+        was first served, so the origin is not re-derived here.
+        """
+
         if sense.clip is not None:
-            return sense
+            return sense, False
         entry = await self._library.find(lemma, sense.senseLabel, sense.partOfSpeech)
         if entry is None:
-            return sense
-        return _served_sense(sense.senseLabel, sense.partOfSpeech, entry)
+            return sense, False
+        return _served_sense(sense.senseLabel, sense.partOfSpeech, entry), (
+            entry.gloss_phrase_is_fallback
+        )
 
     def _empty_lookup(self, request: CreateLookupRequest, raw_selection: str) -> StoredLookup:
         return _stored(

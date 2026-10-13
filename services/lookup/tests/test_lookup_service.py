@@ -29,6 +29,7 @@ from lookup.app.service import (
     GENERATION_FAILED_NOTICE,
     GENERATION_UNAVAILABLE_NOTICE,
     INVENTORY_UNAVAILABLE_NOTICE,
+    PHRASE_FALLBACK_NOTICE,
     PHRASE_SENSE_LABEL,
     LookupService,
 )
@@ -66,10 +67,11 @@ def _service(
     )
 
 
-def _entry(entry_id: str, gloss: str) -> LibraryEntry:
+def _entry(entry_id: str, gloss: str, *, is_fallback: bool = False) -> LibraryEntry:
     return LibraryEntry(
         id=entry_id,
         gloss_phrase=gloss,
+        gloss_phrase_is_fallback=is_fallback,
         clip=LibraryClip(
             url=f"https://cdn.example/{entry_id}.mp4",
             duration_seconds=3.0,
@@ -326,6 +328,63 @@ async def test_a_served_word_starts_no_generation() -> None:
 
     assert response.status == LookupStatus.SERVED
     assert generation.jobs == []
+
+
+@pytest.mark.asyncio
+async def test_a_served_fallback_phrase_is_told_as_a_best_guess() -> None:
+    library = InMemoryLibrary()
+    library.add(
+        "come",
+        "arrive",
+        PartOfSpeech.VERB,
+        _entry("e-come", "a come", is_fallback=True),
+    )
+
+    response = await _service(library=library).create_lookup(_request("coming"), "corr")
+
+    assert response.status == LookupStatus.SERVED
+    assert response.senses[0].glossPhrase == "a come"
+    # The phrase's origin travels in the notice, the reader-facing best-guess
+    # signal (C-001 revision 1, FEAT-004).
+    assert response.notice == PHRASE_FALLBACK_NOTICE
+
+
+@pytest.mark.asyncio
+async def test_a_served_generated_phrase_carries_no_best_guess_notice() -> None:
+    library = InMemoryLibrary()
+    library.add(
+        "come",
+        "arrive",
+        PartOfSpeech.VERB,
+        _entry("e-come", "to move toward or reach a place"),
+    )
+
+    response = await _service(library=library).create_lookup(_request("coming"), "corr")
+
+    assert response.status == LookupStatus.SERVED
+    assert response.notice is None
+
+
+@pytest.mark.asyncio
+async def test_a_poll_that_gains_a_fallback_phrase_is_told_as_a_best_guess() -> None:
+    library = InMemoryLibrary()
+    service = _service(library=library)
+    created = await service.create_lookup(_request("coming"), "corr")
+    assert created.status == LookupStatus.GENERATING
+
+    library.add(
+        "come",
+        "arrive",
+        PartOfSpeech.VERB,
+        _entry("e-come", "a come", is_fallback=True),
+    )
+    polled = await service.get_lookup(created.lookupId, "reader-1", "corr-2")
+    again = await service.get_lookup(created.lookupId, "reader-1", "corr-3")
+
+    assert polled.status == LookupStatus.SERVED
+    assert polled.notice == PHRASE_FALLBACK_NOTICE
+    # The notice stays on a later poll of the already-served lookup.
+    assert again.notice == PHRASE_FALLBACK_NOTICE
 
 
 @pytest.mark.asyncio
