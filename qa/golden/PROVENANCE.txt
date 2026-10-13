@@ -1,0 +1,31 @@
+Golden sets for the model quality bar (docs/Scenova/nfr.md, NFR-050 to NFR-053).
+
+These are the fixed evaluation inputs the judged bar requires. They are curated
+by hand, not sampled from model output, and they are not tuned to the pinned
+model: they are a representative spread of the inputs each capability serves.
+
+gloss_phrase.jsonl  (NFR-050)  200 items  {"lemma", "partOfSpeech", "senseHint"}
+  Inputs to gloss-phrase generation (FEAT-004). Composition: 90 nouns (50
+  concrete, 40 abstract), 50 verbs, 40 adjectives, 20 adverbs. Each item is one
+  distinct sense, with a short hint in the shape the capability contract takes.
+
+word_clip.jsonl     (NFR-051)  100 items  {"word", "phrase"}
+  Inputs to word-clip generation (FEAT-005), spanning concrete and abstract:
+  60 concrete words and 40 abstract words, each paired with the gloss phrase the
+  clip is asked to depict.
+
+phrase_clip.jsonl   (NFR-053)   50 items  {"phrase"}
+  Inputs to phrase-clip generation (FEAT-007): 25 idioms and 25 phrasal verbs.
+
+Item identity: an item is addressed by the join of its input fields (see
+ai/quality/bar.py, item_key). Ratings, recorded runs, and reported failures all
+use that identity, so a rater's verdict attaches to the exact item it judged.
+
+Judging: the bar is judged by two trained raters with a third as adjudicator
+(nfr.md). A rating is a boolean, or {"raters": [bool, ...], "adjudicator": bool}
+when the raters disagree. NFR-050's mechanical rubric (fewer than seven words,
+common words) is checked in the run before the rater's meaning check.
+
+A run of the evaluation is `python -m quality --bar NFR-050` from the repo root
+with ai/ on the path; see ai/quality/__main__.py. A run against the pinned model
+needs the provider credential or a recorded replay.
