@@ -1,0 +1,8 @@
+# API gateway runtime dependencies, pinned exactly for reproducible CI and a
+# clean dependency scan (NFR-028). httpx2 is the internal HTTP client (and the
+# client Starlette's TestClient uses); pyjwt with cryptography verifies Firebase
+# ID tokens.
+fastapi==0.143.0
+uvicorn==0.54.0
+httpx2==2.13.1
+pyjwt[crypto]==2.15.1

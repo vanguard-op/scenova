@@ -1,0 +1,7 @@
+# Lookup service runtime dependencies, pinned exactly for reproducible CI and a
+# clean dependency scan (NFR-028). httpx2 backs the in-process API tests through
+# Starlette's TestClient; the platform installs service requirements into one
+# shared venv (`make setup`).
+fastapi==0.143.0
+uvicorn==0.54.0
+httpx2==2.13.1
