@@ -152,6 +152,29 @@ def _poll_until_settled(
     pytest.fail(f"lookup {lookup_id} stayed 'generating': {body}")
 
 
+def _wait_for_provider_call(
+    stub: httpx2.Client,
+    *,
+    name: str,
+    minimum: int = 1,
+    attempts: int = 100,
+    delay: float = 0.05,
+) -> None:
+    """Wait until the model-provider double has answered at least `minimum` calls.
+
+    The double counts a call when it answers, so waiting on a counter lets a test
+    act at a known point inside a generation instead of racing its completion.
+    """
+
+    calls: dict[str, int] = {}
+    for _ in range(attempts):
+        calls = stub.get("/test/calls").json()
+        if calls.get(name, 0) >= minimum:
+            return
+        time.sleep(delay)
+    pytest.fail(f"the model provider double never made {minimum} '{name}' call(s): {calls}")
+
+
 # --- FEAT-006 acceptance criteria — the store / serve half --------------------
 
 
@@ -645,20 +668,36 @@ def test_one_generation_serves_two_readers_of_the_same_missing_word(
 ) -> None:
     # FEAT-006 edge case: two readers look up the same missing word at once; a
     # single generation runs and both lookups are served from it.
+    #
+    # The model double holds the clip call so the first generation is provably in
+    # flight when the second lookup arrives — the two lookups overlap by
+    # construction, not by timing. The second lookup computes the same stable job
+    # id for the word, is refused as a duplicate (C-003 409), and shares the one
+    # generation, so the double records exactly one clip call.
     loop_model_stub.post("/test/reset")
+    loop_model_stub.post("/test/config", json={"clipDelaySeconds": 1.0})
+    try:
+        first = _create(loop_gateway, "going", client_id="loop-go-a", subject="reader-a").json()
+        assert first["status"] == "generating"
+        # The first job has produced its gloss phrase, so it is inside the held
+        # clip call and the shared library has no entry yet — a second lookup now
+        # cannot be served instead of sharing.
+        _wait_for_provider_call(loop_model_stub, name="phrase")
 
-    first = _create(loop_gateway, "going", client_id="loop-go-a", subject="reader-a").json()
-    second = _create(loop_gateway, "goes", client_id="loop-go-b", subject="reader-b").json()
-    assert first["status"] == "generating" and second["status"] == "generating"
+        second = _create(loop_gateway, "goes", client_id="loop-go-b", subject="reader-b").json()
+        assert second["status"] == "generating"
 
-    settled_first = _poll_until_settled(loop_gateway, first["lookupId"], subject="reader-a")
-    settled_second = _poll_until_settled(loop_gateway, second["lookupId"], subject="reader-b")
+        settled_first = _poll_until_settled(loop_gateway, first["lookupId"], subject="reader-a")
+        settled_second = _poll_until_settled(loop_gateway, second["lookupId"], subject="reader-b")
+        calls = loop_model_stub.get("/test/calls").json()
+    finally:
+        # Release the hold so a later test never inherits it.
+        loop_model_stub.post("/test/reset")
 
     assert settled_first["status"] == "served"
     assert settled_second["status"] == "served"
     assert settled_first["senses"][0]["entryId"] == settled_second["senses"][0]["entryId"]
 
-    calls = loop_model_stub.get("/test/calls").json()
     assert calls["clip"] == 1, "a single generation runs for the shared word"
 
 
