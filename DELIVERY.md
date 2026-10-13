@@ -118,6 +118,8 @@ docs/           BPRD (product-shaper)
 | T-031 | — | qa-engineer | Done | C-004, C-005 |
 | T-032 | FEAT-004 | backend-engineer | Done | C-003, C-004 |
 | T-033 | FEAT-004 | backend-engineer | Done | C-001, C-002, C-003 |
+| T-034 | — | infra-engineer | Done | — |
+| T-035 | FEAT-003 | backend-engineer | Done | C-003 |
 
 ## Decisions Log
 | # | Decision | Rationale | By |
