@@ -1,14 +1,14 @@
 # DELIVERY — Scenova
 
 ## Source of Truth
-`docs/Scenova/` (BPRD), a nested git repo. Content revision `9e1714e347c0`; docs commit `914a1483e624`. Read-only for the squad; `product-shaper` is the only writer. The roadmap owns the build order.
+`docs/Scenova/` (BPRD), a nested git repo. Content revision `5d40527f41b4`; docs commit `d4e4d1d41d4d`. Read-only for the squad; `product-shaper` is the only writer. The roadmap owns the build order.
 
 ## Team & File Ownership
 | Owner | Owns |
 |---|---|
 | infra-engineer | `infra/**`, `ci/**`, `.devcontainer/**`, `Makefile`, root workspace config |
 | backend-engineer | `services/**` |
-| ai-engineer | `ai/**` |
+| ai-engineer | `ai/**`, `qa/golden/**` |
 | frontend-engineer | `apps/mobile/**` |
 | visual-artist | `assets/**` |
 | qa-engineer | `tests/**`, `qa/**` |
@@ -106,7 +106,13 @@ docs/           BPRD (product-shaper)
 | T-019 | FEAT-005 | backend-engineer | Done | C-001, C-003, C-006 |
 | T-020 | FEAT-001, FEAT-002 | frontend-engineer | Done | C-001, C-002 |
 | T-021 | FEAT-005 | ai-engineer | Done | C-005 |
-| T-022 | FEAT-005 | qa-engineer | In Progress | C-005 |
+| T-022 | FEAT-005 | qa-engineer | Done | C-005 |
+| T-023 | FEAT-004, FEAT-005, FEAT-007 | ai-engineer | Done | C-004, C-005 |
+| T-024 | — | backend-engineer | Done | C-007 |
+| T-025 | — | frontend-engineer | Done | C-007 |
+| T-026 | — | backend-engineer | Done | C-007 |
+| T-027 | — | infra-engineer | Done | — |
+| T-028 | — | qa-engineer | Done | C-004, C-005 |
 
 ## Decisions Log
 | # | Decision | Rationale | By |
@@ -125,6 +131,9 @@ docs/           BPRD (product-shaper)
 | D-012 | Contract revision 1 to C-001 and C-002: the reader-facing best-guess signal is `notice` (not a `senseLabel` sentinel); errors carry a `{code, message}` body; 503 is added as retryable | Both services already emit this shape; the sentinel was an undocumented coupling. Only the client needs re-aligning | lead |
 | D-013 | Brand-doc gaps: motion timings stay build-layer-owned; the semantic families' 100/300/700/900 shades are completed; the gloss fallback is made grammatical | The branding reference deliberately excludes motion tokens, so the derived values stand; the shade and fallback gaps were real and are now settled | user |
 | D-014 | The icon set's disabled state is carried by a solid colour, never opacity or alpha | Opacity renders inconsistently across platforms; the muted reading is carried by brightness instead (solid `grey-400` against the `grey-600` default) | user |
+| D-015 | Phase 1's goal is restated to the capture-to-clip foundation; serving a stored clip to the reader defers to the reading loop | The phase's features produce a clip; the component that serves it is the shared library, which the roadmap places in the next phase | user |
+| D-016 | The model quality bar's golden sets are built by the model engineer and the judged run is QA's gate | Keeps dataset construction with the model path and the release decision with QA | user |
+| D-017 | Analytics is added to Phase 1, with a frozen client intake contract (C-007) | The taxonomy was specified but owned by no phase; the launch funnels depend on it | user |
 
 ## Definition of Done
 - **Task:** the acceptance criteria in the cited feature doc are met; the frozen contract is conformed; unit tests pass; format, lint, analyze, and build are clean; work is committed to the dev branch and confined to `Own`.
