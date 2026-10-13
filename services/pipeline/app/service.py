@@ -9,6 +9,11 @@ A decline, a timeout, an unavailable provider, a clip over the four-second cap,
 an exhausted generation budget, or the `enable_generation` kill switch being off
 leaves no clip stored, so the caller shows the fallback.
 
+Every job records the two pinned models the generation path depends on: the text
+model that produced the gloss phrase and the video model the clip is generated
+with. The generation events carry the clip model, since their cost, duration, and
+resolution are the clip's.
+
 Each job also records the three generation lifecycle events (EVT-007 to EVT-009).
 A job stopped before it attempts generation — the kill switch or the budget
 ceiling — records nothing, because it is not a generation that failed and must
@@ -63,6 +68,7 @@ from .models import (
     Kind,
 )
 from .notifier import LoggingNotifier, Notifier
+from .pins import ModelPins
 from .queue import InMemoryJobQueue, JobQueue
 
 logger = logging.getLogger(__name__)
@@ -113,6 +119,7 @@ class GenerationService:
         self._library = library
         self._notifier = notifier
         self._settings = settings
+        self._pins = ModelPins.from_settings(settings)
         self._spawner = spawner
         self._events = events
         self._clock = clock if clock is not None else time.monotonic
@@ -148,7 +155,8 @@ class GenerationService:
             sense_label=request.senseLabel,
             part_of_speech=request.partOfSpeech,
             target_duration_seconds=duration,
-            provider_model=request.modelPin,
+            phrase_model=self._pins.phrase.version,
+            clip_model=request.modelPin,
             correlation_id=correlation_id or uuid4().hex,
             status=JobStatus.QUEUED,
             attempts=request.attempt,
@@ -191,7 +199,7 @@ class GenerationService:
                 job_id=running.id,
                 lookup_id=running.lookup_id,
                 kind=running.kind.value,
-                model_version=running.provider_model,
+                model_version=running.clip_model,
             )
         )
 
@@ -199,7 +207,7 @@ class GenerationService:
             clip = await self._clip_generator.generate(
                 phrase=running.phrase,
                 target_duration_seconds=running.target_duration_seconds,
-                model_pin=running.provider_model,
+                model_pin=running.clip_model,
             )
         except ClipDeclinedError:
             return await self._fail(
@@ -287,7 +295,7 @@ class GenerationService:
                 correlation_id=job.correlation_id,
                 job_id=job.id,
                 lookup_id=job.lookup_id,
-                model_version=job.provider_model,
+                model_version=job.clip_model,
                 duration_ms=_elapsed_ms(started_at, self._clock()),
                 cost_units=COST_UNITS_PER_CLIP,
                 resolution=clip.resolution,
@@ -304,7 +312,7 @@ class GenerationService:
                 job_id=job.id,
                 lookup_id=job.lookup_id,
                 reason=reason,
-                model_version=job.provider_model,
+                model_version=job.clip_model,
             )
         )
         return await self._finish(job, status, cost)
@@ -338,7 +346,7 @@ class GenerationService:
                 job_id=job.id,
                 lookup_id=job.lookup_id,
                 reason=REASON_UNEXPECTED_ERROR,
-                model_version=job.provider_model,
+                model_version=job.clip_model,
             )
         )
 

@@ -62,6 +62,21 @@ async def test_a_word_job_stores_a_clip_and_notifies_the_reader() -> None:
 
 
 @pytest.mark.asyncio
+async def test_the_job_records_both_pinned_models() -> None:
+    # schema.md "GenerationJob": phraseModel and clipModel are both required.
+    # D-018 pins them separately — the text model for the phrase and the video
+    # model for the clip — so the job must not collapse them into one.
+    test_rig = rig()
+    await test_rig.service.submit(request())
+
+    job = await test_rig.queue.get("job-1")
+
+    assert job is not None
+    assert job.phrase_model == "gemini-3.5-flash-lite"
+    assert job.clip_model == "gemini-omni-1.1-flash"
+
+
+@pytest.mark.asyncio
 async def test_a_phrase_job_is_never_written_to_the_shared_library() -> None:
     test_rig = rig()
     await test_rig.service.submit(request(kind=Kind.PHRASE, lemma=None, phrase="kick the bucket"))
