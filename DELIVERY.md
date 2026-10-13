@@ -149,6 +149,7 @@ docs/           BPRD (product-shaper)
 | D-016 | The model quality bar's golden sets are built by the model engineer and the judged run is QA's gate | Keeps dataset construction with the model path and the release decision with QA | user |
 | D-017 | Analytics is added to Phase 1, with a frozen client intake contract (C-007) | The taxonomy was specified but owned by no phase; the launch funnels depend on it | user |
 | D-018 | The gloss phrase and the clip use separate pinned models: the text model `gemini-3.5-flash-lite` for the phrase, the video model `gemini-omni-1.1-flash` for the clip | One model for both is expensive and inaccurate at text; each output is pinned, costed, and measured on its own terms | user |
+| D-019 | The gloss-phrase bound is seven words or fewer; the judged bar is a single trained rater with adjudication; the cost ceiling is verified from the cost signal; the quality gate asserts only the bars the phase's capabilities deliver | The earlier bound and two-rater panel were not achievable and cost a measured miss; NFR-051 is judged in this phase because the clip is generated here, while NFR-053 belongs to the next phase | user |
 
 ## Definition of Done
 - **Task:** the acceptance criteria in the cited feature doc are met; the frozen contract is conformed; unit tests pass; format, lint, analyze, and build are clean; work is committed to the dev branch and confined to `Own`.
