@@ -15,8 +15,8 @@ from pipeline.app.clip_client import ClipResult
 from pipeline.app.config import Settings
 from pipeline.app.errors import QueueUnavailableError
 from pipeline.app.events import GenerationEvent
-from pipeline.app.jobs import GenerationJob
-from pipeline.app.library import InMemoryLibraryWriter
+from pipeline.app.jobs import ClipAsset, GenerationJob, LibraryEntry
+from pipeline.app.library import InMemoryLibraryWriter, LibraryUnavailableError
 from pipeline.app.models import CreateJobRequest, Kind, PartOfSpeech
 from pipeline.app.phrase_client import PhraseResult
 from pipeline.app.queue import InMemoryJobQueue, JobQueue
@@ -148,6 +148,26 @@ class FailingQueue(InMemoryJobQueue):
         raise QueueUnavailableError("The queue is unavailable.")
 
 
+class FlakyLibraryWriter(InMemoryLibraryWriter):
+    """A library that refuses a number of writes before accepting them.
+
+    Stands in for a library outage that recovers partway through the retry, so a
+    test can prove the write is retried and the clip is still delivered (FEAT-006).
+    """
+
+    def __init__(self, failures: int) -> None:
+        super().__init__()
+        self.failures_remaining = failures
+        self.calls = 0
+
+    async def store(self, entry: LibraryEntry, asset: ClipAsset) -> None:
+        self.calls += 1
+        if self.failures_remaining > 0:
+            self.failures_remaining -= 1
+            raise LibraryUnavailableError("The shared library is unreachable.")
+        await super().store(entry, asset)
+
+
 @dataclass
 class Rig:
     """The service under test with the doubles it was built from."""
@@ -216,23 +236,29 @@ def rig(
     generator: FakeClipGenerator | None = None,
     phrase_generator: FakePhraseGenerator | None = None,
     queue: JobQueue | None = None,
+    library: InMemoryLibraryWriter | None = None,
     budget: float = 0.0,
     enable_generation: bool = True,
+    library_retry_delay_seconds: float = 0.0,
     clock: Clock | None = None,
 ) -> Rig:
     resolved_generator = generator if generator is not None else FakeClipGenerator()
     resolved_phrases = phrase_generator if phrase_generator is not None else FakePhraseGenerator()
     resolved_queue = queue if queue is not None else InMemoryJobQueue()
-    library = InMemoryLibraryWriter()
+    resolved_library = library if library is not None else InMemoryLibraryWriter()
     notifier = RecordingNotifier()
     events = RecordingEmitter()
     service = GenerationService(
         queue=resolved_queue,
         phrase_generator=resolved_phrases,
         clip_generator=resolved_generator,
-        library=library,
+        library=resolved_library,
         notifier=notifier,
-        settings=Settings(generation_budget_units=budget, enable_generation=enable_generation),
+        settings=Settings(
+            generation_budget_units=budget,
+            enable_generation=enable_generation,
+            library_store_retry_delay_seconds=library_retry_delay_seconds,
+        ),
         spawner=NullSpawner(),
         events=events,
         clock=clock,
@@ -241,7 +267,7 @@ def rig(
         service=service,
         phrases=resolved_phrases,
         generator=resolved_generator,
-        library=library,
+        library=resolved_library,
         notifier=notifier,
         queue=resolved_queue,
         events=events,

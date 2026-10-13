@@ -8,6 +8,27 @@ from lookup.app.generation import (
     GenerationJobStatus,
     GenerationUnavailableError,
 )
+from lookup.app.library import LibraryEntry, LibraryUnavailableError
+from lookup.app.models import PartOfSpeech
+
+
+class UnavailableLibrary:
+    """A shared library that cannot be reached, as the shipped degradation allows.
+
+    The lookup must treat an unreachable library as a miss and fall back to
+    generation rather than failing the reader (FEAT-006 edge).
+    """
+
+    async def find(
+        self,
+        lemma: str,
+        sense_label: str,
+        part_of_speech: PartOfSpeech,
+    ) -> LibraryEntry | None:
+        raise LibraryUnavailableError("The shared library is unreachable.")
+
+    async def aclose(self) -> None:
+        return None
 
 
 class RecordingGenerationClient:

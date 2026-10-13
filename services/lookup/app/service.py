@@ -10,12 +10,17 @@ FEAT-005 is wired here: a sense the library cannot serve is handed to the
 generation pipeline (C-003), so a later poll of the lookup (C-002) serves the
 clip the pipeline wrote to the shared library. When the pipeline cannot accept
 the job the reader still gets the word and phrase, marked as the fallback.
+
+FEAT-006 is wired here too. The shared library is read on the fast path: an
+active entry is served without a generation, a held or retired one is a miss
+whose id seeds the replacement, and an unreachable library falls back to
+generation rather than failing the reader.
 """
 
 from __future__ import annotations
 
 import asyncio
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -43,7 +48,13 @@ from .inventory import (
     SenseRecord,
     build_default_inventory,
 )
-from .library import InMemoryLibrary, LibraryEntry, LibraryPort
+from .library import (
+    HttpLibrary,
+    LibraryEntry,
+    LibraryEntryStatus,
+    LibraryPort,
+    LibraryUnavailableError,
+)
 from .models import (
     Clip,
     CreateLookupRequest,
@@ -84,6 +95,21 @@ PHRASE_SENSE_LABEL = "phrase"
 
 # A job in one of these states produced no clip and never will (C-006).
 _STOPPED_WITHOUT_CLIP = frozenset({GenerationJobStatus.FAILED, GenerationJobStatus.DECLINED})
+
+
+@dataclass(frozen=True)
+class _SenseResolution:
+    """One sense resolved against the shared library.
+
+    ``sense`` is what the reader is served, with its clip when the library held an
+    active entry. ``regeneration_seed`` is the id of a held or retired entry the
+    miss superseded, which salts the replacement job so it is not refused as a
+    duplicate (FEAT-006).
+    """
+
+    sense: Sense
+    gloss_is_fallback: bool
+    regeneration_seed: str | None
 
 
 class LookupService:
@@ -137,8 +163,9 @@ class LookupService:
         return refreshed.to_response(correlation_id)
 
     async def aclose(self) -> None:
-        """Release the generation client's connections."""
+        """Release the generation and library clients' connections."""
 
+        await self._library.aclose()
         await self._generation.aclose()
 
     async def _resolve(self, request: CreateLookupRequest, raw_selection: str) -> StoredLookup:
@@ -174,8 +201,8 @@ class LookupService:
             lemma = resolved.lemma
             records = resolved.senses
         resolved_senses = [await self._sense(lemma, record) for record in records]
-        senses = tuple(sense for sense, _ in resolved_senses)
-        if any(is_fallback for _, is_fallback in resolved_senses):
+        senses = tuple(resolution.sense for resolution in resolved_senses)
+        if any(resolution.gloss_is_fallback for resolution in resolved_senses):
             # A served phrase that is the fallback template tells the reader the
             # meaning is a best guess (FEAT-004, FEAT-008).
             notice = PHRASE_FALLBACK_NOTICE
@@ -184,7 +211,9 @@ class LookupService:
         job_ids: tuple[str, ...] = ()
         if status is LookupStatus.GENERATING:
             missing = [
-                record for record, sense in zip(records, senses, strict=True) if sense.clip is None
+                (record, resolution.regeneration_seed)
+                for record, resolution in zip(records, resolved_senses, strict=True)
+                if resolution.sense.clip is None
             ]
             jobs = _word_jobs(
                 lookup_id,
@@ -252,24 +281,27 @@ class LookupService:
             GENERATION_UNAVAILABLE_NOTICE,
         )
 
-    async def _sense(self, lemma: str, record: SenseRecord) -> tuple[Sense, bool]:
-        """Resolve one sense and whether its phrase is the fallback template."""
+    async def _sense(self, lemma: str, record: SenseRecord) -> _SenseResolution:
+        """Resolve one sense to a served clip, a miss, and a regeneration seed.
 
-        entry = await self._library.find(lemma, record.sense_label, record.part_of_speech)
+        Only an active entry is served. A held or retired entry is a miss whose
+        id seeds the replacement generation, so the retired clip is not served
+        and a new one can be produced (FEAT-006). An unreachable library is a
+        miss too: the lookup falls back to generation rather than failing.
+        """
+
+        try:
+            entry = await self._library.find(lemma, record.sense_label, record.part_of_speech)
+        except LibraryUnavailableError:
+            return _SenseResolution(_miss_sense(record), False, None)
         if entry is None:
-            return (
-                Sense(
-                    senseLabel=record.sense_label,
-                    partOfSpeech=record.part_of_speech,
-                    glossPhrase=record.gloss_phrase,
-                    entryId=None,
-                    clip=None,
-                ),
-                False,
-            )
-        return (
+            return _SenseResolution(_miss_sense(record), False, None)
+        if entry.status is not LibraryEntryStatus.ACTIVE:
+            return _SenseResolution(_miss_sense(record), False, entry.id)
+        return _SenseResolution(
             _served_sense(record.sense_label, record.part_of_speech, entry),
             entry.gloss_phrase_is_fallback,
+            None,
         )
 
     async def _enqueue(self, jobs: list[GenerationJob]) -> bool:
@@ -365,13 +397,17 @@ class LookupService:
         """Re-resolve one sense and whether a gained entry's phrase is fallback.
 
         An already-served sense is left as it is: its notice was fixed when it
-        was first served, so the origin is not re-derived here.
+        was first served, so the origin is not re-derived here. A held or retired
+        entry and an unreachable library are both still a miss.
         """
 
         if sense.clip is not None:
             return sense, False
-        entry = await self._library.find(lemma, sense.senseLabel, sense.partOfSpeech)
-        if entry is None:
+        try:
+            entry = await self._library.find(lemma, sense.senseLabel, sense.partOfSpeech)
+        except LibraryUnavailableError:
+            return sense, False
+        if entry is None or entry.status is not LibraryEntryStatus.ACTIVE:
             return sense, False
         return _served_sense(sense.senseLabel, sense.partOfSpeech, entry), (
             entry.gloss_phrase_is_fallback
@@ -397,7 +433,11 @@ def build_default_service(settings: Settings | None = None) -> LookupService:
     return LookupService(
         inventory=build_default_inventory(),
         store=InMemoryLookupStore(),
-        library=InMemoryLibrary(),
+        library=HttpLibrary(
+            base_url=resolved.library_base_url,
+            internal_audience=resolved.internal_audience,
+            timeout_seconds=resolved.library_timeout_seconds,
+        ),
         generation=HttpGenerationClient(
             base_url=resolved.pipeline_base_url,
             internal_audience=resolved.internal_audience,
@@ -411,16 +451,23 @@ def build_default_service(settings: Settings | None = None) -> LookupService:
 def _word_jobs(
     lookup_id: str,
     lemma: str,
-    records: list[SenseRecord],
+    missing: list[tuple[SenseRecord, str | None]],
     *,
     model_pin: str,
     target_duration: float,
 ) -> list[GenerationJob]:
     # A word job leaves the phrase null: the pipeline generates the gloss phrase
-    # from the word, its part of speech, and the sense hint (C-003, C-004).
+    # from the word, its part of speech, and the sense hint (C-003, C-004). A miss
+    # that superseded a held or retired entry salts the job id with that entry, so
+    # the replacement is not refused as a duplicate generation (FEAT-006).
     return [
         GenerationJob(
-            job_id=word_job_id(lemma, record.sense_label, record.part_of_speech),
+            job_id=word_job_id(
+                lemma,
+                record.sense_label,
+                record.part_of_speech,
+                regeneration=seed,
+            ),
             lookup_id=lookup_id,
             kind=Kind.WORD,
             lemma=lemma,
@@ -430,7 +477,7 @@ def _word_jobs(
             target_duration_seconds=target_duration,
             model_pin=model_pin,
         )
-        for record in records
+        for record, seed in missing
     ]
 
 
@@ -458,6 +505,18 @@ def _served_sense(sense_label: str, part_of_speech: PartOfSpeech, entry: Library
         glossPhrase=entry.gloss_phrase,
         entryId=entry.id,
         clip=_clip(entry),
+    )
+
+
+def _miss_sense(record: SenseRecord) -> Sense:
+    """The word and phrase a reader sees while the clip is missing (no clip)."""
+
+    return Sense(
+        senseLabel=record.sense_label,
+        partOfSpeech=record.part_of_speech,
+        glossPhrase=record.gloss_phrase,
+        entryId=None,
+        clip=None,
     )
 
 

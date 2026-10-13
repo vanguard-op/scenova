@@ -23,6 +23,7 @@ from pipeline.tests.fakes import (
     FailingQueue,
     FakeClipGenerator,
     FakePhraseGenerator,
+    FlakyLibraryWriter,
     clip,
     fallback_phrase_result,
     phrase,
@@ -234,6 +235,38 @@ async def test_an_unavailable_queue_is_reported() -> None:
 
     with pytest.raises(QueueUnavailableError):
         await test_rig.service.submit(request())
+
+
+@pytest.mark.asyncio
+async def test_a_library_write_failure_is_retried_and_the_clip_still_lands() -> None:
+    # FEAT-006 edge: storage of a completed clip fails, but the reader still
+    # receives the clip for this session and the write is retried.
+    library = FlakyLibraryWriter(failures=1)
+    test_rig = rig(library=library)
+    await test_rig.service.submit(request())
+
+    job = await test_rig.service.run("job-1")
+
+    assert job.status == JobStatus.SUCCEEDED
+    assert library.calls == 2
+    assert library.find("key", "door_opener", PartOfSpeech.NOUN) is not None
+    assert len(test_rig.notifier.ready) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_library_that_never_accepts_the_write_does_not_fail_the_job() -> None:
+    # The clip is delivered even when the write gives up: the reader comes first,
+    # and the job is not marked failed for a storage failure on its own output.
+    library = FlakyLibraryWriter(failures=99)
+    test_rig = rig(library=library)
+    await test_rig.service.submit(request())
+
+    job = await test_rig.service.run("job-1")
+
+    assert job.status == JobStatus.SUCCEEDED
+    assert library.calls == 3  # the configured attempts
+    assert library.all() == ()
+    assert len(test_rig.notifier.ready) == 1
 
 
 @pytest.mark.asyncio

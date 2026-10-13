@@ -63,7 +63,7 @@ from .events import (
     generation_started,
 )
 from .jobs import ClipAsset, GenerationJob, LibraryEntry
-from .library import InMemoryLibraryWriter, LibraryWriter
+from .library import HttpLibraryWriter, LibraryUnavailableError, LibraryWriter
 from .models import (
     CreateJobRequest,
     CreateJobResponse,
@@ -269,10 +269,11 @@ class GenerationService:
         return await self._succeed(running, clip, started_at)
 
     async def aclose(self) -> None:
-        """Release the model clients' connections."""
+        """Release the model and library clients' connections."""
 
         await self._phrase_generator.aclose()
         await self._clip_generator.aclose()
+        await self._library.aclose()
 
     async def get_status(self, job_id: str) -> JobStatusResponse:
         """Report a job's state so a stalled generation can be resolved (C-006).
@@ -341,6 +342,14 @@ class GenerationService:
     async def _store_word_clip(
         self, job: GenerationJob, clip: ClipResult, phrase: str, is_fallback: bool
     ) -> None:
+        """Write the finished word clip, retrying without ever failing the job.
+
+        A library write that cannot be accepted must not cost the reader the clip
+        it just produced (FEAT-006 edge): the job still succeeds and the reader is
+        notified, and the write is retried. A word clip only; a phrase clip is
+        served to the requesting device and never stored (FEAT-007).
+        """
+
         now = _now()
         asset = ClipAsset(
             id=clip.clip_id,
@@ -365,7 +374,29 @@ class GenerationService:
             created_at=now,
             updated_at=now,
         )
-        await self._library.store(entry, asset)
+        await self._store_with_retry(job, entry, asset)
+
+    async def _store_with_retry(
+        self, job: GenerationJob, entry: LibraryEntry, asset: ClipAsset
+    ) -> None:
+        attempts = max(1, self._settings.library_store_attempts)
+        for attempt in range(1, attempts + 1):
+            try:
+                await self._library.store(entry, asset)
+                return
+            except LibraryUnavailableError:
+                logger.warning(
+                    "shared library write failed (job %s, attempt %d/%d)",
+                    job.id,
+                    attempt,
+                    attempts,
+                )
+                if attempt < attempts and self._settings.library_store_retry_delay_seconds:
+                    await asyncio.sleep(self._settings.library_store_retry_delay_seconds)
+        logger.error(
+            "shared library write gave up (job %s); the clip still reached the reader",
+            job.id,
+        )
 
     async def _succeed(
         self, job: GenerationJob, clip: ClipResult, started_at: float
@@ -432,7 +463,7 @@ class GenerationService:
 
 
 def build_default_service(settings: Settings) -> GenerationService:
-    """Build the pipeline with its in-memory queue and library and the model client."""
+    """Build the pipeline with its in-memory queue and the model and library clients."""
 
     return GenerationService(
         queue=InMemoryJobQueue(),
@@ -446,7 +477,11 @@ def build_default_service(settings: Settings) -> GenerationService:
             internal_audience=settings.internal_audience,
             timeout_seconds=settings.model_timeout_seconds,
         ),
-        library=InMemoryLibraryWriter(),
+        library=HttpLibraryWriter(
+            base_url=settings.library_base_url,
+            internal_audience=settings.internal_audience,
+            timeout_seconds=settings.library_timeout_seconds,
+        ),
         notifier=LoggingNotifier(),
         settings=settings,
         spawner=AsyncioTaskSpawner(),

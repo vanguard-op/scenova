@@ -18,6 +18,7 @@ from dataclasses import dataclass
 DEFAULT_INTERNAL_AUDIENCE = "scenova-internal"
 DEFAULT_CORRELATION_ID_HEADER = "x-correlation-id"
 DEFAULT_MODEL_PORT = "8090"
+DEFAULT_LIBRARY_PORT = "8083"
 # The two model versions the generation path pins and no others (architecture
 # "Model Version & Fallback", D-018): the text model that produces the gloss
 # phrase and the video model that produces the clip. Both are pinned so each
@@ -34,6 +35,12 @@ DEFAULT_MODEL_TIMEOUT_SECONDS = 120.0
 # request timeout and answers with its fallback, so the pipeline's outer wait is
 # a little longer than that rather than the clip's long wait.
 DEFAULT_PHRASE_TIMEOUT_SECONDS = 40.0
+# The shared-library write runs after the clip is produced, off the reader's
+# path. When it cannot be accepted the clip is still delivered, so a short wait
+# and a few attempts are enough to ride out a blip without holding the job open.
+DEFAULT_LIBRARY_TIMEOUT_SECONDS = 5.0
+DEFAULT_LIBRARY_STORE_ATTEMPTS = 3
+DEFAULT_LIBRARY_STORE_RETRY_DELAY_SECONDS = 0.25
 # Clips are capped at four seconds so they resolve within a reader's glance.
 CLIP_MAX_DURATION_SECONDS = 4.0
 # The `enable_generation` release flag (release.md "Rollout Phases & Feature
@@ -54,6 +61,10 @@ class Settings:
     model_base_url: str = f"http://127.0.0.1:{DEFAULT_MODEL_PORT}"
     model_timeout_seconds: float = DEFAULT_MODEL_TIMEOUT_SECONDS
     phrase_timeout_seconds: float = DEFAULT_PHRASE_TIMEOUT_SECONDS
+    library_base_url: str = f"http://127.0.0.1:{DEFAULT_LIBRARY_PORT}"
+    library_timeout_seconds: float = DEFAULT_LIBRARY_TIMEOUT_SECONDS
+    library_store_attempts: int = DEFAULT_LIBRARY_STORE_ATTEMPTS
+    library_store_retry_delay_seconds: float = DEFAULT_LIBRARY_STORE_RETRY_DELAY_SECONDS
     clip_max_duration_seconds: float = CLIP_MAX_DURATION_SECONDS
     # The two pinned model versions the generation path records on every job.
     phrase_model_pin: str = PHRASE_MODEL_PIN
@@ -73,6 +84,11 @@ class Settings:
             "MODEL_BASE_URL",
             f"http://127.0.0.1:{_env_str(source, 'MODEL_PORT', DEFAULT_MODEL_PORT)}",
         )
+        library_base_url = _env_str(
+            source,
+            "LIBRARY_BASE_URL",
+            f"http://127.0.0.1:{_env_str(source, 'LIBRARY_PORT', DEFAULT_LIBRARY_PORT)}",
+        )
         return cls(
             internal_audience=_env_str(source, "INTERNAL_AUDIENCE", DEFAULT_INTERNAL_AUDIENCE),
             correlation_id_header=_env_str(
@@ -85,6 +101,18 @@ class Settings:
             ),
             phrase_timeout_seconds=_env_float(
                 source, "PIPELINE_PHRASE_TIMEOUT_SECONDS", DEFAULT_PHRASE_TIMEOUT_SECONDS
+            ),
+            library_base_url=library_base_url,
+            library_timeout_seconds=_env_float(
+                source, "PIPELINE_LIBRARY_TIMEOUT_SECONDS", DEFAULT_LIBRARY_TIMEOUT_SECONDS
+            ),
+            library_store_attempts=_env_int(
+                source, "PIPELINE_LIBRARY_STORE_ATTEMPTS", DEFAULT_LIBRARY_STORE_ATTEMPTS
+            ),
+            library_store_retry_delay_seconds=_env_float(
+                source,
+                "PIPELINE_LIBRARY_STORE_RETRY_DELAY_SECONDS",
+                DEFAULT_LIBRARY_STORE_RETRY_DELAY_SECONDS,
             ),
             phrase_model_pin=_env_str(source, "PHRASE_MODEL_PIN", PHRASE_MODEL_PIN),
             clip_model_pin=_env_str(source, "CLIP_MODEL_PIN", CLIP_MODEL_PIN),
@@ -107,6 +135,16 @@ def _env_bool(env: Mapping[str, str], name: str, default: bool) -> bool:
     if value in (None, ""):
         return default
     return value.strip().lower() not in {"0", "false", "no", "off"}
+
+
+def _env_int(env: Mapping[str, str], name: str, default: int) -> int:
+    raw = env.get(name)
+    if raw in (None, ""):
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
 
 
 def _env_float(env: Mapping[str, str], name: str, default: float) -> float:

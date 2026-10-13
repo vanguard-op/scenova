@@ -22,7 +22,13 @@ from lookup.app.inventory import (
     SenseInventory,
     build_default_inventory,
 )
-from lookup.app.library import InMemoryLibrary, LibraryClip, LibraryEntry, LibraryPort
+from lookup.app.library import (
+    InMemoryLibrary,
+    LibraryClip,
+    LibraryEntry,
+    LibraryEntryStatus,
+    LibraryPort,
+)
 from lookup.app.models import CreateLookupRequest, Kind, LookupStatus, PartOfSpeech
 from lookup.app.service import (
     BEST_GUESS_NOTICE,
@@ -35,7 +41,7 @@ from lookup.app.service import (
     LookupService,
 )
 from lookup.app.store import InMemoryLookupStore
-from lookup.tests.fakes import RecordingGenerationClient, unavailable
+from lookup.tests.fakes import RecordingGenerationClient, UnavailableLibrary, unavailable
 
 
 def _request(
@@ -70,11 +76,18 @@ def _service(
     )
 
 
-def _entry(entry_id: str, gloss: str, *, is_fallback: bool = False) -> LibraryEntry:
+def _entry(
+    entry_id: str,
+    gloss: str,
+    *,
+    is_fallback: bool = False,
+    status: LibraryEntryStatus = LibraryEntryStatus.ACTIVE,
+) -> LibraryEntry:
     return LibraryEntry(
         id=entry_id,
         gloss_phrase=gloss,
         gloss_phrase_is_fallback=is_fallback,
+        status=status,
         clip=LibraryClip(
             url=f"https://cdn.example/{entry_id}.mp4",
             duration_seconds=3.0,
@@ -631,3 +644,101 @@ async def test_a_failed_generation_stays_failed_on_a_later_poll() -> None:
 
     assert first.status == LookupStatus.FALLBACK
     assert second.status == LookupStatus.FALLBACK
+
+
+@pytest.mark.asyncio
+async def test_an_unreachable_library_falls_back_to_generation() -> None:
+    # FEAT-006 edge: the library is unreachable, so the lookup serves the word and
+    # phrase and requests a generation rather than failing the reader.
+    generation = RecordingGenerationClient()
+
+    response = await _service(library=UnavailableLibrary(), generation=generation).create_lookup(
+        _request("coming"), "corr"
+    )
+
+    assert response.status == LookupStatus.GENERATING
+    assert response.senses[0].clip is None
+    assert response.senses[0].glossPhrase == "to move toward or reach a place"
+    assert len(generation.jobs) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_poll_with_an_unreachable_library_keeps_generating() -> None:
+    service = _service(library=UnavailableLibrary())
+    created = await service.create_lookup(_request("coming"), "corr")
+
+    polled = await service.get_lookup(created.lookupId, "reader-1", "corr-2")
+
+    assert polled.status == LookupStatus.GENERATING
+    assert polled.senses[0].clip is None
+
+
+@pytest.mark.parametrize("status", [LibraryEntryStatus.HELD, LibraryEntryStatus.RETIRED])
+@pytest.mark.asyncio
+async def test_a_held_or_retired_clip_is_not_served(status: LibraryEntryStatus) -> None:
+    # FEAT-006: an entry held after a report, or retired after review, is not
+    # served to new readers; a generation is requested instead.
+    library = InMemoryLibrary()
+    library.add(
+        "come",
+        "arrive",
+        PartOfSpeech.VERB,
+        _entry("e-come", "a stale meaning", status=status),
+    )
+    generation = RecordingGenerationClient()
+
+    response = await _service(library=library, generation=generation).create_lookup(
+        _request("coming"), "corr"
+    )
+
+    assert response.status == LookupStatus.GENERATING
+    assert response.senses[0].clip is None
+    assert response.senses[0].entryId is None
+    assert len(generation.jobs) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_retired_clip_regenerates_with_a_salted_job_id() -> None:
+    # The pipeline refuses a repeated job id, so a miss that superseded a retired
+    # entry salts its job id with that entry; otherwise the replacement could
+    # never be generated (FEAT-006).
+    library = InMemoryLibrary()
+    library.add(
+        "come",
+        "arrive",
+        PartOfSpeech.VERB,
+        _entry("e-old", "a stale meaning", status=LibraryEntryStatus.RETIRED),
+    )
+    generation = RecordingGenerationClient()
+
+    await _service(library=library, generation=generation).create_lookup(_request("coming"), "corr")
+
+    job = generation.jobs[0]
+    assert job.job_id == word_job_id("come", "arrive", PartOfSpeech.VERB, regeneration="e-old")
+    assert job.job_id != word_job_id("come", "arrive", PartOfSpeech.VERB)
+
+
+@pytest.mark.asyncio
+async def test_a_replacement_entry_is_served_after_a_retirement() -> None:
+    library = InMemoryLibrary()
+    library.add(
+        "come",
+        "arrive",
+        PartOfSpeech.VERB,
+        _entry("e-old", "a stale meaning", status=LibraryEntryStatus.RETIRED),
+    )
+    service = _service(library=library)
+    created = await service.create_lookup(_request("coming"), "corr")
+    assert created.status == LookupStatus.GENERATING
+
+    # The pipeline's replacement is written over the retired entry.
+    library.add(
+        "come",
+        "arrive",
+        PartOfSpeech.VERB,
+        _entry("e-new", "to move toward or reach a place"),
+    )
+    polled = await service.get_lookup(created.lookupId, "reader-1", "corr-2")
+
+    assert polled.status == LookupStatus.SERVED
+    assert polled.senses[0].entryId == "e-new"

@@ -102,10 +102,25 @@ class GenerationClient(Protocol):
     async def aclose(self) -> None: ...
 
 
-def word_job_id(lemma: str, sense_label: str, part_of_speech: PartOfSpeech) -> str:
-    """A stable job id for one missing word sense, so lookups share its generation."""
+def word_job_id(
+    lemma: str,
+    sense_label: str,
+    part_of_speech: PartOfSpeech,
+    *,
+    regeneration: str | None = None,
+) -> str:
+    """A stable job id for one missing word sense, so lookups share its generation.
 
-    return _digest(f"word:{lemma.casefold()}:{sense_label}:{part_of_speech.value}")
+    ``regeneration`` salts the id with the entry a miss superseded (a held or
+    retired one). The id stays stable while a generation is in flight — concurrent
+    lookups compute the same one and share it — but changes once that entry has
+    been replaced, so a retired clip can be regenerated (FEAT-006).
+    """
+
+    key = f"word:{lemma.casefold()}:{sense_label}:{part_of_speech.value}"
+    if regeneration is not None:
+        key = f"{key}:{regeneration}"
+    return _digest(key)
 
 
 def phrase_job_id(lookup_id: str) -> str:
