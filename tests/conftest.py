@@ -21,8 +21,11 @@ provided:
 - `library_down_stack` — the client path with no library service, so the lookup's
   library read is refused (FEAT-006 edge case).
 
-No stack reaches the model provider: the client-path stacks run without a
-credential, and the loop stack's provider is a double.
+No stack reaches an external provider. The client-path stacks run without a
+model credential and the model-backed stacks point at a local double, and the
+notification stack clears the ambient push-provider configuration and aims the
+generic HTTP seam at a local double, so the shipped Firebase Cloud Messaging
+provider is never contacted.
 """
 
 from __future__ import annotations
@@ -160,6 +163,15 @@ def _service_env(name: str, ports: Mapping[str, int]) -> dict[str, str]:
         # (C-008) and sends the clip-ready notice through the push-provider
         # double, so nothing is asked of a real provider.
         env["LOOKUP_PORT"] = str(ports["lookup"])
+        # Isolate the push provider. The ambient environment — `.env`, which the
+        # CI scripts source and export — configures the shipped provider
+        # (Firebase Cloud Messaging). Left in place it would win over the
+        # double: the service would build the FCM sender and reach for the real
+        # provider, so no notice would reach the double under `make qa`. The
+        # provider selection is cleared and the generic HTTP seam — the seam
+        # `build_push_sender` falls back to — is aimed at the double.
+        env.pop("PUSH_PROVIDER", None)
+        env.pop("PUSH_FCM_BASE_URL", None)
         env["PUSH_BASE_URL"] = f"http://127.0.0.1:{ports['push']}"
     return env
 
