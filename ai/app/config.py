@@ -41,18 +41,26 @@ REGENERATION_ATTEMPTS = 2
 RETRY_BACKOFF_SECONDS = 0.25
 
 # Word-clip generation is pinned as well. The output contract is a 360p clip no
-# longer than four seconds (FEAT-005), and clips are muted unless sound is asked
-# for explicitly (product behaviour rules), so both are constants, not knobs.
+# longer than four seconds (FEAT-005). The pinned video model produces clips of
+# three to ten seconds, so the product's four-second cap makes the effective
+# target range three to four seconds: a shorter request is raised to the model's
+# three-second minimum rather than sent and rejected. Resolution is a constant,
+# not a knob, because the card the clip plays in is fixed.
 ClipResolution = Literal["360p"]
 CLIP_TARGET_RESOLUTION: ClipResolution = "360p"
 CLIP_MAX_DURATION_SECONDS = 4
-CLIP_MIN_DURATION_SECONDS = 1
+CLIP_MIN_DURATION_SECONDS = 3
 CLIP_MIME_TYPE = "video/mp4"
-CLIP_GENERATE_AUDIO = False
+# The pinned video model generates native audio with every clip, so the stored
+# asset carries an audio track. The reader hears it only when they turn sound on
+# (clips are muted by default), so the clip view needs `hasAudio` to be true or
+# it renders the clip unmuted.
+CLIP_HAS_AUDIO = True
 CLIP_STORAGE_PREFIX = "clips/"
 
-# Video generation is a long-running provider operation: the service submits it
-# and polls until it completes, bounded by one overall timeout.
+# Video generation is a long-running provider operation. The Interactions API
+# returns the finished clip in one call, but a clip that is still being worked
+# on is polled to completion, bounded by one overall timeout.
 DEFAULT_CLIP_VIDEO_TIMEOUT_SECONDS = 120.0
 DEFAULT_CLIP_POLL_INTERVAL_SECONDS = 2.0
 
@@ -114,7 +122,7 @@ class Settings:
     clip_max_duration_seconds: int
     clip_video_timeout_seconds: float
     clip_poll_interval_seconds: float
-    clip_generate_audio: bool
+    clip_has_audio: bool
 
 
 def load_settings() -> Settings:
@@ -144,7 +152,7 @@ def load_settings() -> Settings:
         clip_max_duration_seconds=CLIP_MAX_DURATION_SECONDS,
         clip_video_timeout_seconds=DEFAULT_CLIP_VIDEO_TIMEOUT_SECONDS,
         clip_poll_interval_seconds=DEFAULT_CLIP_POLL_INTERVAL_SECONDS,
-        clip_generate_audio=CLIP_GENERATE_AUDIO,
+        clip_has_audio=CLIP_HAS_AUDIO,
     )
 
 

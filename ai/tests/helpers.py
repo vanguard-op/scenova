@@ -128,7 +128,6 @@ class FakeClipModel:
         model_pin: str,
         duration_seconds: int,
         resolution: str,
-        generate_audio: bool,
     ) -> bytes:
         self.calls.append(
             {
@@ -137,7 +136,6 @@ class FakeClipModel:
                 "model_pin": model_pin,
                 "duration_seconds": duration_seconds,
                 "resolution": resolution,
-                "generate_audio": generate_audio,
             }
         )
         if not self._results:

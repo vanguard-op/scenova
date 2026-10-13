@@ -42,7 +42,7 @@ class ClipResult:
 
 
 class ClipService:
-    """Turns a gloss phrase into a short, silent, 360p clip."""
+    """Turns a gloss phrase into a short, 360p clip."""
 
     def __init__(
         self,
@@ -58,10 +58,12 @@ class ClipService:
         self._settings = settings
 
     def _duration_seconds(self, requested: float) -> int:
-        """Clamp the target to the one-to-four-second output contract.
+        """Clamp the target to the pinned model's one-to-four-second range.
 
-        The provider takes whole seconds, so the target is rounded up (never
-        under the requested length) and then capped at four seconds.
+        The provider takes whole seconds and will not make a clip shorter than
+        three seconds, so the target is rounded up (never under the requested
+        length) and then held between the model's minimum and the product's
+        four-second cap.
         """
 
         ceiling = math.ceil(requested)
@@ -81,7 +83,6 @@ class ClipService:
             model_pin=model_pin,
             duration_seconds=duration,
             resolution=self._settings.clip_target_resolution,
-            generate_audio=self._settings.clip_generate_audio,
         )
 
         clip_id = uuid.uuid4().hex
@@ -97,7 +98,7 @@ class ClipService:
             url=stored.url,
             duration_seconds=float(duration),
             resolution=self._settings.clip_target_resolution,
-            has_audio=self._settings.clip_generate_audio,
+            has_audio=self._settings.clip_has_audio,
             # The pinned provider watermarks generated video with SynthID.
             synth_id_watermark=True,
         )

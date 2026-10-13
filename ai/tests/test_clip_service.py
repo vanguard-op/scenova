@@ -29,7 +29,7 @@ async def test_generates_and_stores_a_clip() -> None:
 
     assert result.duration_seconds == 4.0
     assert result.resolution == "360p"
-    assert result.has_audio is False
+    assert result.has_audio is True
     assert result.synth_id_watermark is True
     assert result.storage_key == f"clips/{result.clip_id}.mp4"
     assert store.puts == [(result.storage_key, CLIP_BYTES, "video/mp4")]
@@ -45,13 +45,12 @@ async def test_prompt_and_pins_are_passed_to_the_provider() -> None:
     assert "a spoon on a table" in call["user"]
     assert call["model_pin"] == CLIP_PIN
     assert call["resolution"] == "360p"
-    assert call["generate_audio"] is False
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("target", "expected"),
-    [(1.0, 1), (2.5, 3), (4.0, 4), (0.2, 1), (9.0, 4)],
+    [(1.0, 3), (2.5, 3), (3.0, 3), (4.0, 4), (0.2, 3), (9.0, 4)],
 )
 async def test_duration_is_clamped_to_the_output_contract(target: float, expected: int) -> None:
     model = FakeClipModel([CLIP_BYTES])

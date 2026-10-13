@@ -83,7 +83,7 @@ async def test_the_clip_producer_reports_a_produced_clip() -> None:
     assert outcome["produced"] is True
     assert outcome["durationSeconds"] == 4.0
     assert outcome["resolution"] == "360p"
-    assert outcome["hasAudio"] is False
+    assert outcome["hasAudio"] is True
     assert outcome["synthIdWatermark"] is True
 
 

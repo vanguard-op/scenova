@@ -49,7 +49,7 @@ async def test_generated_clip_matches_the_output_contract() -> None:
     assert body["url"] == f"{CDN_BASE}/{body['storageKey']}"
     assert body["durationSeconds"] == 4.0
     assert body["resolution"] == "360p"
-    assert body["hasAudio"] is False
+    assert body["hasAudio"] is True
     assert body["synthIdWatermark"] is True
     assert store.puts == [(body["storageKey"], CLIP_BYTES, "video/mp4")]
 
@@ -69,14 +69,16 @@ async def test_a_phrase_selection_is_generated_from_the_phrase_itself() -> None:
 
 
 @pytest.mark.asyncio
-async def test_short_target_rounds_up_to_the_next_second() -> None:
+async def test_short_target_is_raised_to_the_model_minimum() -> None:
     response = await post(
         FakeClipModel([CLIP_BYTES]),
         payload=clip_payload(targetDurationSeconds=1.5),
     )
 
     assert response.status_code == 201
-    assert response.json()["durationSeconds"] == 2.0
+    # The pinned model will not make a clip shorter than three seconds, so a
+    # shorter target is raised to that minimum rather than sent and rejected.
+    assert response.json()["durationSeconds"] == 3.0
 
 
 @pytest.mark.asyncio

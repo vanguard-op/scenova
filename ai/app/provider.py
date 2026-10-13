@@ -16,7 +16,9 @@ retries is surfaced as HTTP 503.
 from __future__ import annotations
 
 import asyncio
+import base64
 import logging
+from collections.abc import Mapping
 from typing import Any, Protocol, runtime_checkable
 
 import httpx
@@ -65,7 +67,6 @@ class ClipModel(Protocol):
         model_pin: str,
         duration_seconds: int,
         resolution: str,
-        generate_audio: bool,
     ) -> bytes: ...
 
 
@@ -157,30 +158,51 @@ def _combine_prompt(*, system: str, user: str) -> str:
     return f"{system}\n\n{user}"
 
 
-def _extract_video(operation: Any) -> bytes:
-    """Return the clip bytes, or treat a declined/empty result as a refusal."""
+# Gemini Omni Flash, the pinned clip model, is served by the Interactions API
+# (`client.interactions.create`), not the Veo video API (`generate_videos`).
+# Omni returns the finished clip inline as base64 on the interaction; only a clip
+# over 4MB is delivered by URI. A clip still being worked on is polled to done.
+_IN_FLIGHT_STATUSES = frozenset({"queued", "in_progress"})
 
-    error = getattr(operation, "error", None)
-    if error:
-        raise ProviderUnavailable(f"model provider operation failed: {error}")
 
-    response = getattr(operation, "response", None)
-    filtered = getattr(response, "rai_media_filtered_count", None)
-    if isinstance(filtered, int) and filtered > 0:
-        raise ProviderRefusal("model provider filtered the generated video")
+def _field(resource: Any, name: str) -> Any:
+    """Read one field from a provider resource, model object or mapping alike."""
 
-    videos = getattr(response, "generated_videos", None) or []
-    if not videos:
-        raise ProviderRefusal("model provider returned no video")
+    if isinstance(resource, Mapping):
+        return resource.get(name)
+    return getattr(resource, name, None)
 
-    data = getattr(getattr(videos[0], "video", None), "video_bytes", None)
+
+def _interaction_video(interaction: Any) -> Any:
+    """Return the interaction's video output, or classify the outcome (C-005).
+
+    A completed interaction carries one video block. A platform fault recorded on
+    the interaction is unavailability; an interaction that finished with no video
+    is the provider declining the phrase.
+    """
+
+    errors = _field(interaction, "errors")
+    video = _field(interaction, "output_video")
+    if video is not None:
+        return video
+    if errors:
+        raise ProviderUnavailable(f"model provider interaction failed: {errors}")
+    raise ProviderRefusal(
+        f"model provider produced no clip (status={_field(interaction, 'status')!r})"
+    )
+
+
+def _inline_video_bytes(video: Any) -> bytes | None:
+    """Return the inline clip bytes, or None when the clip was delivered by URI."""
+
+    data = _field(video, "data")
     if not data:
-        raise ProviderRefusal("model provider returned no usable video data")
-    return bytes(data)
+        return None
+    return data if isinstance(data, bytes) else base64.b64decode(data)
 
 
 class GeminiClipModel:
-    """Generates a short clip through the Gemini API against the pinned version."""
+    """Generates a short clip through the Interactions API against the pinned version."""
 
     def __init__(self, settings: Settings, *, breaker: CircuitBreaker | None = None) -> None:
         self._settings = settings
@@ -205,7 +227,6 @@ class GeminiClipModel:
         model_pin: str,
         duration_seconds: int,
         resolution: str,
-        generate_audio: bool,
     ) -> bytes:
         if not self._breaker.allow():
             raise ProviderUnavailable("model provider circuit is open")
@@ -219,7 +240,6 @@ class GeminiClipModel:
                     model_pin=model_pin,
                     duration_seconds=duration_seconds,
                     resolution=resolution,
-                    generate_audio=generate_audio,
                 )
             except (ProviderTimeout, ProviderRefusal):
                 # A slow or declining provider will not improve on a retry.
@@ -249,26 +269,29 @@ class GeminiClipModel:
         model_pin: str,
         duration_seconds: int,
         resolution: str,
-        generate_audio: bool,
     ) -> bytes:
         try:
             client = self._get_client()
-            operation: Any = await asyncio.wait_for(
+            return await asyncio.wait_for(
                 self._generate(
                     client,
                     prompt=_combine_prompt(system=system, user=user),
                     model_pin=model_pin,
                     duration_seconds=duration_seconds,
                     resolution=resolution,
-                    generate_audio=generate_audio,
                 ),
                 timeout=self._settings.clip_video_timeout_seconds,
             )
         except TimeoutError as exc:
             raise ProviderTimeout("model provider timed out") from exc
-        except (httpx.HTTPError, genai_errors.APIError, OSError) as exc:
+        except genai_errors.APIError as exc:
+            # A rejected input is the provider declining the phrase (422); any
+            # other provider error is transient unavailability (503).
+            if exc.code in (400, 403):
+                raise ProviderRefusal(f"model provider rejected the request: {exc}") from exc
             raise ProviderUnavailable(f"model provider request failed: {exc}") from exc
-        return _extract_video(operation)
+        except (httpx.HTTPError, OSError) as exc:
+            raise ProviderUnavailable(f"model provider request failed: {exc}") from exc
 
     async def _generate(
         self,
@@ -278,21 +301,40 @@ class GeminiClipModel:
         model_pin: str,
         duration_seconds: int,
         resolution: str,
-        generate_audio: bool,
-    ) -> Any:
-        """Submit the video job and poll the long-running operation to completion."""
+    ) -> bytes:
+        """Submit the clip and return its bytes once the interaction finishes."""
 
-        operation: Any = await client.aio.models.generate_videos(
+        interaction: Any = await client.aio.interactions.create(
             model=model_pin,
-            prompt=prompt,
-            config=genai_types.GenerateVideosConfig(
-                number_of_videos=1,
-                duration_seconds=duration_seconds,
-                resolution=resolution,
-                generate_audio=generate_audio,
-            ),
+            input=prompt,
+            response_format={
+                "type": "video",
+                "resolution": resolution,
+                "duration": f"{duration_seconds}s",
+            },
         )
-        while not getattr(operation, "done", False):
+        interaction = await self._await_completion(client, interaction)
+        return await self._fetch_bytes(client, _interaction_video(interaction))
+
+    async def _await_completion(self, client: genai.Client, interaction: Any) -> Any:
+        """Poll a clip the provider has not finished making."""
+
+        while _field(interaction, "status") in _IN_FLIGHT_STATUSES:
             await asyncio.sleep(self._settings.clip_poll_interval_seconds)
-            operation = await client.aio.operations.get(operation)
-        return operation
+            interaction = await client.aio.interactions.get(_field(interaction, "id"))
+        return interaction
+
+    async def _fetch_bytes(self, client: genai.Client, video: Any) -> bytes:
+        """Read the clip bytes, downloading a URI delivery if it is not inline."""
+
+        inline = _inline_video_bytes(video)
+        if inline is not None:
+            return inline
+
+        uri = _field(video, "uri")
+        if not uri:
+            raise ProviderRefusal("model provider returned no usable video data")
+        downloaded = await client.aio.files.download(file=uri)
+        if not downloaded:
+            raise ProviderRefusal("model provider returned no usable video data")
+        return bytes(downloaded)
