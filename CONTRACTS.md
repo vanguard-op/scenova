@@ -30,7 +30,7 @@ Errors: 400 (a phrase job without a phrase, or target duration over four seconds
 Status: Frozen
 Auth: internal service identity (called by the generation pipeline only)
 Request: lemma: string|null, partOfSpeech: string, senseHint: string, modelPin: string ("gemini-3.5-flash-lite")
-Response 200: phrase: string (fewer than seven words, common words), source: generated|fallback, bestGuess: boolean
+Response 200: phrase: string (seven words or fewer, common words), source: generated|fallback, bestGuess: boolean
 Errors: 401 (not an internal caller), 503 (provider unavailable after retries; the caller substitutes the fallback). Refusal, timeout, or unusable output is returned as 200 with source=fallback, never as an error to the reader.
 
 ### C-005: POST /internal/model/clip

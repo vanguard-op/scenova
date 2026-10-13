@@ -123,6 +123,10 @@ docs/           BPRD (product-shaper)
 | T-036 | FEAT-004 | qa-engineer | Done | C-004 |
 | T-037 | FEAT-004 | ai-engineer | Done | C-004 |
 | T-038 | FEAT-004 | qa-engineer | Done | C-004 |
+| T-039 | FEAT-004 | ai-engineer | Done | C-004 |
+| T-040 | FEAT-004 | qa-engineer | Done | C-004 |
+| T-041 | — | ai-engineer | Done | C-004 |
+| T-042 | — | qa-engineer | Done | C-004, C-005 |
 
 ## Decisions Log
 | # | Decision | Rationale | By |
@@ -148,7 +152,7 @@ docs/           BPRD (product-shaper)
 
 ## Definition of Done
 - **Task:** the acceptance criteria in the cited feature doc are met; the frozen contract is conformed; unit tests pass; format, lint, analyze, and build are clean; work is committed to the dev branch and confined to `Own`.
-- **Phase:** QA's integration, acceptance, and full regression pass is green at the phase gate; for model-backed capabilities the NFR-050 to NFR-053 golden-set evaluation meets its threshold; the release flags for the phase are recorded.
+- **Phase:** QA's integration, acceptance, and full regression pass is green at the phase gate; for the model-backed capabilities the phase delivers, the golden-set evaluation meets its threshold; the release flags for the phase are recorded.
 
 ## Key Commands
 - `flutter analyze` / `flutter test` — the Flutter app (`apps/mobile`)
