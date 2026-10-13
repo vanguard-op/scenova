@@ -7,10 +7,13 @@ the bar's rubric and raters, and the measured share is asserted against the
 threshold. It drives the shipped `python -m quality` run (`ai/quality`), so the
 number asserted here is the number the release decision reads.
 
-A run that cannot produce, or cannot be judged, fails here and names the missing
-input: a bar that was never measured must not read as green. NFR-052 is measured
-from live reader feedback over a rolling thirty days and has no golden set, so it
-is not asserted from a run (nfr.md, Model Quality & Cost).
+The gate measures only the bars whose capability the phase delivers
+(`golden_bars_for_phase`), so a later phase's capability — the phrase clip of the
+Reading Loop — never blocks this phase (nfr.md, Model Quality & Cost; roadmap.md,
+"Phase 1: Foundations"). A run that cannot produce, or cannot be judged, fails
+here and names the missing input: a bar that was never measured must not read as
+green. NFR-052 is measured from live reader feedback over a rolling thirty days
+and has no golden set, so it is not asserted from a run.
 """
 
 from __future__ import annotations
@@ -22,11 +25,11 @@ from pathlib import Path
 import pytest
 from quality.__main__ import main as quality_main
 
-from qa.quality_bar import BARS, Bar
+from qa.quality_bar import CURRENT_PHASE, Bar, golden_bars_for_phase
 
 pytestmark = [pytest.mark.acceptance, pytest.mark.model]
 
-_GOLDEN_BARS = [bar for bar in BARS if bar.golden_file is not None]
+_GOLDEN_BARS = golden_bars_for_phase(CURRENT_PHASE)
 _HERE = Path(__file__).resolve().parent
 
 # The two inputs a judged run needs beyond the golden set (nfr.md, Model Quality

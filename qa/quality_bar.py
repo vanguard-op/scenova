@@ -20,6 +20,12 @@ nfr.md: the rater's misses and a fixed sample of the rest are re-judged, and the
 adjudicated verdict is the one the run counts); the harness accepts a judge
 callable so a run is reproducible, and reports the metric, the sample size, and
 the failing cases.
+
+The harness declares every bar (NFR-050 to NFR-053), but a phase gate measures
+only the bars whose capability the phase delivers: each bar names the durable
+feature it belongs to (`nfr.md`'s "Feature" column) and `PHASE_FEATURES` places
+each feature in its roadmap phase, so `bars_for_phase` scopes a gate to its own
+phase and a later phase's bar never blocks this one.
 """
 
 from __future__ import annotations
@@ -53,6 +59,10 @@ class Bar:
     # The pinned model this capability is measured against. Every bar declared in
     # `BARS` sets it; a bar that carries none cannot be measured (nfr.md).
     model_pin: str = ""
+    # The durable feature the capability belongs to (nfr.md's Model Quality &
+    # Cost "Feature" column). The roadmap places each feature in a phase, so this
+    # is what scopes a phase gate to the capabilities that phase delivers.
+    feature_id: str = ""
 
 
 BARS: tuple[Bar, ...] = (
@@ -66,6 +76,7 @@ BARS: tuple[Bar, ...] = (
         threshold=0.90,
         cost_ceiling="$0.01 per request",
         model_pin=PHRASE_MODEL_PIN,
+        feature_id="FEAT-004",
     ),
     Bar(
         nfr_id="NFR-051",
@@ -76,6 +87,7 @@ BARS: tuple[Bar, ...] = (
         threshold=0.80,
         cost_ceiling="$0.15 per generated clip",
         model_pin=CLIP_MODEL_PIN,
+        feature_id="FEAT-005",
     ),
     Bar(
         nfr_id="NFR-052",
@@ -86,6 +98,7 @@ BARS: tuple[Bar, ...] = (
         threshold=0.70,
         cost_ceiling="Not applicable",
         model_pin=CLIP_MODEL_PIN,
+        feature_id="FEAT-005",
     ),
     Bar(
         nfr_id="NFR-053",
@@ -96,8 +109,24 @@ BARS: tuple[Bar, ...] = (
         threshold=0.75,
         cost_ceiling="$0.15 per generated clip",
         model_pin=CLIP_MODEL_PIN,
+        feature_id="FEAT-007",
     ),
 )
+
+# The features each roadmap phase delivers (roadmap.md, "Phase 1: Foundations"
+# through "Phase 4: Polish and Account"). A phase gate measures only the bars
+# whose capability the phase delivers, so a later phase's bar never blocks an
+# earlier phase and an earlier phase's bar is never smuggled into a later one.
+PHASE_FEATURES: Mapping[str, tuple[str, ...]] = {
+    "Phase 1: Foundations": ("FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004", "FEAT-005"),
+    "Phase 2: The Reading Loop": ("FEAT-006", "FEAT-007", "FEAT-008"),
+    "Phase 3: Trust and Continuity": ("FEAT-009", "FEAT-010", "FEAT-011"),
+    "Phase 4: Polish and Account": ("FEAT-012", "FEAT-013"),
+}
+
+# The phase the gate is closing (roadmap.md's active phase). A phase advances by
+# moving this to the next heading in `PHASE_FEATURES`.
+CURRENT_PHASE = "Phase 1: Foundations"
 
 
 class GoldenSetMissing(Exception):
@@ -185,3 +214,25 @@ def evaluate(
 
 def bars() -> Iterator[Bar]:
     return iter(BARS)
+
+
+def phase_features(phase: str) -> tuple[str, ...]:
+    """The features one roadmap phase delivers, or raise ``KeyError``."""
+
+    try:
+        return PHASE_FEATURES[phase]
+    except KeyError as exc:
+        raise KeyError(f"unknown roadmap phase: {phase}") from exc
+
+
+def bars_for_phase(phase: str) -> tuple[Bar, ...]:
+    """The bars a phase's capabilities carry (roadmap.md, feature by phase)."""
+
+    delivered = set(phase_features(phase))
+    return tuple(bar for bar in BARS if bar.feature_id in delivered)
+
+
+def golden_bars_for_phase(phase: str) -> tuple[Bar, ...]:
+    """The phase's bars that are measured from a fixed golden set."""
+
+    return tuple(bar for bar in bars_for_phase(phase) if bar.golden_file is not None)
