@@ -112,6 +112,20 @@ void main() {
       expect(scheme.primary, ScenovaPalette.primary500Light);
       expect(scheme.surface, ScenovaPalette.grey50Light);
     });
+
+    test('the icon states follow the iconography direction', () {
+      // Default in text-secondary, active in primary-500, disabled in a solid
+      // grey-400 that is dimmer than the default in both themes.
+      const light = ScenovaColors.light;
+      expect(light.iconDefault, ScenovaPalette.grey600Light);
+      expect(light.iconActive, ScenovaPalette.primary500Light);
+      expect(light.iconDisabled, ScenovaPalette.grey400Light);
+
+      const dark = ScenovaColors.dark;
+      expect(dark.iconDefault, ScenovaPalette.grey600Dark);
+      expect(dark.iconActive, ScenovaPalette.primary500Dark);
+      expect(dark.iconDisabled, ScenovaPalette.grey400Dark);
+    });
   });
 
   group('AppTheme', () {

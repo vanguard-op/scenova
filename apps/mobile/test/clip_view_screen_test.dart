@@ -73,7 +73,7 @@ void main() {
     expect(controller.phase, ClipPhase.playing);
     expect(find.text(_libraryPhrase), findsOneWidget);
     // Autoplay is on by default, so the control offers Pause.
-    expect(find.byIcon(AppIcons.pause), findsOneWidget);
+    expect(findIcon(AppIcons.pause), findsOneWidget);
 
     final saved = await services.historyStore.all();
     expect(saved.single.word, 'come');

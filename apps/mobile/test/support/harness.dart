@@ -20,6 +20,7 @@ import 'package:scenova/services/lookup_api.dart';
 import 'package:scenova/services/settings_controller.dart';
 import 'package:scenova/theme/app_theme.dart';
 import 'package:scenova/theme/tokens.dart';
+import 'package:scenova/widgets/app_icons.dart';
 
 /// The collaborators a test hands to a screen.
 ScenovaServices buildServices({
@@ -107,6 +108,12 @@ Future<void> pumpClipView(
     ),
   );
 }
+
+/// Finds the widget drawing [icon], whether it is a custom-set glyph or a
+/// system icon, so a test asserts the app's own icon and not the platform's.
+Finder findIcon(AppIcon icon) => find.byWidgetPredicate(
+  (widget) => widget is AppIconView && widget.icon == icon,
+);
 
 /// Sizes the test window to a phone so a mobile screen lays out as designed.
 void usePhoneWindow(WidgetTester tester) {

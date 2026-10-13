@@ -211,7 +211,8 @@ class ScenovaColors extends ThemeExtension<ScenovaColors> {
     textDisabled: ScenovaPalette.grey500Light,
     placeholder: ScenovaPalette.grey400Light,
     border: ScenovaPalette.grey300Light,
-    iconDefault: ScenovaPalette.grey700Light,
+    // The iconography direction puts the default state in `text-secondary`.
+    iconDefault: ScenovaPalette.grey600Light,
     iconActive: ScenovaPalette.primary500Light,
     iconDisabled: ScenovaPalette.grey400Light,
     primary: ScenovaPalette.primary500Light,
@@ -266,7 +267,7 @@ class ScenovaColors extends ThemeExtension<ScenovaColors> {
     textDisabled: ScenovaPalette.grey500Dark,
     placeholder: ScenovaPalette.grey400Dark,
     border: ScenovaPalette.grey300Dark,
-    iconDefault: ScenovaPalette.grey700Dark,
+    iconDefault: ScenovaPalette.grey600Dark,
     iconActive: ScenovaPalette.primary500Dark,
     iconDisabled: ScenovaPalette.grey400Dark,
     primary: ScenovaPalette.primary500Dark,

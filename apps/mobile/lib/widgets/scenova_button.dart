@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/colors.dart';
 import '../theme/tokens.dart';
 import '../theme/typography.dart';
+import 'app_icons.dart';
 
 /// The action variants from `docs/Scenova/branding.md` → "Component Tokens →
 /// Buttons".
@@ -30,7 +31,7 @@ class ScenovaButton extends StatefulWidget {
   final String label;
   final VoidCallback? onPressed;
   final ScenovaButtonVariant variant;
-  final IconData? icon;
+  final AppIcon? icon;
   final String? semanticLabel;
   final bool expanded;
   final bool isSubmitting;
@@ -71,8 +72,8 @@ class _ScenovaButtonState extends State<ScenovaButton> {
           ),
         )
       else if (widget.icon != null)
-        Icon(
-          widget.icon,
+        AppIconView(
+          icon: widget.icon!,
           size: tokens.sizing.iconSm,
           color: palette.foreground,
         ),
@@ -150,7 +151,7 @@ class ScenovaIconButton extends StatefulWidget {
     this.semanticLabel,
   });
 
-  final IconData icon;
+  final AppIcon icon;
   final String tooltip;
   final VoidCallback? onPressed;
 
@@ -170,11 +171,12 @@ class _ScenovaIconButtonState extends State<ScenovaIconButton> {
     final colors = ScenovaColors.of(context);
     final tokens = ScenovaTokens.of(context);
     final enabled = widget.onPressed != null;
-    final color = !enabled
-        ? colors.iconDisabled
+    final state = !enabled
+        ? ScenovaIconState.disabled
         : widget.active
-        ? colors.iconActive
-        : colors.iconDefault;
+        ? ScenovaIconState.active
+        : ScenovaIconState.inactive;
+    final color = AppIconView.toneFor(colors, state);
 
     return _FocusRing(
       visible: _focused,
@@ -187,7 +189,11 @@ class _ScenovaIconButtonState extends State<ScenovaIconButton> {
         child: IconButton(
           onPressed: widget.onPressed,
           tooltip: widget.tooltip,
-          icon: Icon(widget.icon, size: tokens.sizing.iconMd, color: color),
+          icon: AppIconView(
+            icon: widget.icon,
+            state: state,
+            size: tokens.sizing.iconMd,
+          ),
           style: IconButton.styleFrom(
             minimumSize: Size.square(tokens.sizing.buttonHeight),
             tapTargetSize: MaterialTapTargetSize.padded,

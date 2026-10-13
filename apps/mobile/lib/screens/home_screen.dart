@@ -201,8 +201,8 @@ class _HomeScreenState extends State<HomeScreen> {
               },
               decoration: InputDecoration(
                 hintText: 'Type or paste a word',
-                prefixIcon: Icon(
-                  AppIcons.search,
+                prefixIcon: AppIconView(
+                  icon: AppIcons.search,
                   size: tokens.sizing.iconMd,
                   color: colors.iconDefault,
                 ),

@@ -36,8 +36,8 @@ class OfflineBanner extends StatelessWidget {
         ),
         child: Row(
           children: <Widget>[
-            Icon(
-              AppIcons.offline,
+            AppIconView(
+              icon: AppIcons.offline,
               size: tokens.sizing.iconSm,
               color: colors.warning.element,
             ),

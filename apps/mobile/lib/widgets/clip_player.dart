@@ -193,8 +193,8 @@ class _Unavailable extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(
-              AppIcons.seeIt,
+            AppIconView(
+              icon: AppIcons.seeIt,
               size: tokens.sizing.iconMd,
               color: colors.iconDefault,
             ),
@@ -264,10 +264,10 @@ class _Ready extends StatelessWidget {
             ),
             if (showPlayAffordance)
               Center(
-                child: Icon(
-                  AppIcons.play,
+                child: AppIconView(
+                  icon: AppIcons.play,
+                  state: ScenovaIconState.active,
                   size: tokens.sizing.iconLg,
-                  color: colors.primary,
                 ),
               ),
             if (playing)
@@ -296,8 +296,8 @@ class _Ready extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
-                      Icon(
-                        AppIcons.listen,
+                      AppIconView(
+                        icon: AppIcons.listen,
                         size: tokens.sizing.iconSm,
                         color: colors.textSecondary,
                       ),

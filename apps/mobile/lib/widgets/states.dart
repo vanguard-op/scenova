@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/colors.dart';
 import '../theme/tokens.dart';
 import '../theme/typography.dart';
+import 'app_icons.dart';
 import 'scenova_button.dart';
 
 /// The shared Empty State (`docs/Scenova/screens.md` → "Shared / Common
@@ -18,7 +19,7 @@ class EmptyState extends StatelessWidget {
     this.onAction,
   });
 
-  final IconData icon;
+  final AppIcon icon;
   final String headline;
   final String body;
   final String? actionLabel;
@@ -41,7 +42,11 @@ class EmptyState extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Icon(icon, size: tokens.sizing.iconLg, color: colors.iconDefault),
+              AppIconView(
+                icon: icon,
+                size: tokens.sizing.iconLg,
+                color: colors.iconDefault,
+              ),
               SizedBox(height: tokens.spacing.md),
               Text(
                 headline,
@@ -103,8 +108,8 @@ class ErrorState extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Icon(
-                Icons.error_outline_rounded,
+              AppIconView(
+                icon: AppIcons.error,
                 size: tokens.sizing.iconLg,
                 color: colors.error.element,
               ),
@@ -126,7 +131,7 @@ class ErrorState extends StatelessWidget {
                   label: retryLabel,
                   onPressed: onRetry,
                   variant: ScenovaButtonVariant.outline,
-                  icon: Icons.refresh_rounded,
+                  icon: AppIcons.retry,
                 ),
               ],
             ],

@@ -220,8 +220,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Icon(
-          AppIcons.info,
+        AppIconView(
+          icon: AppIcons.info,
           size: tokens.sizing.iconSm,
           color: colors.info.element,
         ),
@@ -301,8 +301,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Icon(
-              AppIcons.info,
+            AppIconView(
+              icon: AppIcons.info,
               size: tokens.sizing.iconSm,
               color: colors.warning.element,
             ),

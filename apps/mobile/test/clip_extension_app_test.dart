@@ -98,7 +98,7 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    await tester.tap(find.byIcon(AppIcons.close));
+    await tester.tap(findIcon(AppIcons.close));
     await tester.pump();
 
     expect(calls, contains(ExtensionChannel.methodDismiss));

@@ -58,8 +58,8 @@ class EnableActionGuide extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Icon(
-                AppIcons.info,
+              AppIconView(
+                icon: AppIcons.info,
                 size: tokens.sizing.iconSm,
                 color: colors.info.element,
               ),
