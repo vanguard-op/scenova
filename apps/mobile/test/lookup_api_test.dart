@@ -257,6 +257,18 @@ void main() {
       expect(result.primaryClip, isNull);
     });
 
+    test('marks a word outside the sense list as a best guess', () async {
+      final result = await MockLookupApi().createLookup(_request('quixotic'));
+      expect(result.senses.single.isBestGuess, isTrue);
+      expect(result.notice, isNotNull);
+      expect(result.displayWord, 'quixotic');
+    });
+
+    test('does not mark a library hit as a best guess', () async {
+      final result = await MockLookupApi().createLookup(_request('come'));
+      expect(result.senses.single.isBestGuess, isFalse);
+    });
+
     test('reports an unknown lookup as not found', () async {
       await expectLater(
         MockLookupApi().getLookup('missing'),

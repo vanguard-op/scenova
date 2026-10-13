@@ -98,6 +98,10 @@ class Sense {
     this.clip,
   });
 
+  /// The label the service uses when it fell back to the most likely meaning
+  /// because the word is not in the sense inventory.
+  static const String bestGuessLabel = 'best_guess';
+
   final String senseLabel;
   final String partOfSpeech;
   final String glossPhrase;
@@ -105,6 +109,10 @@ class Sense {
   final Clip? clip;
 
   bool get hasClip => clip != null;
+
+  /// True when this sense was chosen without the word being in the inventory,
+  /// so the reader should be told it is a best guess.
+  bool get isBestGuess => senseLabel == bestGuessLabel;
 
   factory Sense.fromJson(Map<String, dynamic> json) {
     final rawClip = json['clip'];

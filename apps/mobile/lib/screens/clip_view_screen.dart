@@ -249,7 +249,6 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
             caption: _controller.word,
             onRetry: _controller.retry,
           ),
-          showResultNote: false,
         );
 
       case ClipPhase.generating:
@@ -285,11 +284,9 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
     BuildContext context, {
     required Widget player,
     String? note,
-    bool showResultNote = true,
     Widget? action,
   }) {
     final tokens = ScenovaTokens.of(context);
-    final resolvedNote = note ?? (showResultNote ? _controller.note : null);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
@@ -300,7 +297,7 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
         WordPhraseHeader(
           word: _controller.word,
           phrase: _controller.phrase,
-          note: resolvedNote,
+          note: note ?? _controller.note,
           isBestGuess: _controller.isBestGuess,
           compact: true,
         ),

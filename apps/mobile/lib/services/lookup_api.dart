@@ -286,17 +286,18 @@ class MockLookupApi implements LookupApi {
       lookupId: _nextId(),
       kind: LookupKind.word,
       rawSelection: selection,
-      normalisedLemma: selection.toLowerCase(),
+      // The word is not in the sense inventory, so no base form is supplied.
+      normalisedLemma: null,
       status: LookupStatus.generating,
       senses: <Sense>[
         Sense(
-          senseLabel: '1',
+          senseLabel: Sense.bestGuessLabel,
           partOfSpeech: 'verb',
           glossPhrase: 'to print a picture from a carved block of wood',
           entryId: null,
         ),
       ],
-      notice: null,
+      notice: _bestGuessNotice,
       correlationId: 'mock-correlation',
     );
   }
@@ -306,17 +307,17 @@ class MockLookupApi implements LookupApi {
       lookupId: _nextId(),
       kind: LookupKind.word,
       rawSelection: selection,
-      normalisedLemma: selection.toLowerCase(),
+      normalisedLemma: null,
       status: LookupStatus.fallback,
       senses: <Sense>[
         Sense(
-          senseLabel: '1',
+          senseLabel: Sense.bestGuessLabel,
           partOfSpeech: 'adjective',
           glossPhrase: 'hopeful even when things are unlikely',
           entryId: null,
         ),
       ],
-      notice: 'A clip is not available for this word right now.',
+      notice: _bestGuessNotice,
       correlationId: 'mock-correlation',
     );
   }
@@ -343,10 +344,15 @@ class MockLookupApi implements LookupApi {
           ),
         ),
       ],
-      notice: null,
+      notice: generating.notice,
       correlationId: generating.correlationId,
     );
   }
 
   String _nextId() => 'mock-${_counter++}';
+
+  /// Mirrors the service's own wording for a word it does not hold.
+  static const String _bestGuessNotice =
+      "This word isn't in our sense list yet, so we're showing the most likely "
+      'meaning.';
 }
