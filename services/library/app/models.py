@@ -51,9 +51,9 @@ class ClipAssetBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str
-    # Clips are capped at four seconds; the pipeline withholds a longer one
-    # before it ever reaches the library.
-    durationSeconds: float = Field(gt=0, le=4)
+    # The pinned clip model produces three to four seconds (schema "ClipAsset"),
+    # so an asset outside that range is refused before it is stored.
+    durationSeconds: float = Field(ge=3, le=4)
     resolution: Literal["360p"] = "360p"
     storageKey: str
     url: str

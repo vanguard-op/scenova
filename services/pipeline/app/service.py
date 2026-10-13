@@ -7,11 +7,12 @@ selection and skips that step. It then calls the model-serving clip endpoint
 the clip is ready. The reader is never blocked: `submit` enqueues and returns,
 and the job runs in the background.
 
-A decline, a timeout, an unavailable provider, a clip over the four-second cap,
-an exhausted generation budget, or the `enable_generation` kill switch being off
-leaves no clip stored, so the caller shows the fallback. The phrase step never
-fails the job: the model layer's own fallback arrives as a normal result, and an
-unreachable model layer is substituted with the fixed template.
+A decline, a timeout, an unavailable provider, a clip outside the three-to-four-
+second range, an exhausted generation budget, or the `enable_generation` kill
+switch being off leaves no clip stored, so the caller shows the fallback. The
+phrase step never fails the job: the model layer's own fallback arrives as a
+normal result, and an unreachable model layer is substituted with the fixed
+template.
 
 Every job records the two pinned models the generation path depends on: the text
 model that produced the gloss phrase and the video model the clip is generated
@@ -52,6 +53,7 @@ from .errors import (
 )
 from .events import (
     REASON_DURATION_OVER_CAP,
+    REASON_DURATION_UNDER_FLOOR,
     REASON_PROVIDER_DECLINED,
     REASON_PROVIDER_TIMEOUT,
     REASON_PROVIDER_UNAVAILABLE,
@@ -257,11 +259,14 @@ class GenerationService:
                 running, JobStatus.FAILED, COST_UNITS_PER_CLIP, REASON_PROVIDER_UNAVAILABLE
             )
 
-        if not _within_cap(clip, self._settings.clip_max_duration_seconds):
-            logger.info("withheld a clip over the duration cap (job %s)", running.id)
-            return await self._fail(
-                running, JobStatus.FAILED, COST_UNITS_PER_CLIP, REASON_DURATION_OVER_CAP
-            )
+        withheld = _duration_out_of_range(
+            clip,
+            self._settings.clip_min_duration_seconds,
+            self._settings.clip_max_duration_seconds,
+        )
+        if withheld is not None:
+            logger.info("withheld a clip outside the duration range (job %s)", running.id)
+            return await self._fail(running, JobStatus.FAILED, COST_UNITS_PER_CLIP, withheld)
 
         if running.kind is Kind.WORD:
             await self._store_word_clip(running, clip, phrase, resolved.is_fallback)
@@ -494,8 +499,19 @@ def build_default_service(settings: Settings) -> GenerationService:
     )
 
 
-def _within_cap(clip: ClipResult, cap: float) -> bool:
-    return 0 < clip.duration_seconds <= cap
+def _duration_out_of_range(clip: ClipResult, low: float, high: float) -> str | None:
+    """The reason a produced clip cannot be served, or None when it is in range.
+
+    The pinned model's output is three to four seconds; a clip shorter than three
+    is not the output the model produces, and one over four is past the product's
+    cap. Either way the reader gets the fallback and the reason is recorded.
+    """
+
+    if clip.duration_seconds < low:
+        return REASON_DURATION_UNDER_FLOOR
+    if clip.duration_seconds > high:
+        return REASON_DURATION_OVER_CAP
+    return None
 
 
 def _elapsed_ms(started_at: float, finished_at: float) -> int:

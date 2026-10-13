@@ -1,9 +1,9 @@
 """Runtime configuration for the generation pipeline.
 
 Every value has a documented default, so the service starts without an
-environment; nothing secret is read here (NFR-024). The clip cap is a constant
-rather than an environment variable: it is part of the pinned output contract
-the quality bar was measured on, so it changes with the feature, not per
+environment; nothing secret is read here (NFR-024). The clip's duration range is
+a constant rather than an environment variable: it is part of the pinned output
+contract the quality bar was measured on, so it changes with the feature, not per
 environment.
 """
 
@@ -46,7 +46,11 @@ DEFAULT_LIBRARY_STORE_RETRY_DELAY_SECONDS = 0.25
 # produced, off the reader's path. When it cannot be sent the clip is still
 # delivered, so a short wait is enough to report it without holding the job open.
 DEFAULT_NOTIFICATION_TIMEOUT_SECONDS = 5.0
-# Clips are capped at four seconds so they resolve within a reader's glance.
+# The pinned video model produces clips of three to four seconds, so a clip
+# outside that range is withheld: shorter than three is not the output the model
+# was pinned to produce, and longer than four is past the product's cap. Both
+# bounds are part of the pinned output contract, not per-environment knobs.
+CLIP_MIN_DURATION_SECONDS = 3.0
 CLIP_MAX_DURATION_SECONDS = 4.0
 # The `enable_generation` release flag (release.md "Rollout Phases & Feature
 # Flags"): the runtime kill switch that stops new generation while the shared
@@ -72,6 +76,7 @@ class Settings:
     library_store_retry_delay_seconds: float = DEFAULT_LIBRARY_STORE_RETRY_DELAY_SECONDS
     notification_base_url: str = f"http://127.0.0.1:{DEFAULT_NOTIFICATION_PORT}"
     notification_timeout_seconds: float = DEFAULT_NOTIFICATION_TIMEOUT_SECONDS
+    clip_min_duration_seconds: float = CLIP_MIN_DURATION_SECONDS
     clip_max_duration_seconds: float = CLIP_MAX_DURATION_SECONDS
     # The two pinned model versions the generation path records on every job.
     phrase_model_pin: str = PHRASE_MODEL_PIN

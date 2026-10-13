@@ -18,6 +18,7 @@ from pipeline.app.events import (
     GENERATION_FAILED,
     GENERATION_STARTED,
     REASON_DURATION_OVER_CAP,
+    REASON_DURATION_UNDER_FLOOR,
     REASON_PROVIDER_DECLINED,
     REASON_PROVIDER_TIMEOUT,
     REASON_PROVIDER_UNAVAILABLE,
@@ -102,6 +103,16 @@ async def test_a_clip_over_the_cap_records_the_duration_reason() -> None:
     await test_rig.service.run("job-1")
 
     assert test_rig.events.events[-1].properties["reason"] == REASON_DURATION_OVER_CAP
+
+
+@pytest.mark.asyncio
+async def test_a_clip_below_the_floor_records_the_duration_reason() -> None:
+    test_rig = rig(generator=FakeClipGenerator(result=clip(duration_seconds=2.5)))
+    await test_rig.service.submit(request())
+
+    await test_rig.service.run("job-1")
+
+    assert test_rig.events.events[-1].properties["reason"] == REASON_DURATION_UNDER_FLOOR
 
 
 @pytest.mark.asyncio

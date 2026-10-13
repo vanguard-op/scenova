@@ -37,12 +37,14 @@ KEY_PROPERTIES: dict[GenerationEventName, frozenset[str]] = {
     GENERATION_FAILED: frozenset({"reason", "model_version"}),
 }
 
-# Why a generation ended without a clip. The provider failures and the over-cap
-# output are what "Error & Performance Monitoring" attributes to the provider or
-# the phrase; the cap is the pipeline withholding a clip it cannot serve.
+# Why a generation ended without a clip. The provider failures and the
+# out-of-range output are what "Error & Performance Monitoring" attributes to the
+# provider or the phrase; the range is the pipeline withholding a clip it cannot
+# serve.
 REASON_PROVIDER_DECLINED = "provider_declined"
 REASON_PROVIDER_TIMEOUT = "provider_timeout"
 REASON_PROVIDER_UNAVAILABLE = "provider_unavailable"
+REASON_DURATION_UNDER_FLOOR = "duration_under_floor"
 REASON_DURATION_OVER_CAP = "duration_over_cap"
 REASON_UNEXPECTED_ERROR = "unexpected_error"
 

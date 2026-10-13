@@ -1,7 +1,7 @@
 """Generation-service tests: the FEAT-005 acceptance criteria and edge cases.
 
-Covers the clip cap, the background outcome for a decline, a timeout, an
-unavailable provider, the one-job-per-word dedupe, and the generation budget.
+Covers the clip duration range, the background outcome for a decline, a timeout,
+an unavailable provider, the one-job-per-word dedupe, and the generation budget.
 """
 
 from __future__ import annotations
@@ -320,6 +320,31 @@ async def test_a_clip_over_the_four_second_cap_is_withheld() -> None:
 async def test_a_clip_at_the_cap_is_kept() -> None:
     test_rig = rig(generator=FakeClipGenerator(result=clip(duration_seconds=4.0)))
     await test_rig.service.submit(request(duration=4.0))
+
+    job = await test_rig.service.run("job-1")
+
+    assert job.status == JobStatus.SUCCEEDED
+    assert len(test_rig.library.all()) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_clip_below_the_three_second_floor_is_withheld() -> None:
+    # The pinned model does not produce a clip shorter than three seconds, so an
+    # out-of-range clip is withheld and the reader sees the fallback (FEAT-005).
+    test_rig = rig(generator=FakeClipGenerator(result=clip(duration_seconds=2.5)))
+    await test_rig.service.submit(request())
+
+    job = await test_rig.service.run("job-1")
+
+    assert job.status == JobStatus.FAILED
+    assert test_rig.library.all() == ()
+    assert test_rig.notifier.ready == []
+
+
+@pytest.mark.asyncio
+async def test_a_clip_at_the_floor_is_kept() -> None:
+    test_rig = rig(generator=FakeClipGenerator(result=clip(duration_seconds=3.0)))
+    await test_rig.service.submit(request(duration=3.0))
 
     job = await test_rig.service.run("job-1")
 

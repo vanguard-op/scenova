@@ -2,13 +2,13 @@
 
 The job record carries the library key (lemma, sense, part of speech) and the
 target duration alongside the schema's own fields, because the pipeline needs
-them to write a word clip to the shared library and to enforce the four-second
-cap once the clip is produced. It records both pinned models the generation path
-depends on — the text model that produced the gloss phrase and the video model
-that produced the clip — so a clip is attributable to the exact model pair. It
-also carries the correlation id the enqueue arrived with, so a generation event
-ties back to the lookup that started it (`analytics.md` "Error & Performance
-Monitoring").
+them to write a word clip to the shared library and to enforce the three-to-four-
+second range once the clip is produced. It records both pinned models the
+generation path depends on — the text model that produced the gloss phrase and
+the video model that produced the clip — so a clip is attributable to the exact
+model pair. It also carries the correlation id the enqueue arrived with, so a
+generation event ties back to the lookup that started it (`analytics.md`
+"Error & Performance Monitoring").
 """
 
 from __future__ import annotations

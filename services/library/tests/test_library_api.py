@@ -162,6 +162,20 @@ def test_a_clip_over_the_four_second_cap_is_refused() -> None:
     assert response.json()["code"] == "invalid_request"
 
 
+def test_a_clip_below_the_three_second_floor_is_refused() -> None:
+    # schema.md "ClipAsset": the pinned model produces three to four seconds, so
+    # an asset shorter than three is not a clip the library will hold.
+    with _client() as client:
+        response = client.post(
+            "/internal/library/entries",
+            headers=_INTERNAL,
+            json={"entry": _entry(), "asset": _asset(durationSeconds=2.0)},
+        )
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "invalid_request"
+
+
 def test_a_malformed_entry_is_refused() -> None:
     with _client() as client:
         response = client.post(
