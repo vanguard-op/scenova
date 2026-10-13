@@ -90,6 +90,27 @@ async def test_provider_unavailable_propagates() -> None:
 
 
 @pytest.mark.asyncio
+async def test_accepts_a_phrase_at_the_settled_word_cap() -> None:
+    model = FakePhraseModel(["she put the key in the door"])
+
+    result = await make_service(model).generate(request())
+
+    assert result.phrase == "she put the key in the door"
+    assert result.source == "generated"
+
+
+@pytest.mark.asyncio
+async def test_a_phrase_over_the_settled_word_cap_falls_back() -> None:
+    model = FakePhraseModel(["a key in the door on the wall"] * 2)
+
+    result = await make_service(model).generate(request())
+
+    assert result.source == "fallback"
+    assert result.best_guess is True
+    assert len(model.calls) == 2
+
+
+@pytest.mark.asyncio
 async def test_prompt_uses_the_sense_hint_when_lemma_is_absent() -> None:
     model = FakePhraseModel(["a key in the door"])
 

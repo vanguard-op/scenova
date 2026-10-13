@@ -1,6 +1,6 @@
 """Judges for the quality bar: the rubric and the rater.
 
-NFR-050's rubric has three parts — fewer than seven words, common words, one
+NFR-050's rubric has three parts — seven words or fewer, common words, one
 clear meaning. The first two are mechanical and checked here against the same
 guardrail the shipped phrase path uses; the third is a reader's judgement and
 comes from a rater. The clip bars (NFR-051, NFR-053) are entirely a rater's

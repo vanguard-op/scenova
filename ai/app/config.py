@@ -32,8 +32,10 @@ TEMPERATURE = 0.4
 TOP_P = 0.9
 MAX_OUTPUT_TOKENS = 32
 
-# Pinned output handling: "fewer than seven words" from the capability contract.
-MAX_PHRASE_WORDS = 6
+# Pinned output handling: the settled bound is "seven words or fewer" (FEAT-004
+# output contract, NFR-050's rubric). A longer candidate is rejected by the
+# guardrail and regenerated, then replaced by the fallback.
+MAX_PHRASE_WORDS = 7
 MAX_PHRASE_CHARS = 120
 REGENERATION_ATTEMPTS = 2
 RETRY_BACKOFF_SECONDS = 0.25

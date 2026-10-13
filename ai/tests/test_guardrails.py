@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from app.config import MAX_PHRASE_WORDS
 from app.data import load_common_words
 from app.phrase.guardrails import GuardrailResult, is_usable, normalize_phrase
 
@@ -27,7 +28,7 @@ def check(
     text: str,
     *,
     lemma: str | None = "key",
-    max_words: int = 6,
+    max_words: int = MAX_PHRASE_WORDS,
     max_chars: int = 120,
 ) -> GuardrailResult:
     return is_usable(
@@ -54,15 +55,15 @@ def test_strips_wrapping_quotes_and_collapses_whitespace() -> None:
     assert result.phrase == "a key in the door."
 
 
-def test_rejects_seven_words() -> None:
-    result = check("a key in the door on the wall")
+def test_rejects_a_phrase_over_the_settled_word_cap() -> None:
+    result = check("the old key on the old door in")
 
     assert result.ok is False
     assert result.reason == "too many words"
 
 
-def test_accepts_six_words() -> None:
-    assert check("a key in the old door").ok is True
+def test_accepts_a_phrase_at_the_settled_word_cap() -> None:
+    assert check("the old key on the old door").ok is True
 
 
 def test_rejects_empty_and_whitespace() -> None:
@@ -113,7 +114,7 @@ def test_accepts_a_common_inflection_of_a_known_base() -> None:
         "he climbs the ladder",
         lemma="ladder",
         common_words=words,
-        max_words=6,
+        max_words=MAX_PHRASE_WORDS,
         max_chars=120,
     )
 
@@ -127,7 +128,7 @@ def test_accepts_a_past_tense_of_a_known_base() -> None:
         "she walked home",
         lemma="walk",
         common_words=words,
-        max_words=6,
+        max_words=MAX_PHRASE_WORDS,
         max_chars=120,
     )
 
@@ -145,7 +146,7 @@ def test_accepts_a_common_adverb_of_a_known_base() -> None:
         "she reads a book quietly",
         lemma=None,
         common_words=words,
-        max_words=6,
+        max_words=MAX_PHRASE_WORDS,
         max_chars=120,
     )
 
@@ -159,7 +160,7 @@ def test_accepts_a_common_adjective_of_a_known_base() -> None:
         "be careful with the glass",
         lemma=None,
         common_words=words,
-        max_words=6,
+        max_words=MAX_PHRASE_WORDS,
         max_chars=120,
     )
 
@@ -173,7 +174,7 @@ def test_accepts_a_y_derived_form_of_a_known_base() -> None:
         "the baby cried",
         lemma=None,
         common_words=words,
-        max_words=6,
+        max_words=MAX_PHRASE_WORDS,
         max_chars=120,
     )
 

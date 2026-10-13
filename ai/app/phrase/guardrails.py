@@ -1,7 +1,7 @@
 """Guardrails for a generated gloss phrase (FEAT-004).
 
-A phrase is usable when it is a single phrase or simple sentence of fewer than
-seven words, built only from common words. The word being glossed is allowed
+A phrase is usable when it is a single phrase or simple sentence of seven words
+or fewer, built only from common words. The word being glossed is allowed
 through even if it is itself uncommon, because the phrase exists to show that
 word in use; every other word must be in the common vocabulary.
 """
