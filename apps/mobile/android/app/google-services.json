@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "732029539217",
+    "project_id": "scenova-hq",
+    "storage_bucket": "scenova-hq.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:732029539217:android:2af78b8fc8db9a6effc030",
+        "android_client_info": {
+          "package_name": "app.scenova.scenova"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBTbt6ZSULsGB2ny0da4OJXeyoneahGlmI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
