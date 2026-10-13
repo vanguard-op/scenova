@@ -50,6 +50,10 @@ dependencies:
   # itself rather than a poster and the controls follow real playback.
   video_player: ^2.14.1
 
+  # Issues the device push token registered against a lookup (C-008), so the
+  # notification service can reach the reader when the clip is ready.
+  firebase_messaging: ^16.7.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

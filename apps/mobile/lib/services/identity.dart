@@ -3,6 +3,8 @@ import 'dart:math';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 
+import 'firebase_client.dart';
+
 /// The reader's identity for the lookup path.
 ///
 /// `C-001` and `C-002` authenticate every lookup with a Firebase ID token in the
@@ -55,15 +57,16 @@ class AnonymousIdentity implements IdentityProvider {
 /// is authenticated without the reader creating an account; at sign-in the same
 /// identity is upgraded to the account and the gateway sees one subject.
 ///
-/// Firebase reads its project configuration from the platform files the build
-/// supplies, so initialisation is deferred to the first request rather than
-/// done at startup. `initialize` and `authOverride` are injectable for tests.
+/// The client's project configuration is the committed `firebase_options.dart`,
+/// and initialisation is deferred to the first request rather than done at
+/// startup, so a build that never authenticates pays nothing. `initialize` and
+/// `authOverride` are injectable for tests.
 class FirebaseIdentity implements IdentityProvider {
   FirebaseIdentity({
     FirebaseAuth? authOverride,
     Future<FirebaseApp> Function()? initialize,
   }) : _auth = authOverride,
-       _initialize = initialize ?? Firebase.initializeApp;
+       _initialize = initialize ?? initializeFirebaseClient;
 
   FirebaseAuth? _auth;
   final Future<FirebaseApp> Function() _initialize;

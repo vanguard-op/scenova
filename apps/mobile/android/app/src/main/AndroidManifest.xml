@@ -3,6 +3,9 @@
          registrations, so it needs network access in every build type, not just
          the debug and profile builds that carry the Flutter tool's copy. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- The clip-ready notice (FEAT-008) is a notification; from Android 13 the
+         reader is asked for this when they take the notify offer. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="@string/app_name"
         android:name="${applicationName}"

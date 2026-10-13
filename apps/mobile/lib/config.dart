@@ -127,6 +127,18 @@ abstract final class AppConfig {
   static bool get useFirebaseAuth =>
       authMode == 'firebase' || (authMode.isEmpty && kReleaseMode);
 
+  /// How the device's push token is obtained (`C-008`).
+  ///
+  /// `dev` mints a pseudonymous token for a laptop run; `firebase` takes the
+  /// real device token from the platform's messaging service (D-005). A release
+  /// build defaults to Firebase; a debug build to the development provider, so
+  /// a laptop run needs no messaging service.
+  static const String pushMode = String.fromEnvironment('SCENOVA_PUSH_MODE');
+
+  /// Whether the push token comes from Firebase Cloud Messaging.
+  static bool get useFirebaseMessaging =>
+      pushMode == 'firebase' || (pushMode.isEmpty && kReleaseMode);
+
   /// The wait after which the reader is told a clip is still being made and
   /// offered a notification when it is ready.
   static const Duration generatingNoticeThreshold = Duration(seconds: 10);

@@ -121,10 +121,12 @@ class ScenovaServices {
                 baseUrl: AppConfig.apiBaseUrl,
                 idTokenProvider: identity.idToken,
               ),
-        // The platform messaging service that issues the real token is a build
-        // change still to land; the development provider stands in until it
-        // does.
-        tokens: DevelopmentPushTokenProvider(),
+        // The device token the notification service addresses (`C-008`): the
+        // real Firebase Cloud Messaging token in production, and a pseudonymous
+        // development token on a laptop, mirroring the identity above.
+        tokens: AppConfig.useFirebaseMessaging
+            ? FirebaseMessagingPushTokenProvider()
+            : DevelopmentPushTokenProvider(),
         connectivity: connectivity,
       ),
       locale: locale,
