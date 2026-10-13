@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <title>listen</title>
+  <desc>Listen, disabled</desc>
+  <g id="icon-listen" data-name="listen">
+    <title>Listen, disabled</title>
+    <g id="icon-listen-speaker-icon-listen" data-name="Speaker">
+      <title>Speaker</title>
+      <path d="M 3.5 9.5 L 7 9.5 L 11 6 L 11 18 L 7 14.5 L 3.5 14.5 Z" fill="none" stroke="#625E6C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <g id="icon-listen-wave-icon-listen" data-name="Sound wave">
+      <title>Sound wave</title>
+      <path d="M 14 9.5 C 15.5 11 15.5 13 14 14.5" fill="none" stroke="#625E6C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

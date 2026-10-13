@@ -6,11 +6,11 @@
     <title>Report, disabled</title>
     <g id="icon-report-pole-icon-report" data-name="Flag pole">
       <title>Flag pole</title>
-      <polyline points="6,4 6,20" fill="none" stroke="#8C889666" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <polyline points="6,4 6,20" fill="none" stroke="#8C8896" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
     </g>
     <g id="icon-report-flag-icon-report" data-name="Flag">
       <title>Flag</title>
-      <path d="M 6 5 L 16.5 5 L 14 8.5 L 16.5 12 L 6 12 Z" fill="none" stroke="#8C889666" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M 6 5 L 16.5 5 L 14 8.5 L 16.5 12 L 6 12 Z" fill="none" stroke="#8C8896" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
     </g>
   </g>
 </svg>

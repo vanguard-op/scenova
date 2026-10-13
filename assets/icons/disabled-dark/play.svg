@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <title>play</title>
+  <desc>Play, disabled</desc>
+  <g id="icon-play" data-name="play">
+    <title>Play, disabled</title>
+    <g id="icon-play-triangle-icon-play" data-name="Play triangle">
+      <title>Play triangle</title>
+      <polygon points="7,5.5 17,12 7,18.5" fill="none" stroke="#625E6C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

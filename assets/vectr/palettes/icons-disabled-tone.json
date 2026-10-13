@@ -1,8 +1,8 @@
 {
   "id": "icons-disabled-tone",
   "projectId": "project",
-  "name": "Scenova icons, disabled tone",
+  "name": "Scenova icons, disabled tone (light)",
   "tokens": [
-    { "name": "icon-default", "value": "#8C889666", "description": "grey-400 at reduced opacity, for disabled icons" }
+    { "name": "icon-default", "value": "#8C8896", "description": "grey-400 light, solid: disabled icon tone, a lower-contrast shade than the grey-600 default" }
   ]
 }
