@@ -1,200 +1,200 @@
-{"key": "key|noun|a small metal object that opens a lock", "output": {"phrase": "Open the locked front door.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "door|noun|the flat panel you push to enter a room", "output": {"phrase": "Open the bedroom door.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "cup|noun|a small container you drink from", "output": {"phrase": "Hot tea in a cup.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "spoon|noun|a tool with a round end for eating soup", "output": {"phrase": "Eating hot soup with a spoon.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "ladder|noun|a set of steps for climbing up a wall", "output": {"phrase": "Climbing up to fix the roof.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "bridge|noun|a road built over a river", "output": {"phrase": "Cars drive across it over water.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "candle|noun|a stick of wax that burns with a small flame", "output": {"phrase": "a candle", "source": "fallback", "bestGuess": true, "failed": false, "reason": null}}
-{"key": "window|noun|the glass opening in a wall that lets in light", "output": {"phrase": "Look through the glass to outside.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "chair|noun|a seat with a back for one person", "output": {"phrase": "Sit on the wooden chair.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "table|noun|a flat surface on legs for eating or working", "output": {"phrase": "Eating dinner at the kitchen table.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "shoe|noun|a covering for the foot you wear outside", "output": {"phrase": "Put it on your foot.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "sock|noun|a soft covering worn inside a shoe", "output": {"phrase": "White cotton on my foot.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "hat|noun|a covering you wear on your head", "output": {"phrase": "Wear a warm hat outside.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "coat|noun|a warm outer layer worn in cold weather", "output": {"phrase": "Wear a thick winter coat outside.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "umbrella|noun|a folding cover you hold to keep off rain", "output": {"phrase": "Open it when it rains.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "mirror|noun|glass that shows your own face", "output": {"phrase": "Look at your face in it.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "towel|noun|cloth you use to dry your body", "output": {"phrase": "Dry your wet skin after swimming.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "soap|noun|a bar you use with water to wash", "output": {"phrase": "Wash dirty hands with a bar.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "brush|noun|a tool with stiff hairs for tidying hair", "output": {"phrase": "Use a brush for your hair.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "knife|noun|a tool with a sharp edge for cutting", "output": {"phrase": "Cut an apple with a knife.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "fork|noun|a tool with points for picking up food", "output": {"phrase": "Eat pasta with a metal fork.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "plate|noun|a flat dish you put food on", "output": {"phrase": "Food on a round plate.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "bowl|noun|a deep round dish for soup or cereal", "output": {"phrase": "Eating hot soup from a bowl.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "key|noun|a small metal object that opens a lock", "output": {"phrase": "Open the door with a key.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "door|noun|the flat panel you push to enter a room", "output": {"phrase": "Open the door to go inside.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "cup|noun|a small container you drink from", "output": {"phrase": "Drink water from a cup.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "spoon|noun|a tool with a round end for eating soup", "output": {"phrase": "Eat hot soup with a spoon.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "ladder|noun|a set of steps for climbing up a wall", "output": {"phrase": "Climb up the ladder.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "bridge|noun|a road built over a river", "output": {"phrase": "Cross the bridge.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "candle|noun|a stick of wax that burns with a small flame", "output": {"phrase": "Light a birthday candle.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "window|noun|the glass opening in a wall that lets in light", "output": {"phrase": "Look out the clean window.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "chair|noun|a seat with a back for one person", "output": {"phrase": "Sit on the red chair.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "table|noun|a flat surface on legs for eating or working", "output": {"phrase": "Eat dinner at the table.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "shoe|noun|a covering for the foot you wear outside", "output": {"phrase": "Put on your shoe.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "sock|noun|a soft covering worn inside a shoe", "output": {"phrase": "Put your foot in a sock.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "hat|noun|a covering you wear on your head", "output": {"phrase": "Put on your hat.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "coat|noun|a warm outer layer worn in cold weather", "output": {"phrase": "Put on your winter coat.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "umbrella|noun|a folding cover you hold to keep off rain", "output": {"phrase": "Open your umbrella in the rain.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "mirror|noun|glass that shows your own face", "output": {"phrase": "Look in the mirror.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "towel|noun|cloth you use to dry your body", "output": {"phrase": "Dry your body with a towel.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "soap|noun|a bar you use with water to wash", "output": {"phrase": "Wash your hands with soap.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "brush|noun|a tool with stiff hairs for tidying hair", "output": {"phrase": "Use a hair brush.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "knife|noun|a tool with a sharp edge for cutting", "output": {"phrase": "Cut the bread with a knife.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "fork|noun|a tool with points for picking up food", "output": {"phrase": "Eat pasta with a fork.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "plate|noun|a flat dish you put food on", "output": {"phrase": "Put food on my plate.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "bowl|noun|a deep round dish for soup or cereal", "output": {"phrase": "Eat soup from a bowl.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
 {"key": "bottle|noun|a tall container with a narrow neck for liquid", "output": {"phrase": "Milk in a glass bottle.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "box|noun|a stiff container with straight sides and a lid", "output": {"phrase": "a box", "source": "fallback", "bestGuess": true, "failed": false, "reason": null}}
-{"key": "bag|noun|a soft container with handles for carrying things", "output": {"phrase": "Put apples in my shopping bag.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "rope|noun|a thick cord used to tie or pull things", "output": {"phrase": "a rope", "source": "fallback", "bestGuess": true, "failed": false, "reason": null}}
-{"key": "nail|noun|a thin metal pin hammered into wood", "output": {"phrase": "Hammer a nail into wood.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "hammer|noun|a tool with a heavy head for driving nails", "output": {"phrase": "Hit the nail with it.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "needle|noun|a thin pointed tool used with thread to sew", "output": {"phrase": "Sewing a button on a shirt.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "wheel|noun|a round part that turns to move a vehicle", "output": {"phrase": "A red car has four wheels.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "engine|noun|the machine that makes a vehicle move", "output": {"phrase": "The car engine won't start today.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "road|noun|a hard flat way for cars to travel on", "output": {"phrase": "Cars drive on this black road.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "river|noun|a wide stream of water flowing to the sea", "output": {"phrase": "Water flows in a big river.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "mountain|noun|a very high piece of land with steep sides", "output": {"phrase": "Climbing to the top.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "forest|noun|a large area covered with trees", "output": {"phrase": "Many tall trees growing together.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "garden|noun|a piece of ground where flowers are grown", "output": {"phrase": "Red roses grow in the yard.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "fence|noun|a low barrier of wood or wire around land", "output": {"phrase": "White wood around the green grass.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "roof|noun|the top cover of a building", "output": {"phrase": "Rain falls on the red roof.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "floor|noun|the flat surface you walk on indoors", "output": {"phrase": "Drop your keys on the floor.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "wall|noun|the upright side of a room or building", "output": {"phrase": "Paint the living room wall white.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "clock|noun|a device that shows the time", "output": {"phrase": "Look at the wall clock.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "lamp|noun|a light you switch on in a room", "output": {"phrase": "Turn on the bed light.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "phone|noun|a device you use to call or send messages", "output": {"phrase": "Talk to your friend.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "book|noun|pages with writing joined in a cover", "output": {"phrase": "Read a story before bed.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "pen|noun|a thin tool with ink for writing", "output": {"phrase": "a pen", "source": "fallback", "bestGuess": true, "failed": false, "reason": null}}
-{"key": "paper|noun|thin flat sheets for writing or printing", "output": {"phrase": "Draw a picture with a pencil.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "letter|noun|a written message you send by post", "output": {"phrase": "A friend mailed a birthday card.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "ticket|noun|a small card that lets you travel or enter", "output": {"phrase": "A train ride card.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "coin|noun|a small round piece of money", "output": {"phrase": "Put a coin in the machine.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "hope|noun|the feeling that something good may happen", "output": {"phrase": "a hope", "source": "fallback", "bestGuess": true, "failed": false, "reason": null}}
-{"key": "fear|noun|the feeling you get when you are in danger", "output": {"phrase": "Hiding from a big angry dog.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "anger|noun|the hot feeling when something makes you mad", "output": {"phrase": "He shouts when his team loses.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "joy|noun|the warm feeling of great happiness", "output": {"phrase": "Kids opening birthday gifts together.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "sadness|noun|the heavy feeling when you are unhappy", "output": {"phrase": "Crying when your dog runs away.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "love|noun|the deep warm feeling you have for family", "output": {"phrase": "Hugging your mom and dad.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "trust|noun|the belief that someone will not harm you", "output": {"phrase": "Give the baby to your mother.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "doubt|noun|the feeling of not being sure", "output": {"phrase": "Is this door locked.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "courage|noun|the strength to act even when you are afraid", "output": {"phrase": "Jumping into the cold swimming pool.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "patience|noun|the calm ability to wait without getting upset", "output": {"phrase": "a patience", "source": "fallback", "bestGuess": true, "failed": false, "reason": null}}
-{"key": "freedom|noun|the state of being able to do what you choose", "output": {"phrase": "Running fast in the open park.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "justice|noun|fair treatment that follows the law", "output": {"phrase": "The judge gave a fair decision.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "truth|noun|the fact that agrees with what really happened", "output": {"phrase": "He told the real story.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "memory|noun|the ability to remember things you saw", "output": {"phrase": "I see my old school.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "dream|noun|the pictures in your mind while you sleep", "output": {"phrase": "Flying high during sleep.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "idea|noun|a thought or plan that comes to your mind", "output": {"phrase": "A good plan in my head.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "reason|noun|the cause that explains why something happened", "output": {"phrase": "The reason for the broken window.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "purpose|noun|the aim that explains why you do something", "output": {"phrase": "My purpose is learning English.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "habit|noun|a thing you do often without thinking", "output": {"phrase": "Biting your nails when you wait.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "luck|noun|the good or bad things that happen by chance", "output": {"phrase": "Winning money in a game.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "danger|noun|the chance that something bad will happen", "output": {"phrase": "Fast cars can bring danger.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "safety|noun|the state of being free from harm", "output": {"phrase": "a safety", "source": "fallback", "bestGuess": true, "failed": false, "reason": null}}
-{"key": "silence|noun|the complete absence of sound", "output": {"phrase": "A sleeping baby in the room.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "noise|noun|a loud or unpleasant sound", "output": {"phrase": "Cars make noise in the street.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "beauty|noun|the quality of being lovely to look at", "output": {"phrase": "A red rose in the garden.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "strength|noun|the power to lift or carry heavy things", "output": {"phrase": "He can lift the heavy box.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "weakness|noun|the lack of strength in body or will", "output": {"phrase": "Sick people have no strength.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "wisdom|noun|the good judgement that comes with experience", "output": {"phrase": "An old teacher gives good advice.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "knowledge|noun|the things a person has learned and knows", "output": {"phrase": "Reading books to learn new things.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "power|noun|the ability to control people or events", "output": {"phrase": "The king has power.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "peace|noun|the calm state when there is no war", "output": {"phrase": "No war in the country.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "war|noun|fighting between countries with weapons", "output": {"phrase": "Soldiers fighting with guns.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "health|noun|the good condition of your body", "output": {"phrase": "Eat fruit to have good health.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "wealth|noun|a large amount of money and property", "output": {"phrase": "a wealth", "source": "fallback", "bestGuess": true, "failed": false, "reason": null}}
-{"key": "time|noun|the passing of minutes, hours, and days", "output": {"phrase": "a time", "source": "fallback", "bestGuess": true, "failed": false, "reason": null}}
-{"key": "change|noun|the act of becoming different", "output": {"phrase": "a change", "source": "fallback", "bestGuess": true, "failed": false, "reason": null}}
-{"key": "choice|noun|the act of picking one thing over another", "output": {"phrase": "Picking a red apple.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "mistake|noun|something done wrong by accident", "output": {"phrase": "Writing the wrong word on paper.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "promise|noun|a firm statement that you will do something", "output": {"phrase": "I give you my word.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "secret|noun|a fact you keep hidden from other people", "output": {"phrase": "Tell no one.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "run|verb|to move fast on your feet", "output": {"phrase": "Catch the bus by running fast.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "walk|verb|to move on your feet at a slow speed", "output": {"phrase": "Go to the park on foot.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "jump|verb|to push off the ground into the air", "output": {"phrase": "Jump high over the puddle.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "climb|verb|to go up using your hands and feet", "output": {"phrase": "Kids climb the big tree.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "swim|verb|to move through water with your arms", "output": {"phrase": "Swim in the pool.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "throw|verb|to send something through the air with your hand", "output": {"phrase": "Throw the red ball.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "box|noun|a stiff container with straight sides and a lid", "output": {"phrase": "Put shoes in a box.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "bag|noun|a soft container with handles for carrying things", "output": {"phrase": "Put apples in your bag.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "rope|noun|a thick cord used to tie or pull things", "output": {"phrase": "Tie the box with rope.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "nail|noun|a thin metal pin hammered into wood", "output": {"phrase": "Hit a nail with a hammer.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "hammer|noun|a tool with a heavy head for driving nails", "output": {"phrase": "Hit the nail with a hammer.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "needle|noun|a thin pointed tool used with thread to sew", "output": {"phrase": "Sew a button with a needle.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "wheel|noun|a round part that turns to move a vehicle", "output": {"phrase": "A car has a flat wheel.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "engine|noun|the machine that makes a vehicle move", "output": {"phrase": "Start the car engine.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "road|noun|a hard flat way for cars to travel on", "output": {"phrase": "Cars drive on the road.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "river|noun|a wide stream of water flowing to the sea", "output": {"phrase": "Swim in the cool river.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "mountain|noun|a very high piece of land with steep sides", "output": {"phrase": "Climb a high mountain.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "forest|noun|a large area covered with trees", "output": {"phrase": "Many trees grow in a forest.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "garden|noun|a piece of ground where flowers are grown", "output": {"phrase": "Red roses grow in my garden.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "fence|noun|a low barrier of wood or wire around land", "output": {"phrase": "A white fence around the yard.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "roof|noun|the top cover of a building", "output": {"phrase": "Cats walk on the roof.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "floor|noun|the flat surface you walk on indoors", "output": {"phrase": "Drop the keys on the floor.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "wall|noun|the upright side of a room or building", "output": {"phrase": "Paint the white wall.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "clock|noun|a device that shows the time", "output": {"phrase": "The clock on the wall.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "lamp|noun|a light you switch on in a room", "output": {"phrase": "Turn on the lamp.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "phone|noun|a device you use to call or send messages", "output": {"phrase": "Answer my phone call.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "book|noun|pages with writing joined in a cover", "output": {"phrase": "Read a red book.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "pen|noun|a thin tool with ink for writing", "output": {"phrase": "Write with a blue pen.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "paper|noun|thin flat sheets for writing or printing", "output": {"phrase": "Write on white paper.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "letter|noun|a written message you send by post", "output": {"phrase": "Get a letter in the mail.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "ticket|noun|a small card that lets you travel or enter", "output": {"phrase": "Buy a train ticket.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "coin|noun|a small round piece of money", "output": {"phrase": "Put a coin in the box.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "hope|noun|the feeling that something good may happen", "output": {"phrase": "I have hope for tomorrow.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "fear|noun|the feeling you get when you are in danger", "output": {"phrase": "Fear makes you run away fast.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "anger|noun|the hot feeling when something makes you mad", "output": {"phrase": "His anger made him shout.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "joy|noun|the warm feeling of great happiness", "output": {"phrase": "She jumped with joy.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "sadness|noun|the heavy feeling when you are unhappy", "output": {"phrase": "His sadness made him cry.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "love|noun|the deep warm feeling you have for family", "output": {"phrase": "I have love for my family.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "trust|noun|the belief that someone will not harm you", "output": {"phrase": "Put your trust in me.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "doubt|noun|the feeling of not being sure", "output": {"phrase": "I have doubt about that.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "courage|noun|the strength to act even when you are afraid", "output": {"phrase": "It takes courage to jump.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "patience|noun|the calm ability to wait without getting upset", "output": {"phrase": "Have patience with the baby.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "freedom|noun|the state of being able to do what you choose", "output": {"phrase": "Birds have freedom in the sky.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "justice|noun|fair treatment that follows the law", "output": {"phrase": "Justice for all people.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "truth|noun|the fact that agrees with what really happened", "output": {"phrase": "Tell the truth about it.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "memory|noun|the ability to remember things you saw", "output": {"phrase": "A good memory for faces.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "dream|noun|the pictures in your mind while you sleep", "output": {"phrase": "A bad dream wakes me up.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "idea|noun|a thought or plan that comes to your mind", "output": {"phrase": "I have a good idea.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "reason|noun|the cause that explains why something happened", "output": {"phrase": "The reason for the rain.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "purpose|noun|the aim that explains why you do something", "output": {"phrase": "Find the purpose of this game.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "habit|noun|a thing you do often without thinking", "output": {"phrase": "Biting nails is a bad habit.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "luck|noun|the good or bad things that happen by chance", "output": {"phrase": "Good luck on your test.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "danger|noun|the chance that something bad will happen", "output": {"phrase": "Stay away from that danger.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "safety|noun|the state of being free from harm", "output": {"phrase": "Helmets give your head safety.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "silence|noun|the complete absence of sound", "output": {"phrase": "Silence in the dark room.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "noise|noun|a loud or unpleasant sound", "output": {"phrase": "That big truck makes much noise.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "beauty|noun|the quality of being lovely to look at", "output": {"phrase": "The beauty of the red rose.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "strength|noun|the power to lift or carry heavy things", "output": {"phrase": "Lift the box with great strength.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "weakness|noun|the lack of strength in body or will", "output": {"phrase": "a weakness", "source": "fallback", "bestGuess": true, "failed": false, "reason": null}}
+{"key": "wisdom|noun|the good judgement that comes with experience", "output": {"phrase": "Old people have great wisdom.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "knowledge|noun|the things a person has learned and knows", "output": {"phrase": "She has much knowledge about dogs.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "power|noun|the ability to control people or events", "output": {"phrase": "The king has great power.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "peace|noun|the calm state when there is no war", "output": {"phrase": "Live in peace and quiet.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "war|noun|fighting between countries with weapons", "output": {"phrase": "A war between two countries.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "health|noun|the good condition of your body", "output": {"phrase": "Good food gives you good health.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "wealth|noun|a large amount of money and property", "output": {"phrase": "He has great wealth.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "time|noun|the passing of minutes, hours, and days", "output": {"phrase": "Time goes by so fast.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "change|noun|the act of becoming different", "output": {"phrase": "A big change in weather.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "choice|noun|the act of picking one thing over another", "output": {"phrase": "Make a good choice today.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "mistake|noun|something done wrong by accident", "output": {"phrase": "I made a big mistake today.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "promise|noun|a firm statement that you will do something", "output": {"phrase": "Keep your promise to help me.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "secret|noun|a fact you keep hidden from other people", "output": {"phrase": "Keep my secret safe today.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "run|verb|to move fast on your feet", "output": {"phrase": "Run to the park.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "walk|verb|to move on your feet at a slow speed", "output": {"phrase": "Walk in the park.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "jump|verb|to push off the ground into the air", "output": {"phrase": "Jump over the big box.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "climb|verb|to go up using your hands and feet", "output": {"phrase": "Climb a tall tree.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "swim|verb|to move through water with your arms", "output": {"phrase": "I swim in the pool.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "throw|verb|to send something through the air with your hand", "output": {"phrase": "Throw a red ball.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
 {"key": "catch|verb|to take hold of something moving through the air", "output": {"phrase": "Catch the red ball.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
 {"key": "push|verb|to press something away from you", "output": {"phrase": "Push the heavy door open.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
 {"key": "pull|verb|to move something toward you", "output": {"phrase": "Pull the heavy door open.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
 {"key": "lift|verb|to raise something up from the ground", "output": {"phrase": "Lift the heavy box.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "carry|verb|to hold something and take it with you", "output": {"phrase": "Carry your bag to school.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "carry|verb|to hold something and take it with you", "output": {"phrase": "Carry your bag to the car.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
 {"key": "drop|verb|to let something fall from your hand", "output": {"phrase": "Drop your keys on the floor.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "open|verb|to move a door or lid so it is not shut", "output": {"phrase": "Open the front door.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "close|verb|to shut a door or lid", "output": {"phrase": "Close the front door please.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "break|verb|to make something come apart into pieces", "output": {"phrase": "Break a wooden stick in two.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "fix|verb|to make a broken thing work again", "output": {"phrase": "a fix", "source": "fallback", "bestGuess": true, "failed": false, "reason": null}}
-{"key": "build|verb|to make something by joining parts together", "output": {"phrase": "Make a toy house with blocks.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "dig|verb|to make a hole in the ground", "output": {"phrase": "Dog digs a hole.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "plant|verb|to put a seed in the ground to grow", "output": {"phrase": "a plant", "source": "fallback", "bestGuess": true, "failed": false, "reason": null}}
+{"key": "open|verb|to move a door or lid so it is not shut", "output": {"phrase": "Open the door now.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "close|verb|to shut a door or lid", "output": {"phrase": "Close the door now.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "break|verb|to make something come apart into pieces", "output": {"phrase": "Break the glass cup.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "fix|verb|to make a broken thing work again", "output": {"phrase": "Fix the broken toy car.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "build|verb|to make something by joining parts together", "output": {"phrase": "Build a house with wood.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "dig|verb|to make a hole in the ground", "output": {"phrase": "Dig a hole in the dirt.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "plant|verb|to put a seed in the ground to grow", "output": {"phrase": "Plant a seed in dirt.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
 {"key": "water|verb|to pour water on a plant", "output": {"phrase": "Water the green plant.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "cook|verb|to make food hot and ready to eat", "output": {"phrase": "Cook soup in the kitchen.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "eat|verb|to put food in your mouth and swallow it", "output": {"phrase": "Eat an apple for lunch.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "drink|verb|to swallow a liquid", "output": {"phrase": "Drink water when you are thirsty.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "sleep|verb|to rest with your eyes closed at night", "output": {"phrase": "Go to bed at night.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "wake|verb|to stop sleeping in the morning", "output": {"phrase": "Open eyes in the morning.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "sing|verb|to make music with your voice", "output": {"phrase": "Birds sing in the morning.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "dance|verb|to move your body to music", "output": {"phrase": "Move to the song.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "laugh|verb|to make happy sounds when something is funny", "output": {"phrase": "Children play and laugh together.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "cry|verb|to shed tears when you are sad", "output": {"phrase": "The baby cries for milk.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "shout|verb|to say something very loudly", "output": {"phrase": "a shout", "source": "fallback", "bestGuess": true, "failed": false, "reason": null}}
-{"key": "whisper|verb|to speak very softly so only one person hears", "output": {"phrase": "a whisper", "source": "fallback", "bestGuess": true, "failed": false, "reason": null}}
-{"key": "listen|verb|to pay attention to a sound", "output": {"phrase": "Listen to the sad song.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "cook|verb|to make food hot and ready to eat", "output": {"phrase": "Cook dinner in the kitchen.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "eat|verb|to put food in your mouth and swallow it", "output": {"phrase": "Eat an apple today.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "drink|verb|to swallow a liquid", "output": {"phrase": "Drink some cold water.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "sleep|verb|to rest with your eyes closed at night", "output": {"phrase": "I sleep in my bed.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "wake|verb|to stop sleeping in the morning", "output": {"phrase": "Wake up at six today.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "sing|verb|to make music with your voice", "output": {"phrase": "Sing a happy song.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "dance|verb|to move your body to music", "output": {"phrase": "Dance to the music.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "laugh|verb|to make happy sounds when something is funny", "output": {"phrase": "We laugh at the funny show.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "cry|verb|to shed tears when you are sad", "output": {"phrase": "Babies cry when they are sad.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "shout|verb|to say something very loudly", "output": {"phrase": "Shout to the dog.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "whisper|verb|to speak very softly so only one person hears", "output": {"phrase": "Whisper in her ear.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "listen|verb|to pay attention to a sound", "output": {"phrase": "Listen to the music.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
 {"key": "watch|verb|to look at something for a while", "output": {"phrase": "Watch the funny cat video.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "read|verb|to look at words and understand them", "output": {"phrase": "Read a book in bed.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "read|verb|to look at words and understand them", "output": {"phrase": "Read a book.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
 {"key": "write|verb|to make words with a pen on paper", "output": {"phrase": "Write your name on the paper.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "draw|verb|to make a picture with a pen or pencil", "output": {"phrase": "a draw", "source": "fallback", "bestGuess": true, "failed": false, "reason": null}}
-{"key": "count|verb|to say numbers in order to find how many", "output": {"phrase": "Count the red apples.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "draw|verb|to make a picture with a pen or pencil", "output": {"phrase": "Draw a cat with a pen.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "count|verb|to say numbers in order to find how many", "output": {"phrase": "Count from one to ten.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
 {"key": "buy|verb|to pay money to get something", "output": {"phrase": "Buy milk at the store.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "sell|verb|to give something in return for money", "output": {"phrase": "Sell fruit at the market.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "give|verb|to hand something to someone", "output": {"phrase": "Give me the apple.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "take|verb|to pick something up and keep it", "output": {"phrase": "Take the red apple.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "sell|verb|to give something in return for money", "output": {"phrase": "Sell cars for money.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "give|verb|to hand something to someone", "output": {"phrase": "Give me the red pen.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "take|verb|to pick something up and keep it", "output": {"phrase": "Take that red apple.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
 {"key": "send|verb|to make something go to another place or person", "output": {"phrase": "Send a letter to your friend.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "find|verb|to discover something you were looking for", "output": {"phrase": "Find your lost red pen.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "lose|verb|to no longer know where something is", "output": {"phrase": "a lose", "source": "fallback", "bestGuess": true, "failed": false, "reason": null}}
-{"key": "hide|verb|to put something where no one can see it", "output": {"phrase": "Put your toy under the bed.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "wait|verb|to stay until something happens", "output": {"phrase": "Sit here for the bus.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "hurry|verb|to move quickly because you have little time", "output": {"phrase": "Run to catch the bus.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "help|verb|to do something useful for someone", "output": {"phrase": "Help me carry this heavy bag.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "follow|verb|to go along behind someone", "output": {"phrase": "Walk behind the tall man.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "lead|verb|to go first and show the way", "output": {"phrase": "You lead the way outside.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "tall|adjective|having a great height from top to bottom", "output": {"phrase": "A very high green tree.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "short|adjective|having a small height or length", "output": {"phrase": "A small dog is short.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "heavy|adjective|weighing a lot and hard to lift", "output": {"phrase": "Big rocks on the ground.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "light|adjective|weighing very little and easy to lift", "output": {"phrase": "A feather on your hand.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "fast|adjective|moving or able to move very quickly", "output": {"phrase": "A red sports car.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "slow|adjective|moving without speed", "output": {"phrase": "a slow", "source": "fallback", "bestGuess": true, "failed": false, "reason": null}}
-{"key": "hot|adjective|having a high temperature, like fire", "output": {"phrase": "Hot soup in a bowl.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "cold|adjective|having a low temperature, like ice", "output": {"phrase": "Ice cream feels very cold.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "wet|adjective|covered or soaked with water", "output": {"phrase": "Rain made my shoes wet.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "dry|adjective|having no water on it", "output": {"phrase": "A dry towel after a bath.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "soft|adjective|easy to press and pleasant to touch", "output": {"phrase": "A sleeping cat has soft fur.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "hard|adjective|firm and not easy to press or break", "output": {"phrase": "A rock is hard.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "sharp|adjective|having an edge that cuts easily", "output": {"phrase": "A knife cuts the bread.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "dull|adjective|having an edge that no longer cuts", "output": {"phrase": "The knife will not cut bread.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "clean|adjective|free from dirt or marks", "output": {"phrase": "White snow on the ground.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "dirty|adjective|covered with dirt or stains", "output": {"phrase": "Mud on your new white shoes.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "empty|adjective|having nothing inside", "output": {"phrase": "The glass has no water.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "full|adjective|holding as much as it can", "output": {"phrase": "The glass is full of milk.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "wide|adjective|large from one side to the other", "output": {"phrase": "A big open door.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "narrow|adjective|small from one side to the other", "output": {"phrase": "A car on a thin road.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "deep|adjective|going far down from the top", "output": {"phrase": "A deep blue swimming pool.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "shallow|adjective|not going far down from the top", "output": {"phrase": "Water at the beach is shallow.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "loud|adjective|making a lot of sound", "output": {"phrase": "A crying baby sounds very loud.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "quiet|adjective|making very little sound", "output": {"phrase": "A sleeping baby in bed.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "bright|adjective|giving out a lot of light", "output": {"phrase": "The sun in the sky.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "dark|adjective|having little or no light", "output": {"phrase": "Turn on the lamp at night.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "rich|adjective|having a lot of money", "output": {"phrase": "He has a big expensive car.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "poor|adjective|having very little money", "output": {"phrase": "He has no money for food.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "young|adjective|having lived only a short time", "output": {"phrase": "A tiny puppy with big eyes.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "old|adjective|having lived for many years", "output": {"phrase": "An old man with white hair.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "strong|adjective|having a lot of power in the body", "output": {"phrase": "He can lift heavy boxes.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "weak|adjective|having little power in the body", "output": {"phrase": "a weak", "source": "fallback", "bestGuess": true, "failed": false, "reason": null}}
-{"key": "happy|adjective|feeling pleased and cheerful", "output": {"phrase": "Smiling children playing with toys.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "sad|adjective|feeling unhappy and low", "output": {"phrase": "Crying over a broken toy.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "brave|adjective|not showing fear in danger", "output": {"phrase": "a brave", "source": "fallback", "bestGuess": true, "failed": false, "reason": null}}
-{"key": "afraid|adjective|feeling fear about something", "output": {"phrase": "A big dog makes her afraid.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "kind|adjective|caring and helpful to other people", "output": {"phrase": "She shares food with her friend.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "rude|adjective|showing no respect for other people", "output": {"phrase": "Shouting at an old person.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "calm|adjective|quiet and not excited or upset", "output": {"phrase": "a calm", "source": "fallback", "bestGuess": true, "failed": false, "reason": null}}
-{"key": "busy|adjective|having a lot of things to do", "output": {"phrase": "She has too much work today.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "quickly|adverb|at a fast speed", "output": {"phrase": "Run quickly to catch the bus.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "slowly|adverb|at a low speed", "output": {"phrase": "a slowly", "source": "fallback", "bestGuess": true, "failed": false, "reason": null}}
-{"key": "carefully|adverb|with attention so nothing goes wrong", "output": {"phrase": "Hold the glass with both hands.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "loudly|adverb|with a lot of sound", "output": {"phrase": "The baby cries loudly.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "quietly|adverb|with very little sound", "output": {"phrase": "Read a book in bed.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "always|adverb|every time, without a single exception", "output": {"phrase": "Sun comes up every single morning.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "never|adverb|not at any time at all", "output": {"phrase": "I will never eat a rock.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "often|adverb|many times, again and again", "output": {"phrase": "She eats apples every day.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "early|adverb|before the usual or expected time", "output": {"phrase": "I wake up before the sun.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "late|adverb|after the usual or expected time", "output": {"phrase": "The bus arrived very late today.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "here|adverb|in this exact place near me", "output": {"phrase": "Sit right here with me.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "there|adverb|in that place away from me", "output": {"phrase": "Put the bag over there.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "find|verb|to discover something you were looking for", "output": {"phrase": "Find your lost keys.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "lose|verb|to no longer know where something is", "output": {"phrase": "I always lose my house keys.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "hide|verb|to put something where no one can see it", "output": {"phrase": "Hide your key under the mat.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "wait|verb|to stay until something happens", "output": {"phrase": "Wait for the red bus.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "hurry|verb|to move quickly because you have little time", "output": {"phrase": "Hurry to catch the bus.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "help|verb|to do something useful for someone", "output": {"phrase": "Help me cook dinner.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "follow|verb|to go along behind someone", "output": {"phrase": "Follow the dog outside.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "lead|verb|to go first and show the way", "output": {"phrase": "Lead the way outside.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "tall|adjective|having a great height from top to bottom", "output": {"phrase": "That tall tree is green.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "short|adjective|having a small height or length", "output": {"phrase": "He is a short boy.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "heavy|adjective|weighing a lot and hard to lift", "output": {"phrase": "This box is heavy.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "light|adjective|weighing very little and easy to lift", "output": {"phrase": "This box is light.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "fast|adjective|moving or able to move very quickly", "output": {"phrase": "That is a fast car.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "slow|adjective|moving without speed", "output": {"phrase": "The slow turtle walks home.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "hot|adjective|having a high temperature, like fire", "output": {"phrase": "This coffee is hot.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "cold|adjective|having a low temperature, like ice", "output": {"phrase": "Ice cream is cold.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "wet|adjective|covered or soaked with water", "output": {"phrase": "A wet dog runs home.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "dry|adjective|having no water on it", "output": {"phrase": "A dry towel.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "soft|adjective|easy to press and pleasant to touch", "output": {"phrase": "A soft pillow.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "hard|adjective|firm and not easy to press or break", "output": {"phrase": "The rock is hard.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "sharp|adjective|having an edge that cuts easily", "output": {"phrase": "A sharp knife cuts bread.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "dull|adjective|having an edge that no longer cuts", "output": {"phrase": "A dull knife cuts nothing.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "clean|adjective|free from dirt or marks", "output": {"phrase": "A clean white shirt.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "dirty|adjective|covered with dirt or stains", "output": {"phrase": "Dirty shoes on the mat.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "empty|adjective|having nothing inside", "output": {"phrase": "An empty glass of milk.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "full|adjective|holding as much as it can", "output": {"phrase": "A full glass of water.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "wide|adjective|large from one side to the other", "output": {"phrase": "A wide river.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "narrow|adjective|small from one side to the other", "output": {"phrase": "A narrow road goes up.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "deep|adjective|going far down from the top", "output": {"phrase": "A deep hole in the ground.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "shallow|adjective|not going far down from the top", "output": {"phrase": "This water is shallow.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "loud|adjective|making a lot of sound", "output": {"phrase": "A loud red car.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "quiet|adjective|making very little sound", "output": {"phrase": "A quiet baby is sleeping now.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "bright|adjective|giving out a lot of light", "output": {"phrase": "The sun is very bright today.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "dark|adjective|having little or no light", "output": {"phrase": "It is too dark to read.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "rich|adjective|having a lot of money", "output": {"phrase": "He is a rich man.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "poor|adjective|having very little money", "output": {"phrase": "He is a poor man.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "young|adjective|having lived only a short time", "output": {"phrase": "A young puppy plays outside.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "old|adjective|having lived for many years", "output": {"phrase": "An old man walks slow.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "strong|adjective|having a lot of power in the body", "output": {"phrase": "He has strong arms.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "weak|adjective|having little power in the body", "output": {"phrase": "A sick person is weak.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "happy|adjective|feeling pleased and cheerful", "output": {"phrase": "A happy little dog runs.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "sad|adjective|feeling unhappy and low", "output": {"phrase": "She felt sad about the dog.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "brave|adjective|not showing fear in danger", "output": {"phrase": "A brave dog saves the cat.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "afraid|adjective|feeling fear about something", "output": {"phrase": "I am afraid of dogs.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "kind|adjective|caring and helpful to other people", "output": {"phrase": "She is a kind teacher.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "rude|adjective|showing no respect for other people", "output": {"phrase": "That rude boy hit me.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "calm|adjective|quiet and not excited or upset", "output": {"phrase": "A calm blue sea.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "busy|adjective|having a lot of things to do", "output": {"phrase": "I am very busy today.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "quickly|adverb|at a fast speed", "output": {"phrase": "Run quickly to the car.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "slowly|adverb|at a low speed", "output": {"phrase": "Walk slowly down the street.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "carefully|adverb|with attention so nothing goes wrong", "output": {"phrase": "Hold the hot cup carefully.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "loudly|adverb|with a lot of sound", "output": {"phrase": "The dog barks loudly.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "quietly|adverb|with very little sound", "output": {"phrase": "Walk quietly in the library.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "always|adverb|every time, without a single exception", "output": {"phrase": "She always drinks water.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "never|adverb|not at any time at all", "output": {"phrase": "I never eat cold soup.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "often|adverb|many times, again and again", "output": {"phrase": "I go there often.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "early|adverb|before the usual or expected time", "output": {"phrase": "Arrive early for the bus.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "late|adverb|after the usual or expected time", "output": {"phrase": "The bus came late.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "here|adverb|in this exact place near me", "output": {"phrase": "Sit here with me.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "there|adverb|in that place away from me", "output": {"phrase": "Put the box over there.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
 {"key": "above|adverb|at a higher place than something", "output": {"phrase": "Look at the bird above.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "below|adverb|at a lower place than something", "output": {"phrase": "Fish swim below the boat.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "inside|adverb|within a building or container", "output": {"phrase": "Go inside the warm house.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "outside|adverb|not within a building", "output": {"phrase": "Playing games outside the house.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "together|adverb|with each other in one group", "output": {"phrase": "They walk to school together.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "alone|adverb|without any other person near", "output": {"phrase": "Sitting in an empty room.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "again|adverb|one more time", "output": {"phrase": "Say the word one time.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
-{"key": "almost|adverb|not quite, but very nearly", "output": {"phrase": "an almost", "source": "fallback", "bestGuess": true, "failed": false, "reason": null}}
+{"key": "below|adverb|at a lower place than something", "output": {"phrase": "Look at the floor below.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "inside|adverb|within a building or container", "output": {"phrase": "Stay inside when it rains.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "outside|adverb|not within a building", "output": {"phrase": "Wait outside the red door.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "together|adverb|with each other in one group", "output": {"phrase": "Walk together in the park.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "alone|adverb|without any other person near", "output": {"phrase": "I walk home alone today.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "again|adverb|one more time", "output": {"phrase": "Read the book again.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
+{"key": "almost|adverb|not quite, but very nearly", "output": {"phrase": "I am almost ready.", "source": "generated", "bestGuess": false, "failed": false, "reason": null}}
