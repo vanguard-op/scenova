@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'app_router.dart';
 import 'screens/home_screen.dart';
+import 'screens/onboarding_screen.dart';
 import 'screens/placeholder_screen.dart';
 import 'services/app_services.dart';
 import 'theme/app_theme.dart';
@@ -12,7 +13,7 @@ import 'theme/tokens.dart';
 /// The theme is rebuilt when the device class changes (the 600px breakpoint) or
 /// the platform brightness changes, and the platform reduce-motion setting is
 /// pushed into the reader's settings so the clip view can hold on a still
-/// frame.
+/// frame. The landing surface is Onboarding until setup is stored, then Home.
 class ScenovaApp extends StatefulWidget {
   const ScenovaApp({super.key, required this.services});
 
@@ -67,6 +68,18 @@ class _ScenovaAppState extends State<ScenovaApp> with WidgetsBindingObserver {
     if (next != _deviceClass) setState(() => _deviceClass = next);
   }
 
+  /// Setup is stored; the shell opens Home from here on
+  /// (`docs/Scenova/screens.md` → Navigation Map: Onboarding → Home).
+  void _finishOnboarding() {
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  /// First launch opens on Onboarding; Home takes over once setup is stored.
+  Widget get _landing => widget.services.settings.onboardingComplete
+      ? HomeScreen(router: _router)
+      : OnboardingScreen(onComplete: _finishOnboarding);
+
   DeviceClass _resolveDeviceClass() {
     final view = WidgetsBinding.instance.platformDispatcher.views.first;
     return DeviceClass.fromWidth(
@@ -91,7 +104,7 @@ class _ScenovaAppState extends State<ScenovaApp> with WidgetsBindingObserver {
           deviceClass: _deviceClass,
         ),
         themeMode: ThemeMode.system,
-        home: HomeScreen(router: _router),
+        home: _landing,
         routes: <String, WidgetBuilder>{
           AppRoutes.history: (_) => const PlaceholderScreen(
             title: 'History',

@@ -10,6 +10,7 @@ import 'package:scenova/models/lookup.dart';
 import 'package:scenova/screens/clip_controller.dart';
 import 'package:scenova/screens/clip_view_screen.dart';
 import 'package:scenova/screens/home_screen.dart';
+import 'package:scenova/screens/onboarding_screen.dart';
 import 'package:scenova/services/app_services.dart';
 import 'package:scenova/services/capture_channel.dart';
 import 'package:scenova/services/connectivity.dart';
@@ -105,6 +106,40 @@ Future<void> pumpClipView(
       ),
     ),
   );
+}
+
+/// Sizes the test window to a phone so a mobile screen lays out as designed.
+void usePhoneWindow(WidgetTester tester) {
+  tester.view.physicalSize = const Size(400, 940);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.reset);
+}
+
+/// Builds the onboarding screen on its own with the real theme.
+///
+/// The shell owns the switch to Home, so a test reads completion from
+/// [VoidCallback] it passes in and from the reader's stored settings.
+Future<ScenovaServices> pumpOnboarding(
+  WidgetTester tester, {
+  SettingsController? settings,
+  VoidCallback? onComplete,
+}) async {
+  usePhoneWindow(tester);
+  final services = buildServices(settings: settings);
+  await tester.pumpWidget(
+    ScenovaScope(
+      services: services,
+      child: MaterialApp(
+        theme: AppTheme.build(
+          brightness: Brightness.light,
+          deviceClass: DeviceClass.mobile,
+        ),
+        home: OnboardingScreen(onComplete: onComplete ?? () {}),
+      ),
+    ),
+  );
+  await tester.pump();
+  return services;
 }
 
 /// Tears the tree down so no controller, ticker, or timer outlives the test.

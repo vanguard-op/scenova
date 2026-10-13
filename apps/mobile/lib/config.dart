@@ -42,4 +42,14 @@ abstract final class AppConfig {
     'SCENOVA_SEED_HISTORY',
     defaultValue: true,
   );
+
+  /// Whether the app opens on Onboarding.
+  ///
+  /// First launch is the product's onboarding by rule; the flag exists so a
+  /// development run can boot straight into Home once it has seen the flow.
+  /// Flip with `--dart-define=SCENOVA_ONBOARDING=false`.
+  static const bool runOnboarding = bool.fromEnvironment(
+    'SCENOVA_ONBOARDING',
+    defaultValue: true,
+  );
 }

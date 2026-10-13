@@ -53,7 +53,13 @@ class ScenovaServices {
             ),
       historyStore: InMemoryHistoryStore(seed: history),
       connectivity: ManualConnectivity(),
-      settings: SettingsController(),
+      settings: SettingsController(
+        onboardingComplete: !AppConfig.runOnboarding,
+        // A fresh install has not enabled the platform entry point yet, so
+        // Onboarding's enable step is shown; the platform sets this once the
+        // action or extension is on.
+        actionEnabled: false,
+      ),
       entitlements: FixedEntitlementProvider(entitlement),
       captureChannel: CaptureChannel(),
       locale: locale,

@@ -13,13 +13,21 @@ import 'scenova_button.dart';
 /// iOS a share extension. When the action is off and a lookup cannot start, this
 /// is what the reader is shown instead of a silent failure.
 class EnableActionGuide extends StatelessWidget {
-  const EnableActionGuide({super.key, this.onOpen, this.compact = false});
+  const EnableActionGuide({
+    super.key,
+    this.onOpen,
+    this.compact = false,
+    this.openLabel = 'Open setup',
+  });
 
   /// Opens the place where setup is finished, when one is reachable.
   final VoidCallback? onOpen;
 
   /// The tighter treatment used inline on Home.
   final bool compact;
+
+  /// The label for the action that takes the reader to setup.
+  final String openLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -77,7 +85,7 @@ class EnableActionGuide extends StatelessWidget {
           if (!compact && onOpen != null) ...<Widget>[
             SizedBox(height: tokens.spacing.sm),
             ScenovaButton(
-              label: 'Open setup',
+              label: openLabel,
               onPressed: onOpen,
               variant: ScenovaButtonVariant.ghost,
             ),

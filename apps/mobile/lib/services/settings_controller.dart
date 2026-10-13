@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
-/// Reader preferences that the clip view and the entry gate read.
+/// Reader preferences that the clip view, the entry gate, and the app shell
+/// read.
 ///
 /// Clip behaviour lives here so the in-context card honours it wherever it is
 /// opened. The Preferences screen (a later surface) will edit the same state.
@@ -10,11 +11,13 @@ class SettingsController extends ChangeNotifier {
     bool soundOn = false,
     bool consentModelProcessing = true,
     bool actionEnabled = true,
+    bool onboardingComplete = false,
   }) {
     _platformReduceMotion = platformReduceMotion;
     _soundOn = soundOn;
     _consentModelProcessing = consentModelProcessing;
     _actionEnabled = actionEnabled;
+    _onboardingComplete = onboardingComplete;
   }
 
   bool _platformReduceMotion = false;
@@ -31,6 +34,19 @@ class SettingsController extends ChangeNotifier {
   bool _soundOn = false;
   bool _consentModelProcessing = true;
   bool _actionEnabled = true;
+  bool _onboardingComplete = false;
+
+  /// Whether first-run setup has been finished or skipped.
+  ///
+  /// The app opens on Onboarding until this is set. It is stored with the
+  /// reader's local settings; the durable store behind this flag is the same
+  /// seam the rest of the preferences will move onto.
+  bool get onboardingComplete => _onboardingComplete;
+  set onboardingComplete(bool value) {
+    if (_onboardingComplete == value) return;
+    _onboardingComplete = value;
+    notifyListeners();
+  }
 
   /// Reduce motion, honouring an explicit reader choice over the platform
   /// setting. When on, a clip holds on a still frame and plays on tap.

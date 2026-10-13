@@ -1,8 +1,9 @@
 // Development preview gallery.
 //
 // Renders one screen state per page so the design can be looked at in a browser
-// without a reading app: `?frame=0` … `?frame=11`. Built with
-// `flutter build web -t tool/preview_main.dart`; this is tooling, never shipped.
+// without a reading app: `?frame=<n>`, add `?dark=1` for the dark theme and
+// `?device=tablet` for the tablet device class. Built with `flutter build web -t tool/preview_main.dart`; this is tooling, never
+// shipped.
 import 'package:flutter/material.dart';
 import 'package:scenova/app_router.dart';
 import 'package:scenova/models/entitlement.dart';
@@ -11,6 +12,7 @@ import 'package:scenova/models/lookup.dart';
 import 'package:scenova/screens/clip_controller.dart';
 import 'package:scenova/screens/clip_view_screen.dart';
 import 'package:scenova/screens/home_screen.dart';
+import 'package:scenova/screens/onboarding_screen.dart';
 import 'package:scenova/services/app_services.dart';
 import 'package:scenova/services/capture_channel.dart';
 import 'package:scenova/services/capture_intake.dart';
@@ -32,11 +34,14 @@ class PreviewApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final frames = _frames();
-    final raw = Uri.base.queryParameters['frame'];
+    final params = Uri.base.queryParameters;
+    final raw = params['frame'];
     final index = raw == null ? null : int.tryParse(raw);
     final theme = AppTheme.build(
-      brightness: Brightness.light,
-      deviceClass: DeviceClass.mobile,
+      brightness: params['dark'] == '1' ? Brightness.dark : Brightness.light,
+      deviceClass: params['device'] == 'tablet'
+          ? DeviceClass.tablet
+          : DeviceClass.mobile,
     );
     if (index == null || index < 0 || index >= frames.length) {
       return MaterialApp(
@@ -119,6 +124,28 @@ class _AllFrames extends StatelessWidget {
 
 List<(String, Widget)> _frames() {
   return <(String, Widget)>[
+    (
+      'Onboarding — default (enable the action)',
+      _onboarding(
+        SettingsController(actionEnabled: false, onboardingComplete: false),
+      ),
+    ),
+    (
+      'Onboarding — consent declined',
+      _onboarding(
+        SettingsController(
+          actionEnabled: false,
+          onboardingComplete: false,
+          consentModelProcessing: false,
+        ),
+      ),
+    ),
+    (
+      'Onboarding — action already on (consent only)',
+      _onboarding(
+        SettingsController(actionEnabled: true, onboardingComplete: false),
+      ),
+    ),
     ('Home — loaded', _home(history: _seed(), online: true)),
     ('Home — empty', _home(history: const <HistoryEntry>[], online: true)),
     ('Home — offline', _home(history: _seed(), online: false)),
@@ -178,6 +205,14 @@ List<(String, Widget)> _frames() {
     ('Extension — empty selection', _extensionClip('   ')),
     ('Extension — offline', _extensionClip('quixotic', online: false)),
   ];
+}
+
+Widget _onboarding(SettingsController settings) {
+  final services = _services(settings: settings);
+  return ScenovaScope(
+    services: services,
+    child: OnboardingScreen(onComplete: () {}),
+  );
 }
 
 Widget _home({
