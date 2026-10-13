@@ -9,7 +9,13 @@
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-extend-exclude = [".venv", "build", "dist", "**/migrations/versions"]
+# Generated Flutter build artifacts are never Python sources. They are
+# gitignored, but the gates must not depend on gitignore semantics (mypy ignores
+# it entirely), so the paths are excluded explicitly here.
+extend-exclude = [
+  ".venv", "build", "dist", "**/migrations/versions",
+  "apps/mobile/ios/Flutter/ephemeral", "apps/mobile/ios/Pods", "apps/mobile/.dart_tool",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC", "S", "RUF"]
@@ -30,7 +36,15 @@ indent-style = "space"
 line-length = 100
 target-version = ["py312"]
 extend-exclude = '''
-/(\.venv|build|dist|migrations/versions)/
+/(
+    \.venv
+  | build
+  | dist
+  | migrations/versions
+  | ios/Flutter/ephemeral
+  | ios/Pods
+  | \.dart_tool
+)/
 '''
 
 [tool.mypy]
@@ -39,7 +53,10 @@ strict = true
 warn_unreachable = true
 warn_redundant_casts = true
 no_implicit_reexport = true
-exclude = ["(\\.venv|build|dist|migrations/versions)"]
+exclude = [
+  "(\\.venv|build|dist|migrations/versions)",
+  "(ios/Flutter/ephemeral|ios/Pods|\\.dart_tool)",
+]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
