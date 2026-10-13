@@ -147,6 +147,13 @@ def _service_env(name: str, ports: Mapping[str, int]) -> dict[str, str]:
     elif name == "lookup":
         env["PIPELINE_PORT"] = str(ports["pipeline"])
         env["LIBRARY_PORT"] = str(ports["library"])
+        # The harness exercises the phrase path (FEAT-007), so the phrase-clip
+        # release flag is pinned on here rather than inherited from a local
+        # `.env`, which ships it off until the phase rolls out (release.md
+        # "Rollout Phases & Feature Flags"). Left off, a short phrase falls back
+        # to the word path, so the phrase routing and acceptance criteria cannot
+        # be exercised at all.
+        env["FLAG_ENABLE_PHRASE_CLIP"] = "true"
     elif name == "pipeline":
         env["MODEL_PORT"] = str(ports["model"])
         env["LIBRARY_PORT"] = str(ports["library"])
@@ -158,6 +165,10 @@ def _service_env(name: str, ports: Mapping[str, int]) -> dict[str, str]:
         # removed above, a generation still ends in the provider-unavailable
         # fallback on the client-path stack.
         env["FLAG_ENABLE_GENERATION"] = "true"
+        # The phrase path is delivered by this phase (FEAT-007); pin its release
+        # flag on for the same reason, so the inherited `.env` default (off until
+        # the phase rolls out) cannot stop a phrase job before it runs.
+        env["FLAG_ENABLE_PHRASE_CLIP"] = "true"
     elif name == "notification":
         # The notification intake confirms the lookup against the lookup service
         # (C-008) and sends the clip-ready notice through the push-provider
