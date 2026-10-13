@@ -16,6 +16,7 @@ from dataclasses import dataclass
 # The audience asserted on internal service-to-service calls (C-003, C-004,
 # C-005). The lookup service sends it when it enqueues a generation job.
 DEFAULT_INTERNAL_AUDIENCE = "scenova-internal"
+DEFAULT_CORRELATION_ID_HEADER = "x-correlation-id"
 DEFAULT_MODEL_PORT = "8090"
 # Clip generation is a long-running job (NFR-003, NFR-004), so the internal
 # client waits far longer than the lookup path does.
@@ -35,6 +36,7 @@ class Settings:
     """Generation pipeline settings, resolved from the environment."""
 
     internal_audience: str = DEFAULT_INTERNAL_AUDIENCE
+    correlation_id_header: str = DEFAULT_CORRELATION_ID_HEADER
     require_internal_auth: bool = True
     model_base_url: str = f"http://127.0.0.1:{DEFAULT_MODEL_PORT}"
     model_timeout_seconds: float = DEFAULT_MODEL_TIMEOUT_SECONDS
@@ -54,6 +56,9 @@ class Settings:
         )
         return cls(
             internal_audience=_env_str(source, "INTERNAL_AUDIENCE", DEFAULT_INTERNAL_AUDIENCE),
+            correlation_id_header=_env_str(
+                source, "CORRELATION_ID_HEADER", DEFAULT_CORRELATION_ID_HEADER
+            ),
             require_internal_auth=_env_bool(source, "PIPELINE_REQUIRE_INTERNAL_AUTH", True),
             model_base_url=model_base_url,
             model_timeout_seconds=_env_float(

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
 
 from pipeline.app.api import create_app
@@ -123,6 +124,24 @@ def test_an_unavailable_queue_is_a_service_unavailable() -> None:
 
     assert response.status_code == 503
     assert response.json()["code"] == "queue_unavailable"
+
+
+@pytest.mark.asyncio
+async def test_the_correlation_id_header_is_stored_on_the_job() -> None:
+    # The enqueue's correlation id is kept so a generation event ties back to the
+    # lookup that started it (`analytics.md` "Error & Performance Monitoring").
+    test_rig = rig()
+    with _client(test_rig.service) as client:
+        response = client.post(
+            "/internal/generation-jobs",
+            json=_payload(),
+            headers={**_INTERNAL, "x-correlation-id": "corr-1"},
+        )
+
+    assert response.status_code == 202
+    job = await test_rig.queue.get("job-1")
+    assert job is not None
+    assert job.correlation_id == "corr-1"
 
 
 def test_get_job_reports_the_contract_shape() -> None:

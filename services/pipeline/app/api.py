@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Annotated
+from uuid import uuid4
 
 from fastapi import FastAPI, Header, Request
 from fastapi.exceptions import RequestValidationError
@@ -63,10 +64,12 @@ def create_app(
     @app.post("/internal/generation-jobs", status_code=202)
     async def create_job(
         payload: CreateJobRequest,
+        request: Request,
         x_internal_audience: Annotated[str | None, Header()] = None,
     ) -> CreateJobResponse:
         _require_internal(resolved_settings, x_internal_audience)
-        return await resolved_service.submit(payload)
+        correlation_id = request.headers.get(resolved_settings.correlation_id_header) or uuid4().hex
+        return await resolved_service.submit(payload, correlation_id)
 
     @app.get("/internal/generation-jobs/{job_id}")
     async def get_job(

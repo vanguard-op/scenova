@@ -8,13 +8,19 @@ blocked: `submit` enqueues and returns, and the job runs in the background.
 A decline, a timeout, an unavailable provider, a clip over the four-second cap,
 an exhausted generation budget, or the `enable_generation` kill switch being off
 leaves no clip stored, so the caller shows the fallback.
+
+Each job also records the three generation lifecycle events (EVT-007 to EVT-009).
+A job stopped before it attempts generation — the kill switch or the budget
+ceiling — records nothing, because it is not a generation that failed and must
+not count against the generation-failure rate (`release.md`).
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Coroutine
+import time
+from collections.abc import Callable, Coroutine
 from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Any, Protocol
@@ -35,6 +41,18 @@ from .errors import (
     MissingPhraseError,
     TargetDurationError,
 )
+from .events import (
+    REASON_DURATION_OVER_CAP,
+    REASON_PROVIDER_DECLINED,
+    REASON_PROVIDER_TIMEOUT,
+    REASON_PROVIDER_UNAVAILABLE,
+    REASON_UNEXPECTED_ERROR,
+    GenerationEventEmitter,
+    LoggingGenerationEventEmitter,
+    generation_completed,
+    generation_failed,
+    generation_started,
+)
 from .jobs import ClipAsset, GenerationJob, LibraryEntry
 from .library import InMemoryLibraryWriter, LibraryWriter
 from .models import (
@@ -52,6 +70,9 @@ logger = logging.getLogger(__name__)
 # One provider clip call, normalised to a single unit for the generation-cost
 # metric and the generation budget.
 COST_UNITS_PER_CLIP = 1.0
+
+# The monotonic clock used to measure a generation's latency for EVT-008.
+Clock = Callable[[], float]
 
 
 class TaskSpawner(Protocol):
@@ -84,6 +105,8 @@ class GenerationService:
         notifier: Notifier,
         settings: Settings,
         spawner: TaskSpawner,
+        events: GenerationEventEmitter,
+        clock: Clock | None = None,
     ) -> None:
         self._queue = queue
         self._clip_generator = clip_generator
@@ -91,11 +114,15 @@ class GenerationService:
         self._notifier = notifier
         self._settings = settings
         self._spawner = spawner
+        self._events = events
+        self._clock = clock if clock is not None else time.monotonic
         # Guards the running generation-cost total across concurrent jobs.
         self._cost_lock = asyncio.Lock()
         self._cost_units = 0.0
 
-    async def submit(self, request: CreateJobRequest) -> CreateJobResponse:
+    async def submit(
+        self, request: CreateJobRequest, correlation_id: str | None = None
+    ) -> CreateJobResponse:
         """Validate, enqueue once, and hand the job to the background.
 
         The caller derives a stable jobId for a missing word, so two concurrent
@@ -122,6 +149,7 @@ class GenerationService:
             part_of_speech=request.partOfSpeech,
             target_duration_seconds=duration,
             provider_model=request.modelPin,
+            correlation_id=correlation_id or uuid4().hex,
             status=JobStatus.QUEUED,
             attempts=request.attempt,
             cost_units=0.0,
@@ -144,12 +172,28 @@ class GenerationService:
         if not self._settings.enable_generation:
             # The kill switch is off: stop before any provider call, so the job
             # ends without a clip and the reader's lookup resolves to the
-            # fallback (release.md "Rollout Phases & Feature Flags").
+            # fallback (release.md "Rollout Phases & Feature Flags"). No
+            # generation event is recorded: generation was never attempted, so
+            # the stop must not count against the generation-failure rate.
             logger.info("generation is disabled; job %s stopped without a clip", running.id)
             return await self._finish(running, JobStatus.FAILED, 0.0)
 
         if not await self._admit():
+            # The budget ceiling is a capacity decision, not a provider failure,
+            # so it is not recorded as a generation failure either.
+            logger.info("generation budget exhausted; job %s stopped without a clip", running.id)
             return await self._finish(running, JobStatus.FAILED, 0.0)
+
+        started_at = self._clock()
+        self._events.emit(
+            generation_started(
+                correlation_id=running.correlation_id,
+                job_id=running.id,
+                lookup_id=running.lookup_id,
+                kind=running.kind.value,
+                model_version=running.provider_model,
+            )
+        )
 
         try:
             clip = await self._clip_generator.generate(
@@ -158,18 +202,28 @@ class GenerationService:
                 model_pin=running.provider_model,
             )
         except ClipDeclinedError:
-            return await self._finish(running, JobStatus.DECLINED, COST_UNITS_PER_CLIP)
-        except (ClipTimeoutError, ClipUnavailableError):
-            return await self._finish(running, JobStatus.FAILED, COST_UNITS_PER_CLIP)
+            return await self._fail(
+                running, JobStatus.DECLINED, COST_UNITS_PER_CLIP, REASON_PROVIDER_DECLINED
+            )
+        except ClipTimeoutError:
+            return await self._fail(
+                running, JobStatus.FAILED, COST_UNITS_PER_CLIP, REASON_PROVIDER_TIMEOUT
+            )
+        except ClipUnavailableError:
+            return await self._fail(
+                running, JobStatus.FAILED, COST_UNITS_PER_CLIP, REASON_PROVIDER_UNAVAILABLE
+            )
 
         if not _within_cap(clip, self._settings.clip_max_duration_seconds):
             logger.info("withheld a clip over the duration cap (job %s)", running.id)
-            return await self._finish(running, JobStatus.FAILED, COST_UNITS_PER_CLIP)
+            return await self._fail(
+                running, JobStatus.FAILED, COST_UNITS_PER_CLIP, REASON_DURATION_OVER_CAP
+            )
 
         if running.kind is Kind.WORD:
             await self._store_word_clip(running, clip)
         await self._notifier.clip_ready(lookup_id=running.lookup_id, job_id=running.id, clip=clip)
-        return await self._finish(running, JobStatus.SUCCEEDED, COST_UNITS_PER_CLIP)
+        return await self._succeed(running, clip, started_at)
 
     async def aclose(self) -> None:
         """Release the model client's connections."""
@@ -225,6 +279,36 @@ class GenerationService:
         )
         await self._library.store(entry, asset)
 
+    async def _succeed(
+        self, job: GenerationJob, clip: ClipResult, started_at: float
+    ) -> GenerationJob:
+        self._events.emit(
+            generation_completed(
+                correlation_id=job.correlation_id,
+                job_id=job.id,
+                lookup_id=job.lookup_id,
+                model_version=job.provider_model,
+                duration_ms=_elapsed_ms(started_at, self._clock()),
+                cost_units=COST_UNITS_PER_CLIP,
+                resolution=clip.resolution,
+            )
+        )
+        return await self._finish(job, JobStatus.SUCCEEDED, COST_UNITS_PER_CLIP)
+
+    async def _fail(
+        self, job: GenerationJob, status: JobStatus, cost: float, reason: str
+    ) -> GenerationJob:
+        self._events.emit(
+            generation_failed(
+                correlation_id=job.correlation_id,
+                job_id=job.id,
+                lookup_id=job.lookup_id,
+                reason=reason,
+                model_version=job.provider_model,
+            )
+        )
+        return await self._finish(job, status, cost)
+
     async def _finish(self, job: GenerationJob, status: JobStatus, cost: float) -> GenerationJob:
         finished = replace(job, status=status, cost_units=cost, completed_at=_now())
         await self._queue.save(finished)
@@ -236,6 +320,27 @@ class GenerationService:
         except Exception:
             # A background job must never take the event loop down with it.
             logger.exception("generation job %s failed unexpectedly", job_id)
+            await self._record_unexpected(job_id)
+
+    async def _record_unexpected(self, job_id: str) -> None:
+        """Record an unexpected background failure as EVT-009.
+
+        A job that raises before it reaches a defined outcome would otherwise
+        leave the failure rate blind to it.
+        """
+
+        job = await self._queue.get(job_id)
+        if job is None:
+            return
+        self._events.emit(
+            generation_failed(
+                correlation_id=job.correlation_id,
+                job_id=job.id,
+                lookup_id=job.lookup_id,
+                reason=REASON_UNEXPECTED_ERROR,
+                model_version=job.provider_model,
+            )
+        )
 
 
 def build_default_service(settings: Settings) -> GenerationService:
@@ -252,11 +357,16 @@ def build_default_service(settings: Settings) -> GenerationService:
         notifier=LoggingNotifier(),
         settings=settings,
         spawner=AsyncioTaskSpawner(),
+        events=LoggingGenerationEventEmitter(),
     )
 
 
 def _within_cap(clip: ClipResult, cap: float) -> bool:
     return 0 < clip.duration_seconds <= cap
+
+
+def _elapsed_ms(started_at: float, finished_at: float) -> int:
+    return max(0, round((finished_at - started_at) * 1000))
 
 
 def _now() -> str:

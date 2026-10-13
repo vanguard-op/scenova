@@ -13,11 +13,12 @@ from typing import Any
 from pipeline.app.clip_client import ClipResult
 from pipeline.app.config import Settings
 from pipeline.app.errors import QueueUnavailableError
+from pipeline.app.events import GenerationEvent
 from pipeline.app.jobs import GenerationJob
 from pipeline.app.library import InMemoryLibraryWriter
 from pipeline.app.models import CreateJobRequest, Kind, PartOfSpeech
 from pipeline.app.queue import InMemoryJobQueue, JobQueue
-from pipeline.app.service import GenerationService
+from pipeline.app.service import Clock, GenerationService
 
 MODEL_PIN = "gemini-omni-1.1-flash"
 
@@ -72,6 +73,33 @@ class NullSpawner:
         coro.close()
 
 
+class RecordingEmitter:
+    """A generation-event emitter that records every event, in order."""
+
+    def __init__(self) -> None:
+        self.events: list[GenerationEvent] = []
+
+    def emit(self, event: GenerationEvent) -> None:
+        self.events.append(event)
+
+
+class FakeClock:
+    """A monotonic clock that returns each reading in turn.
+
+    A test passes the start and end readings it wants, so a measured duration is
+    exact rather than wall-clock dependent.
+    """
+
+    def __init__(self, *readings: float) -> None:
+        self._readings = list(readings)
+        self._last = readings[-1] if readings else 0.0
+
+    def __call__(self) -> float:
+        if self._readings:
+            self._last = self._readings.pop(0)
+        return self._last
+
+
 class FailingQueue(InMemoryJobQueue):
     """A queue that refuses every enqueue, as an unavailable queue would."""
 
@@ -88,6 +116,7 @@ class Rig:
     library: InMemoryLibraryWriter
     notifier: RecordingNotifier
     queue: JobQueue
+    events: RecordingEmitter
 
 
 def clip(duration_seconds: float = 3.0) -> ClipResult:
@@ -134,11 +163,13 @@ def rig(
     queue: JobQueue | None = None,
     budget: float = 0.0,
     enable_generation: bool = True,
+    clock: Clock | None = None,
 ) -> Rig:
     resolved_generator = generator if generator is not None else FakeClipGenerator()
     resolved_queue = queue if queue is not None else InMemoryJobQueue()
     library = InMemoryLibraryWriter()
     notifier = RecordingNotifier()
+    events = RecordingEmitter()
     service = GenerationService(
         queue=resolved_queue,
         clip_generator=resolved_generator,
@@ -146,6 +177,8 @@ def rig(
         notifier=notifier,
         settings=Settings(generation_budget_units=budget, enable_generation=enable_generation),
         spawner=NullSpawner(),
+        events=events,
+        clock=clock,
     )
     return Rig(
         service=service,
@@ -153,4 +186,5 @@ def rig(
         library=library,
         notifier=notifier,
         queue=resolved_queue,
+        events=events,
     )
