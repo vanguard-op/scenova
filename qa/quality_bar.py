@@ -126,7 +126,7 @@ PHASE_FEATURES: Mapping[str, tuple[str, ...]] = {
 
 # The phase the gate is closing (roadmap.md's active phase). A phase advances by
 # moving this to the next heading in `PHASE_FEATURES`.
-CURRENT_PHASE = "Phase 1: Foundations"
+CURRENT_PHASE = "Phase 2: The Reading Loop"
 
 
 class GoldenSetMissing(Exception):

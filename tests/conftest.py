@@ -81,6 +81,20 @@ LIBRARY_DOWN_PORTS = {
     "model": 18290,
 }
 
+# The notification-path stack boots the client path plus the notification service
+# and a push-provider double, so a clip-ready notice can be followed from the
+# reader's registration (C-008) through a finished generation to the push send
+# (FEAT-008).
+NOTIFY_PORTS = {
+    "gateway": 18380,
+    "lookup": 18381,
+    "pipeline": 18382,
+    "library": 18383,
+    "notification": 18384,
+    "model": 18390,
+    "push": 18391,
+}
+
 # name -> (working directory, uvicorn module). Mirrors ci/lib.sh's service
 # registry for the shippable services.
 SERVICES: dict[str, tuple[Path, str]] = {
@@ -95,6 +109,14 @@ SERVICES: dict[str, tuple[Path, str]] = {
 # C-005) so the pipeline's clients are exercised unchanged.
 MODEL_SERVICE: tuple[Path, str] = (REPO_ROOT / "ai", "app.main:app")
 MODEL_STUB: tuple[Path, str] = (REPO_ROOT / "tests", "model_stub:app")
+
+# The notification service (C-008) and the push-provider double the notify stack
+# points its outbound send at, so a clip-ready notice is observable end to end.
+NOTIFICATION_SERVICE: tuple[Path, str] = (
+    REPO_ROOT / "services" / "notification",
+    "app.main:app",
+)
+PUSH_STUB: tuple[Path, str] = (REPO_ROOT / "tests", "push_stub:app")
 
 INTERNAL_AUDIENCE = "scenova-internal"
 CORRELATION_HEADER = "x-correlation-id"
@@ -117,18 +139,28 @@ def _service_env(name: str, ports: Mapping[str, int]) -> dict[str, str]:
     env.pop("GEMINI_API_KEY", None)
     if name == "gateway":
         env["LOOKUP_PORT"] = str(ports["lookup"])
+        if "notification" in ports:
+            env["NOTIFICATION_PORT"] = str(ports["notification"])
     elif name == "lookup":
         env["PIPELINE_PORT"] = str(ports["pipeline"])
         env["LIBRARY_PORT"] = str(ports["library"])
     elif name == "pipeline":
         env["MODEL_PORT"] = str(ports["model"])
         env["LIBRARY_PORT"] = str(ports["library"])
+        if "notification" in ports:
+            env["NOTIFICATION_PORT"] = str(ports["notification"])
         # The harness exercises the generation path, so the pipeline's kill
         # switch is pinned on here rather than inherited from a local `.env`
         # (release.md "Rollout Phases & Feature Flags"). With the credential
         # removed above, a generation still ends in the provider-unavailable
         # fallback on the client-path stack.
         env["FLAG_ENABLE_GENERATION"] = "true"
+    elif name == "notification":
+        # The notification intake confirms the lookup against the lookup service
+        # (C-008) and sends the clip-ready notice through the push-provider
+        # double, so nothing is asked of a real provider.
+        env["LOOKUP_PORT"] = str(ports["lookup"])
+        env["PUSH_BASE_URL"] = f"http://127.0.0.1:{ports['push']}"
     return env
 
 
@@ -272,6 +304,20 @@ def library_down_stack(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Sta
         yield booted
 
 
+@pytest.fixture(scope="session")
+def notify_stack(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Stack]:
+    """Boot the notification path: the client path plus the notifier and a push double."""
+
+    entries = {
+        **SERVICES,
+        "notification": NOTIFICATION_SERVICE,
+        "model": MODEL_STUB,
+        "push": PUSH_STUB,
+    }
+    with _boot(entries, NOTIFY_PORTS, tmp_path_factory) as booted:
+        yield booted
+
+
 @pytest.fixture()
 def gateway(stack: Stack) -> Iterator[httpx2.Client]:
     """A client for the client-facing gateway (C-001, C-002)."""
@@ -333,4 +379,36 @@ def library_down_gateway(library_down_stack: Stack) -> Iterator[httpx2.Client]:
     """A gateway client whose lookup service cannot reach the shared library."""
 
     with httpx2.Client(base_url=library_down_stack.url("gateway"), timeout=10.0) as client:
+        yield client
+
+
+@pytest.fixture()
+def notify_gateway(notify_stack: Stack) -> Iterator[httpx2.Client]:
+    """A gateway client for the notification-path stack (C-001, C-008)."""
+
+    with httpx2.Client(base_url=notify_stack.url("gateway"), timeout=10.0) as client:
+        yield client
+
+
+@pytest.fixture()
+def notify_push(notify_stack: Stack) -> Iterator[httpx2.Client]:
+    """A client for the push-provider double (observes the clip-ready notice)."""
+
+    with httpx2.Client(base_url=notify_stack.url("push"), timeout=10.0) as client:
+        yield client
+
+
+@pytest.fixture()
+def notify_model_stub(notify_stack: Stack) -> Iterator[httpx2.Client]:
+    """A client for the notification-path stack's model-provider double."""
+
+    with httpx2.Client(base_url=notify_stack.url("model"), timeout=10.0) as client:
+        yield client
+
+
+@pytest.fixture()
+def notify_library(notify_stack: Stack) -> Iterator[httpx2.Client]:
+    """A library client for the notification-path stack."""
+
+    with httpx2.Client(base_url=notify_stack.url("library"), timeout=10.0) as client:
         yield client

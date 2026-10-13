@@ -12,6 +12,7 @@ for a shared word" (FEAT-006 edge case).
 
 from __future__ import annotations
 
+import asyncio
 from typing import Annotated
 from uuid import uuid4
 
@@ -24,6 +25,9 @@ _INTERNAL_AUDIENCE = "scenova-internal"
 app = FastAPI(title="Scenova Model Provider (test double)", version="1.0.0")
 
 _calls: dict[str, int] = {"phrase": 0, "clip": 0}
+# A test-only hold on the clip call, so a test can keep a lookup generating while
+# it acts on it (FEAT-008's clip-ready notice). Zero by default.
+_clip_delay_seconds: float = 0.0
 
 
 class PhraseRequest(BaseModel):
@@ -62,7 +66,7 @@ def generate_phrase(
 
 
 @app.post("/internal/model/clip", status_code=201, response_model=None)
-def generate_clip(
+async def generate_clip(
     payload: ClipRequest,
     x_internal_audience: Annotated[str | None, Header()] = None,
 ) -> dict[str, object] | JSONResponse:
@@ -75,6 +79,8 @@ def generate_clip(
                 "message": "A clip target over four seconds is outside the cap.",
             },
         )
+    if _clip_delay_seconds:
+        await asyncio.sleep(_clip_delay_seconds)
     _calls["clip"] += 1
     clip_id = f"clip_{uuid4().hex}"
     return {
@@ -95,10 +101,22 @@ def provider_calls() -> dict[str, int]:
     return dict(_calls)
 
 
+@app.post("/test/config")
+def set_config(payload: dict[str, object]) -> dict[str, object]:
+    """Set the test-only clip hold in seconds (test-only)."""
+
+    global _clip_delay_seconds
+    delay = payload.get("clipDelaySeconds", 0.0)
+    _clip_delay_seconds = float(delay) if isinstance(delay, (int, float, str)) else 0.0
+    return {"clipDelaySeconds": _clip_delay_seconds}
+
+
 @app.post("/test/reset")
 def reset_calls() -> dict[str, int]:
-    """Zero the provider-call counters (test-only)."""
+    """Zero the provider-call counters and clear the clip hold (test-only)."""
 
+    global _clip_delay_seconds
     _calls["phrase"] = 0
     _calls["clip"] = 0
+    _clip_delay_seconds = 0.0
     return dict(_calls)
