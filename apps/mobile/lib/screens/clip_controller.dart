@@ -67,7 +67,6 @@ class ClipViewController extends ChangeNotifier {
   bool _playing = false;
   bool _willNotify = false;
   bool _noticeShown = false;
-  bool _bestGuess = false;
   FeedbackMark? _feedback;
 
   CaptureSelection get selection => _selection;
@@ -93,14 +92,11 @@ class ClipViewController extends ChangeNotifier {
   /// The clip that would play.
   Clip? get clip => _chosenSense?.clip ?? _result?.primaryClip;
 
-  /// True when the sense was chosen without the word being in the inventory.
-  ///
-  /// The service marks that case on the sense label
-  /// ([Sense.bestGuessLabel]) and explains it in `notice`; the reader is told
-  /// the meaning is a guess.
-  bool get isBestGuess => _bestGuess;
-
   /// The note shown with the word and phrase.
+  ///
+  /// It carries any reader-facing advisory the service sends, including the
+  /// best-guess note when the word is outside the sense inventory. The sense
+  /// label is a human label and is never read as a signal.
   String? get note => _result?.notice;
 
   Sense? get _firstSense =>
@@ -120,7 +116,6 @@ class ClipViewController extends ChangeNotifier {
     _errorMessage = null;
     _chosenSense = null;
     _result = null;
-    _bestGuess = false;
     _setPhase(ClipPhase.loading);
 
     if (_selection.isEmpty) {
@@ -215,7 +210,6 @@ class ClipViewController extends ChangeNotifier {
 
   void _applyResult(LookupResult result) {
     _result = result;
-    _bestGuess = result.senses.any((sense) => sense.isBestGuess);
 
     // With the allowance spent the word and phrase still show; no clip is
     // generated until the allowance is restored.

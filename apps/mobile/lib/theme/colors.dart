@@ -5,10 +5,9 @@ import 'package:flutter/material.dart';
 /// Source of truth: `docs/Scenova/branding.md` — "Color Palette". Every colour
 /// in the app resolves through this file; no widget carries a literal colour.
 ///
-/// The palette publishes the 500 shade for each accent and semantic family but
-/// not the 100 and 900 shades it names; the tint tokens below are that 500
-/// shade at a fixed alpha so the family still reads as a tinted background.
-/// This is reported as a gap in the branding spec.
+/// Each accent and semantic family publishes its full 100/300/500/700/900
+/// scale: 500 is the element colour, 100 tints its background, 900 is its text,
+/// and 300 and 700 are the borders and pressed states.
 abstract final class ScenovaPalette {
   // Primary — a 9-shade scale.
   static const Color primary900Light = Color(0xFF221B54);
@@ -52,23 +51,92 @@ abstract final class ScenovaPalette {
   static const Color grey50Light = Color(0xFFF7F6F9);
   static const Color grey50Dark = Color(0xFF1B1A20);
 
-  // Accent and semantic families — the 500 shade is the element colour.
+  // Success — a resolved lookup or a saved clip.
+  static const Color success100Light = Color(0xFFEEF7F3);
+  static const Color success100Dark = Color(0xFF114029);
+  static const Color success300Light = Color(0xFF96D9BB);
+  static const Color success300Dark = Color(0xFF2E8A5B);
   static const Color success500Light = Color(0xFF2E9E6B);
   static const Color success500Dark = Color(0xFF57C48D);
+  static const Color success700Light = Color(0xFF1F7F53);
+  static const Color success700Dark = Color(0xFF9CD3B7);
+  static const Color success900Light = Color(0xFF105133);
+  static const Color success900Dark = Color(0xFFCFE7DB);
+
+  // Warning — a slow lookup or a still-generating clip.
+  static const Color warning100Light = Color(0xFFFAF0EB);
+  static const Color warning100Dark = Color(0xFF4A2008);
+  static const Color warning300Light = Color(0xFFE8A787);
+  static const Color warning300Dark = Color(0xFF9E4A19);
   static const Color warning500Light = Color(0xFFC9541B);
   static const Color warning500Dark = Color(0xFFDE7B42);
+  static const Color warning700Light = Color(0xFF90390E);
+  static const Color warning700Dark = Color(0xFFE3AC8D);
+  static const Color warning900Light = Color(0xFF5B2206);
+  static const Color warning900Dark = Color(0xFFEFD6C7);
+
+  // Error — a failed generation or a destructive action.
+  static const Color error100Light = Color(0xFFF7EEEE);
+  static const Color error100Dark = Color(0xFF470B0B);
+  static const Color error300Light = Color(0xFFD89797);
+  static const Color error300Dark = Color(0xFF981F1F);
   static const Color error500Light = Color(0xFFC43B3B);
   static const Color error500Dark = Color(0xFFDE6A6A);
+  static const Color error700Light = Color(0xFF7E2020);
+  static const Color error700Dark = Color(0xFFDE9191);
+  static const Color error900Light = Color(0xFF501111);
+  static const Color error900Dark = Color(0xFFEDCACA);
+
+  // Info — an informational note or tip.
+  static const Color info100Light = Color(0xFFECF1F9);
+  static const Color info100Dark = Color(0xFF07244B);
+  static const Color info300Light = Color(0xFF8DB0E2);
+  static const Color info300Dark = Color(0xFF1751A1);
   static const Color info500Light = Color(0xFF3C7DD9);
   static const Color info500Dark = Color(0xFF6BA0E8);
+  static const Color info700Light = Color(0xFF154589);
+  static const Color info700Dark = Color(0xFF8BB1E5);
+  static const Color info900Light = Color(0xFF0A2A57);
+  static const Color info900Dark = Color(0xFFC6D8F0);
+
+  // Accent — the target word highlighted.
+  static const Color accent100Light = Color(0xFFF8F4ED);
+  static const Color accent100Dark = Color(0xFF4A3708);
+  static const Color accent300Light = Color(0xFFDFC791);
+  static const Color accent300Dark = Color(0xFF9F7A18);
   static const Color accent500Light = Color(0xFFC99A2E);
   static const Color accent500Dark = Color(0xFFE4BE5C);
+  static const Color accent700Light = Color(0xFF856419);
+  static const Color accent700Dark = Color(0xFFE4CB8C);
+  static const Color accent900Light = Color(0xFF553F0C);
+  static const Color accent900Dark = Color(0xFFF0E4C7);
 
   /// White, used for text on filled primary and destructive surfaces.
   static const Color onFill = Color(0xFFFFFFFF);
 
   /// No colour; used for outline and ghost surfaces.
   static const Color transparent = Color(0x00000000);
+}
+
+/// One accent or semantic family resolved for a brightness.
+///
+/// The 500 shade is the element colour, 100 tints its background, 900 is its
+/// text, and 300 and 700 are the border and pressed shades.
+@immutable
+class ScenovaSemanticColors {
+  const ScenovaSemanticColors({
+    required this.element,
+    required this.tint,
+    required this.border,
+    required this.pressed,
+    required this.text,
+  });
+
+  final Color element;
+  final Color tint;
+  final Color border;
+  final Color pressed;
+  final Color text;
 }
 
 /// Semantic colour tokens resolved for one brightness.
@@ -94,15 +162,10 @@ class ScenovaColors extends ThemeExtension<ScenovaColors> {
     required this.primaryPressed,
     required this.focusRing,
     required this.success,
-    required this.successTint,
     required this.warning,
-    required this.warningTint,
     required this.error,
-    required this.errorTint,
     required this.info,
-    required this.infoTint,
     required this.accent,
-    required this.accentTint,
     required this.onFill,
   });
 
@@ -122,16 +185,22 @@ class ScenovaColors extends ThemeExtension<ScenovaColors> {
   final Color primaryDeep;
   final Color primaryPressed;
   final Color focusRing;
-  final Color success;
-  final Color successTint;
-  final Color warning;
-  final Color warningTint;
-  final Color error;
-  final Color errorTint;
-  final Color info;
-  final Color infoTint;
-  final Color accent;
-  final Color accentTint;
+
+  /// The resolved success family: a clip saved or a lookup resolved.
+  final ScenovaSemanticColors success;
+
+  /// The resolved warning family: a slow lookup or a clip still generating.
+  final ScenovaSemanticColors warning;
+
+  /// The resolved error family: a failed generation or a destructive action.
+  final ScenovaSemanticColors error;
+
+  /// The resolved info family: an informational note or tip.
+  final ScenovaSemanticColors info;
+
+  /// The resolved accent family: the target word highlighted.
+  final ScenovaSemanticColors accent;
+
   final Color onFill;
 
   static const ScenovaColors light = ScenovaColors(
@@ -151,16 +220,41 @@ class ScenovaColors extends ThemeExtension<ScenovaColors> {
     primaryDeep: ScenovaPalette.primary700Light,
     primaryPressed: ScenovaPalette.primary600Light,
     focusRing: ScenovaPalette.primary500Light,
-    success: ScenovaPalette.success500Light,
-    successTint: Color(0x1F2E9E6B),
-    warning: ScenovaPalette.warning500Light,
-    warningTint: Color(0x1FC9541B),
-    error: ScenovaPalette.error500Light,
-    errorTint: Color(0x1FC43B3B),
-    info: ScenovaPalette.info500Light,
-    infoTint: Color(0x1F3C7DD9),
-    accent: ScenovaPalette.accent500Light,
-    accentTint: Color(0x1FC99A2E),
+    success: ScenovaSemanticColors(
+      element: ScenovaPalette.success500Light,
+      tint: ScenovaPalette.success100Light,
+      border: ScenovaPalette.success300Light,
+      pressed: ScenovaPalette.success700Light,
+      text: ScenovaPalette.success900Light,
+    ),
+    warning: ScenovaSemanticColors(
+      element: ScenovaPalette.warning500Light,
+      tint: ScenovaPalette.warning100Light,
+      border: ScenovaPalette.warning300Light,
+      pressed: ScenovaPalette.warning700Light,
+      text: ScenovaPalette.warning900Light,
+    ),
+    error: ScenovaSemanticColors(
+      element: ScenovaPalette.error500Light,
+      tint: ScenovaPalette.error100Light,
+      border: ScenovaPalette.error300Light,
+      pressed: ScenovaPalette.error700Light,
+      text: ScenovaPalette.error900Light,
+    ),
+    info: ScenovaSemanticColors(
+      element: ScenovaPalette.info500Light,
+      tint: ScenovaPalette.info100Light,
+      border: ScenovaPalette.info300Light,
+      pressed: ScenovaPalette.info700Light,
+      text: ScenovaPalette.info900Light,
+    ),
+    accent: ScenovaSemanticColors(
+      element: ScenovaPalette.accent500Light,
+      tint: ScenovaPalette.accent100Light,
+      border: ScenovaPalette.accent300Light,
+      pressed: ScenovaPalette.accent700Light,
+      text: ScenovaPalette.accent900Light,
+    ),
     onFill: ScenovaPalette.onFill,
   );
 
@@ -181,16 +275,41 @@ class ScenovaColors extends ThemeExtension<ScenovaColors> {
     primaryDeep: ScenovaPalette.primary700Dark,
     primaryPressed: ScenovaPalette.primary600Dark,
     focusRing: ScenovaPalette.primary500Dark,
-    success: ScenovaPalette.success500Dark,
-    successTint: Color(0x3357C48D),
-    warning: ScenovaPalette.warning500Dark,
-    warningTint: Color(0x33DE7B42),
-    error: ScenovaPalette.error500Dark,
-    errorTint: Color(0x33DE6A6A),
-    info: ScenovaPalette.info500Dark,
-    infoTint: Color(0x336BA0E8),
-    accent: ScenovaPalette.accent500Dark,
-    accentTint: Color(0x33E4BE5C),
+    success: ScenovaSemanticColors(
+      element: ScenovaPalette.success500Dark,
+      tint: ScenovaPalette.success100Dark,
+      border: ScenovaPalette.success300Dark,
+      pressed: ScenovaPalette.success700Dark,
+      text: ScenovaPalette.success900Dark,
+    ),
+    warning: ScenovaSemanticColors(
+      element: ScenovaPalette.warning500Dark,
+      tint: ScenovaPalette.warning100Dark,
+      border: ScenovaPalette.warning300Dark,
+      pressed: ScenovaPalette.warning700Dark,
+      text: ScenovaPalette.warning900Dark,
+    ),
+    error: ScenovaSemanticColors(
+      element: ScenovaPalette.error500Dark,
+      tint: ScenovaPalette.error100Dark,
+      border: ScenovaPalette.error300Dark,
+      pressed: ScenovaPalette.error700Dark,
+      text: ScenovaPalette.error900Dark,
+    ),
+    info: ScenovaSemanticColors(
+      element: ScenovaPalette.info500Dark,
+      tint: ScenovaPalette.info100Dark,
+      border: ScenovaPalette.info300Dark,
+      pressed: ScenovaPalette.info700Dark,
+      text: ScenovaPalette.info900Dark,
+    ),
+    accent: ScenovaSemanticColors(
+      element: ScenovaPalette.accent500Dark,
+      tint: ScenovaPalette.accent100Dark,
+      border: ScenovaPalette.accent300Dark,
+      pressed: ScenovaPalette.accent700Dark,
+      text: ScenovaPalette.accent900Dark,
+    ),
     onFill: ScenovaPalette.onFill,
   );
 
@@ -221,10 +340,10 @@ class ScenovaColors extends ThemeExtension<ScenovaColors> {
       onSurfaceVariant: textSecondary,
       outline: border,
       outlineVariant: border,
-      error: error,
+      error: error.element,
       onError: onFill,
-      errorContainer: errorTint,
-      onErrorContainer: textPrimary,
+      errorContainer: error.tint,
+      onErrorContainer: error.text,
     );
   }
 
@@ -246,16 +365,11 @@ class ScenovaColors extends ThemeExtension<ScenovaColors> {
     Color? primaryDeep,
     Color? primaryPressed,
     Color? focusRing,
-    Color? success,
-    Color? successTint,
-    Color? warning,
-    Color? warningTint,
-    Color? error,
-    Color? errorTint,
-    Color? info,
-    Color? infoTint,
-    Color? accent,
-    Color? accentTint,
+    ScenovaSemanticColors? success,
+    ScenovaSemanticColors? warning,
+    ScenovaSemanticColors? error,
+    ScenovaSemanticColors? info,
+    ScenovaSemanticColors? accent,
     Color? onFill,
   }) {
     return ScenovaColors(
@@ -276,15 +390,10 @@ class ScenovaColors extends ThemeExtension<ScenovaColors> {
       primaryPressed: primaryPressed ?? this.primaryPressed,
       focusRing: focusRing ?? this.focusRing,
       success: success ?? this.success,
-      successTint: successTint ?? this.successTint,
       warning: warning ?? this.warning,
-      warningTint: warningTint ?? this.warningTint,
       error: error ?? this.error,
-      errorTint: errorTint ?? this.errorTint,
       info: info ?? this.info,
-      infoTint: infoTint ?? this.infoTint,
       accent: accent ?? this.accent,
-      accentTint: accentTint ?? this.accentTint,
       onFill: onFill ?? this.onFill,
     );
   }

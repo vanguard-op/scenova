@@ -26,7 +26,7 @@ class AllowanceIndicator extends StatelessWidget {
       color = colors.textSecondary;
     } else if ((entitlement.lookupsRemaining ?? 0) <= 0) {
       label = 'You have used this month\'s lookups.';
-      color = colors.warning;
+      color = colors.warning.element;
     } else {
       final remaining = entitlement.lookupsRemaining;
       label = remaining == 1

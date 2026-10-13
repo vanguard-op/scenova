@@ -12,5 +12,11 @@ import UIKit
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    // The share extension hands the selected text to the app through the
+    // `scenova://capture` URL; the bridge delivers it to Dart.
+    CaptureBridge.shared.attach(
+      messenger: engineBridge.applicationRegistrar.messenger(),
+      pluginRegistry: engineBridge.pluginRegistry
+    )
   }
 }

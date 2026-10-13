@@ -30,21 +30,22 @@ class OfflineBanner extends StatelessWidget {
           vertical: tokens.spacing.sm,
         ),
         decoration: BoxDecoration(
-          color: colors.warningTint,
+          color: colors.warning.tint,
           borderRadius: BorderRadius.circular(ScenovaRadius.md),
+          border: Border.all(color: colors.warning.border),
         ),
         child: Row(
           children: <Widget>[
             Icon(
               AppIcons.offline,
               size: tokens.sizing.iconSm,
-              color: colors.warning,
+              color: colors.warning.element,
             ),
             SizedBox(width: tokens.spacing.sm),
             Expanded(
               child: Text(
                 message ?? 'You are offline. Saved clips still play.',
-                style: styles.bodySmall.copyWith(color: colors.textPrimary),
+                style: styles.bodySmall.copyWith(color: colors.warning.text),
               ),
             ),
           ],

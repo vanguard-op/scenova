@@ -106,7 +106,7 @@ class ErrorState extends StatelessWidget {
               Icon(
                 Icons.error_outline_rounded,
                 size: tokens.sizing.iconLg,
-                color: colors.error,
+                color: colors.error.element,
               ),
               SizedBox(height: tokens.spacing.md),
               Text(

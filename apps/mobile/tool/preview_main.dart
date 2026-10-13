@@ -122,6 +122,14 @@ List<(String, Widget)> _frames() {
     ('Home — loaded', _home(history: _seed(), online: true)),
     ('Home — empty', _home(history: const <HistoryEntry>[], online: true)),
     ('Home — offline', _home(history: _seed(), online: false)),
+    (
+      'Home — action off (how to enable it)',
+      _home(
+        history: _seed(),
+        online: true,
+        settings: SettingsController()..actionEnabled = false,
+      ),
+    ),
     ('Clip — serving from library (playing)', _clip('come')),
     ('Clip — sense choice', _clip('bank')),
     (
@@ -165,8 +173,16 @@ List<(String, Widget)> _frames() {
   ];
 }
 
-Widget _home({required List<HistoryEntry> history, required bool online}) {
-  final services = _services(history: history, online: online);
+Widget _home({
+  required List<HistoryEntry> history,
+  required bool online,
+  SettingsController? settings,
+}) {
+  final services = _services(
+    history: history,
+    online: online,
+    settings: settings,
+  );
   return ScenovaScope(
     services: services,
     child: HomeScreen(router: AppRouter(services: services)),

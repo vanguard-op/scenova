@@ -282,7 +282,7 @@ class _Ready extends StatelessWidget {
                         value: progress.value,
                         minHeight: tokens.spacing.xs,
                         backgroundColor: colors.border,
-                        color: colors.accent,
+                        color: colors.accent.element,
                       );
                     },
                   ),

@@ -59,6 +59,54 @@ void main() {
       expect(ScenovaColors.resolve(Brightness.light), ScenovaColors.light);
     });
 
+    test('publishes the completed 100/300/500/700/900 semantic shades', () {
+      const light = ScenovaColors.light;
+      expect(light.warning.element, ScenovaPalette.warning500Light);
+      expect(light.warning.tint, ScenovaPalette.warning100Light);
+      expect(light.warning.border, ScenovaPalette.warning300Light);
+      expect(light.warning.pressed, ScenovaPalette.warning700Light);
+      expect(light.warning.text, ScenovaPalette.warning900Light);
+
+      expect(light.error.element, ScenovaPalette.error500Light);
+      expect(light.error.tint, ScenovaPalette.error100Light);
+      expect(light.error.border, ScenovaPalette.error300Light);
+      expect(light.error.pressed, ScenovaPalette.error700Light);
+      expect(light.error.text, ScenovaPalette.error900Light);
+
+      expect(light.info.tint, ScenovaPalette.info100Light);
+      expect(light.accent.element, ScenovaPalette.accent500Light);
+      expect(light.success.text, ScenovaPalette.success900Light);
+
+      const dark = ScenovaColors.dark;
+      expect(dark.warning.tint, ScenovaPalette.warning100Dark);
+      expect(dark.error.text, ScenovaPalette.error900Dark);
+      expect(dark.info.border, ScenovaPalette.info300Dark);
+      expect(dark.accent.pressed, ScenovaPalette.accent700Dark);
+      expect(dark.success.element, ScenovaPalette.success500Dark);
+    });
+
+    test(
+      'the semantic tints are solid shades, not alpha over an unknown surface',
+      () {
+        // The in-context card sits over a page the product does not own, so a tint
+        // is a solid shade rather than the element colour at reduced opacity.
+        for (final colors in <ScenovaColors>[
+          ScenovaColors.light,
+          ScenovaColors.dark,
+        ]) {
+          for (final family in <ScenovaSemanticColors>[
+            colors.success,
+            colors.warning,
+            colors.error,
+            colors.info,
+            colors.accent,
+          ]) {
+            expect(family.tint.a, 1.0);
+          }
+        }
+      },
+    );
+
     test('builds a colour scheme from the palette', () {
       final scheme = ScenovaColors.light.toColorScheme(Brightness.light);
       expect(scheme.primary, ScenovaPalette.primary500Light);

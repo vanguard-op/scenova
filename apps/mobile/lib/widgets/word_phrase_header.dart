@@ -3,20 +3,20 @@ import 'package:flutter/material.dart';
 import '../theme/colors.dart';
 import '../theme/tokens.dart';
 import '../theme/typography.dart';
-import 'app_icons.dart';
 
 /// The shared Word and Phrase Header (`docs/Scenova/screens.md`).
 ///
 /// The target word as a heading with the gloss phrase beneath it. The phrase is
-/// shown while a clip generates or when no clip is available. A very long word
-/// wraps to two lines and then truncates.
+/// shown while a clip generates or when no clip is available, and any
+/// reader-facing advisory the service sends travels in [note] — including the
+/// best-guess note, which is a notice and never a sense-label signal. A very
+/// long word wraps to two lines and then truncates.
 class WordPhraseHeader extends StatelessWidget {
   const WordPhraseHeader({
     super.key,
     required this.word,
     this.phrase,
     this.note,
-    this.isBestGuess = false,
     this.textAlign = TextAlign.start,
     this.compact = false,
   });
@@ -24,7 +24,6 @@ class WordPhraseHeader extends StatelessWidget {
   final String word;
   final String? phrase;
   final String? note;
-  final bool isBestGuess;
   final TextAlign textAlign;
 
   /// The caption treatment, used under the clip where the word is repeated
@@ -60,24 +59,6 @@ class WordPhraseHeader extends StatelessWidget {
             textAlign: textAlign,
           ),
         ),
-        if (isBestGuess) ...<Widget>[
-          SizedBox(height: tokens.spacing.xs),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Icon(
-                AppIcons.info,
-                size: tokens.sizing.iconSm,
-                color: colors.textSecondary,
-              ),
-              SizedBox(width: tokens.spacing.xs),
-              Text(
-                'Best guess',
-                style: styles.caption.copyWith(color: colors.textSecondary),
-              ),
-            ],
-          ),
-        ],
         if (phrase != null && phrase!.isNotEmpty) ...<Widget>[
           SizedBox(height: tokens.spacing.xs),
           Text(phrase!, style: phraseStyle, textAlign: textAlign),

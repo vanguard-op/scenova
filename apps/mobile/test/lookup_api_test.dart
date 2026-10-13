@@ -205,6 +205,52 @@ void main() {
       );
     });
 
+    test('reads the {code, message} error body', () async {
+      final api = apiReturning(
+        (_) => http.Response(
+          jsonEncode(<String, dynamic>{
+            'code': 'upstream_unavailable',
+            'message': 'The lookup service is catching up. Try again shortly.',
+          }),
+          503,
+        ),
+      );
+
+      await expectLater(
+        api.getLookup('lk_1'),
+        throwsA(
+          isA<LookupApiException>()
+              .having((e) => e.code, 'code', 'upstream_unavailable')
+              .having(
+                (e) => e.message,
+                'message',
+                'The lookup service is catching up. Try again shortly.',
+              )
+              // 503 is the contract's retryable upstream case.
+              .having((e) => e.isRetryable, 'isRetryable', isTrue),
+        ),
+      );
+    });
+
+    test(
+      'falls back to local wording when the error body is unreadable',
+      () async {
+        final api = apiReturning((_) => http.Response('not json', 503));
+        await expectLater(
+          api.getLookup('lk_1'),
+          throwsA(
+            isA<LookupApiException>()
+                .having((e) => e.code, 'code', isNull)
+                .having(
+                  (e) => e.message,
+                  'message',
+                  'The lookup service is unavailable.',
+                ),
+          ),
+        );
+      },
+    );
+
     test('maps a transport failure to the offline case', () async {
       final api = HttpLookupApi(
         baseUrl: 'https://gateway.scenova.app',
@@ -257,16 +303,22 @@ void main() {
       expect(result.primaryClip, isNull);
     });
 
-    test('marks a word outside the sense list as a best guess', () async {
-      final result = await MockLookupApi().createLookup(_request('quixotic'));
-      expect(result.senses.single.isBestGuess, isTrue);
-      expect(result.notice, isNotNull);
-      expect(result.displayWord, 'quixotic');
-    });
+    test(
+      'signals a best guess through the notice, not the sense label',
+      () async {
+        final result = await MockLookupApi().createLookup(_request('quixotic'));
+        // The reader-facing best-guess signal is the notice; the sense label
+        // stays a plain human label.
+        expect(result.notice, isNotNull);
+        expect(result.senses.single.senseLabel, isNot(contains('guess')));
+        expect(result.displayWord, 'quixotic');
+      },
+    );
 
-    test('does not mark a library hit as a best guess', () async {
+    test('leaves the notice empty for a library hit', () async {
       final result = await MockLookupApi().createLookup(_request('come'));
-      expect(result.senses.single.isBestGuess, isFalse);
+      expect(result.notice, isNull);
+      expect(result.senses.single.senseLabel, isNotEmpty);
     });
 
     test('reports an unknown lookup as not found', () async {

@@ -11,6 +11,7 @@ import '../theme/typography.dart';
 import '../widgets/allowance_indicator.dart';
 import '../widgets/app_icons.dart';
 import '../widgets/brand_mark.dart';
+import '../widgets/enable_action_guide.dart';
 import '../widgets/offline_banner.dart';
 import '../widgets/scenova_button.dart';
 import '../widgets/skeleton.dart';
@@ -180,7 +181,10 @@ class _HomeScreenState extends State<HomeScreen> {
               SizedBox(height: tokens.spacing.md),
             ],
             if (!_scope.settings.actionEnabled) ...<Widget>[
-              _EnableActionHint(onOpen: widget.router.openPreferences),
+              EnableActionGuide(
+                compact: true,
+                onOpen: widget.router.openPreferences,
+              ),
               SizedBox(height: tokens.spacing.md),
             ],
             AllowanceIndicator(entitlement: _entitlement),
@@ -291,60 +295,6 @@ class _RecentRow extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-    );
-  }
-}
-
-class _EnableActionHint extends StatelessWidget {
-  const _EnableActionHint({required this.onOpen});
-
-  final VoidCallback onOpen;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = ScenovaColors.of(context);
-    final tokens = ScenovaTokens.of(context);
-    final styles = ScenovaTextStyles.of(context);
-
-    return Container(
-      padding: EdgeInsets.all(tokens.spacing.md),
-      decoration: BoxDecoration(
-        color: colors.infoTint,
-        borderRadius: BorderRadius.circular(ScenovaRadius.md),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Icon(AppIcons.info, size: tokens.sizing.iconSm, color: colors.info),
-          SizedBox(width: tokens.spacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  'Turn on the Scenova action',
-                  style: styles.body.copyWith(
-                    color: colors.textPrimary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                SizedBox(height: tokens.spacing.xs),
-                Text(
-                  'Add Scenova to the selection menu so a word can come '
-                  'straight from your book.',
-                  style: styles.bodySmall.copyWith(color: colors.textSecondary),
-                ),
-                SizedBox(height: tokens.spacing.sm),
-                ScenovaButton(
-                  label: 'Set it up',
-                  onPressed: onOpen,
-                  variant: ScenovaButtonVariant.ghost,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

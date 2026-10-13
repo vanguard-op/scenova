@@ -22,7 +22,9 @@ class LookupApiException implements Exception {
   /// A transport failure: the device is offline or the request never arrived.
   bool get isOffline => statusCode == 0;
 
-  /// Rate limited or a service-side failure: retrying may succeed.
+  /// Rate limited, or the upstream lookup is unavailable: retrying may
+  /// succeed. `503` is the contract's retryable upstream case; other `5xx`
+  /// failures are treated the same way.
   bool get isRetryable => statusCode == 429 || statusCode >= 500;
 
   /// The selection was empty or over the phrase limit.
@@ -122,17 +124,24 @@ class HttpLookupApi implements LookupApi {
     throw _mapError(status, response.body);
   }
 
+  /// Maps an error response to a failure, reading the contract's
+  /// `{code, message}` body.
+  ///
+  /// The service's `message` is used when it sends one; a status we know falls
+  /// back to the app's own wording so a reader never sees a raw error.
   LookupApiException _mapError(int status, String body) {
     String? code;
+    String? serviceMessage;
     try {
       final decoded = jsonDecode(body);
       if (decoded is Map<String, dynamic>) {
         code = decoded['code'] as String?;
+        serviceMessage = decoded['message'] as String?;
       }
     } on FormatException {
-      code = null;
+      // The body was not readable; fall back to the app's own wording.
     }
-    final message = switch (status) {
+    final fallback = switch (status) {
       400 => 'Scenova looks up single words and short phrases.',
       401 => 'Sign in to look up a word.',
       404 => 'That lookup is no longer available.',
@@ -140,6 +149,9 @@ class HttpLookupApi implements LookupApi {
       429 => 'Too many lookups just now. Try again shortly.',
       _ => 'The lookup service is unavailable.',
     };
+    final message = (serviceMessage == null || serviceMessage.isEmpty)
+        ? fallback
+        : serviceMessage;
     return LookupApiException(status, message, code: code);
   }
 }
@@ -291,12 +303,14 @@ class MockLookupApi implements LookupApi {
       status: LookupStatus.generating,
       senses: <Sense>[
         Sense(
-          senseLabel: Sense.bestGuessLabel,
+          senseLabel: '1',
           partOfSpeech: 'verb',
           glossPhrase: 'to print a picture from a carved block of wood',
           entryId: null,
         ),
       ],
+      // The word is outside the sense inventory, so the best-guess note is the
+      // reader-facing signal; the sense label stays a plain human label.
       notice: _bestGuessNotice,
       correlationId: 'mock-correlation',
     );
@@ -311,7 +325,7 @@ class MockLookupApi implements LookupApi {
       status: LookupStatus.fallback,
       senses: <Sense>[
         Sense(
-          senseLabel: Sense.bestGuessLabel,
+          senseLabel: '1',
           partOfSpeech: 'adjective',
           glossPhrase: 'hopeful even when things are unlikely',
           entryId: null,

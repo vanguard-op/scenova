@@ -298,7 +298,6 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
           word: _controller.word,
           phrase: _controller.phrase,
           note: note ?? _controller.note,
-          isBestGuess: _controller.isBestGuess,
           compact: true,
         ),
         if (action != null) ...<Widget>[

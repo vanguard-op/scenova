@@ -312,7 +312,7 @@ class _VariantPalette {
         foreground: colors.textSecondary,
       ),
       ScenovaButtonVariant.destructive => _VariantPalette(
-        background: colors.error,
+        background: colors.error.element,
         foreground: colors.onFill,
       ),
     };
