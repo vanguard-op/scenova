@@ -443,6 +443,131 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     await teardown(tester);
   });
+
+  testWidgets('a phrase clip is saved to the device and replayed from it', (
+    tester,
+  ) async {
+    final api = RecordingLookupApi(MockLookupApi(pollsUntilReady: 1));
+    final services = buildServices(api: api);
+    final controller = controllerFor(services, 'once in a while');
+    addTearDown(controller.dispose);
+
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 150));
+    await tester.pump();
+
+    expect(controller.phase, ClipPhase.playing);
+    final saved = await services.historyStore.all();
+    expect(saved.single.kind, LookupKind.phrase);
+    expect(saved.single.hasClip, isTrue);
+    expect(api.createCalls, 1);
+
+    // The same phrase looked up again is served from the device, with no new
+    // generation (`FEAT-007`). The tree is reset first so a fresh clip view
+    // mounts, as a later lookup would.
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    final replay = controllerFor(services, 'once in a while');
+    addTearDown(replay.dispose);
+    await pumpClipView(tester, services, replay);
+    await tester.pump();
+    await tester.pump();
+
+    expect(replay.phase, ClipPhase.playing);
+    expect(api.createCalls, 1);
+    await teardown(tester);
+  });
+
+  testWidgets('a saved phrase plays from the device when offline', (
+    tester,
+  ) async {
+    final services = buildServices(
+      api: MockLookupApi(),
+      online: false,
+      history: InMemoryHistoryStore(
+        seed: <HistoryEntry>[
+          seededEntry(
+            word: 'once in a while',
+            phrase: 'once in a while',
+            kind: LookupKind.phrase,
+            clipUrl: 'device://once-in-a-while',
+          ),
+        ],
+      ),
+    );
+    final controller = controllerFor(services, 'once in a while');
+    addTearDown(controller.dispose);
+
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+    await tester.pump();
+
+    expect(controller.phase, ClipPhase.playing);
+    expect(find.text('once in a while'), findsWidgets);
+    await teardown(tester);
+  });
+
+  testWidgets('an offline phrase with no saved clip says so', (tester) async {
+    final services = buildServices(api: MockLookupApi(), online: false);
+    final controller = controllerFor(services, 'once in a while');
+    addTearDown(controller.dispose);
+
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+    await tester.pump();
+
+    expect(controller.phase, ClipPhase.offline);
+    expect(
+      find.text('This phrase is not saved on this device'),
+      findsOneWidget,
+    );
+    await teardown(tester);
+  });
+
+  testWidgets('a selection over six words asks the reader to narrow it', (
+    tester,
+  ) async {
+    final api = RecordingLookupApi(MockLookupApi());
+    final services = buildServices(api: api);
+    final controller = controllerFor(
+      services,
+      'the quick brown fox jumps over the lazy dog',
+    );
+    addTearDown(controller.dispose);
+
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+
+    expect(controller.phase, ClipPhase.selectionTooLong);
+    expect(find.text('Pick a shorter phrase'), findsOneWidget);
+    // No lookup was sent for the over-limit selection.
+    expect(api.createCalls, 0);
+    await teardown(tester);
+  });
+
+  testWidgets('a declined phrase shows the fallback and stores nothing', (
+    tester,
+  ) async {
+    final services = buildServices(
+      api: MockLookupApi(
+        script: <LookupResult>[_phraseFallback('tough it out')],
+      ),
+    );
+    final controller = controllerFor(services, 'tough it out');
+    addTearDown(controller.dispose);
+
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+    await tester.pump();
+
+    expect(controller.phase, ClipPhase.fallback);
+    expect(find.text('No clip for this phrase yet.'), findsOneWidget);
+    expect(find.text('Try again'), findsOneWidget);
+    expect(await services.historyStore.all(), isEmpty);
+    await teardown(tester);
+  });
 }
 
 LookupRequest _request(String selection) => LookupRequest(
@@ -460,6 +585,21 @@ LookupResult _denied(String selection) => LookupResult(
   normalisedLemma: selection,
   status: LookupStatus.denied,
   senses: const <Sense>[],
+  notice: null,
+  correlationId: 'test',
+);
+
+/// A phrase the provider declined: the phrase shows with no clip and nothing is
+/// stored (`FEAT-007`).
+LookupResult _phraseFallback(String selection) => LookupResult(
+  lookupId: 'phrase-fallback-1',
+  kind: LookupKind.phrase,
+  rawSelection: selection,
+  normalisedLemma: null,
+  status: LookupStatus.fallback,
+  senses: <Sense>[
+    Sense(senseLabel: '1', partOfSpeech: '', glossPhrase: selection),
+  ],
   notice: null,
   correlationId: 'test',
 );

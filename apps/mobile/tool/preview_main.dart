@@ -181,6 +181,26 @@ List<(String, Widget)> _frames() {
     ('Clip — fallback', _clip('quixotic')),
     ('Clip — offline', _clip('quixotic', online: false)),
     (
+      'Clip — phrase clip (generated, kept on the device)',
+      _clip('once in a while'),
+    ),
+    (
+      'Clip — phrase replayed from the device',
+      _clip(
+        'once in a while',
+        history: <HistoryEntry>[
+          HistoryEntry(
+            id: 'phrase',
+            word: 'once in a while',
+            phrase: 'once in a while',
+            kind: LookupKind.phrase,
+            savedAt: DateTime.now(),
+            clipUrl: 'device://once-in-a-while',
+          ),
+        ],
+      ),
+    ),
+    (
       'Clip — error',
       _clip(
         'come',
@@ -255,12 +275,14 @@ Widget _clip(
   ClipPresentation presentation = ClipPresentation.page,
   Duration? pollInterval,
   Duration? noticeThreshold,
+  List<HistoryEntry> history = const <HistoryEntry>[],
 }) {
   final services = _services(
     api: api,
     online: online,
     entitlement: entitlement,
     settings: settings,
+    history: history,
   );
   return ScenovaScope(
     services: services,

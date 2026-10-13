@@ -233,8 +233,34 @@ class MockLookupApi implements LookupApi {
       'bank' => _senseChoice(selection),
       'xylograph' => _generating(selection),
       'quixotic' => _fallback(selection),
-      _ => _libraryHit(selection),
+      _ =>
+        selection.contains(' ')
+            ? _phraseClip(selection)
+            : _libraryHit(selection),
     };
+  }
+
+  /// A short phrase generates its clip on demand and keeps it only on the
+  /// device, so the phrase never carries a library entry (`FEAT-007`).
+  LookupResult _phraseClip(String selection) {
+    return LookupResult(
+      lookupId: _nextId(),
+      kind: LookupKind.phrase,
+      rawSelection: selection,
+      // A phrase is not normalised to a base form; it is its own key.
+      normalisedLemma: null,
+      status: LookupStatus.generating,
+      senses: <Sense>[
+        Sense(
+          senseLabel: '1',
+          partOfSpeech: '',
+          glossPhrase: selection,
+          entryId: null,
+        ),
+      ],
+      notice: null,
+      correlationId: 'mock-correlation',
+    );
   }
 
   LookupResult _libraryHit(String selection) {

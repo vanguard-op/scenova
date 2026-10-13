@@ -182,7 +182,8 @@ enum ClipSource {
   /// A clip generated for this lookup.
   generated('generated'),
 
-  /// A clip replayed from device history with no connection.
+  /// A clip replayed from the device's own history, whether the device is
+  /// offline or the phrase clip is simply already saved there.
   saved('saved');
 
   const ClipSource(this.wire);

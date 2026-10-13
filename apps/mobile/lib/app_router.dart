@@ -64,10 +64,6 @@ class AppRouter {
       return;
     }
 
-    if (selection.overLimit && selection.notice != null) {
-      notice.value = CaptureNotice(selection.notice!);
-    }
-
     final active = _activeClip;
     if (active != null) {
       await active.submit(selection);

@@ -111,7 +111,7 @@ void main() {
     await teardown(tester);
   });
 
-  testWidgets('a selection over six words is kept within the limit', (
+  testWidgets('a selection over six words asks the reader to narrow it', (
     tester,
   ) async {
     await pumpHarness(tester);
@@ -123,11 +123,15 @@ void main() {
     );
     await tester.tap(find.text('Look up'));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
 
-    expect(find.text(CaptureSelection.overLimitNotice), findsWidgets);
-    expect(find.byType(SnackBar), findsOneWidget);
-    expect(find.text('the quick brown fox jumps over'), findsWidgets);
+    // The reader is asked in place, with their selection left untouched, and
+    // no lookup is opened.
+    expect(find.text(CaptureSelection.overLimitNotice), findsOneWidget);
+    expect(find.byType(ClipViewScreen), findsNothing);
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller!.text,
+      'the quick brown fox jumps over the lazy dog',
+    );
     await teardown(tester);
   });
 }

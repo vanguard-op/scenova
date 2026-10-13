@@ -258,19 +258,39 @@ class ThrowingLookupApi implements LookupApi {
   Future<LookupResult> getLookup(String lookupId) async => throw error;
 }
 
+/// Wraps a lookup service and counts the lookups that reach it, so a test can
+/// prove a clip was served from the device without a new generation.
+class RecordingLookupApi implements LookupApi {
+  RecordingLookupApi(this.delegate);
+
+  final LookupApi delegate;
+  int createCalls = 0;
+
+  @override
+  Future<LookupResult> createLookup(LookupRequest request) {
+    createCalls++;
+    return delegate.createLookup(request);
+  }
+
+  @override
+  Future<LookupResult> getLookup(String lookupId) =>
+      delegate.getLookup(lookupId);
+}
+
 /// A saved lookup, for seeding history.
 HistoryEntry seededEntry({
   required String word,
   required String phrase,
   String? clipUrl,
   bool hasAudio = false,
+  LookupKind kind = LookupKind.word,
   Duration age = const Duration(minutes: 1),
 }) {
   return HistoryEntry(
     id: 'seed-$word',
     word: word,
     phrase: phrase,
-    kind: LookupKind.word,
+    kind: kind,
     savedAt: DateTime.now().subtract(age),
     clipUrl: clipUrl,
     hasAudio: hasAudio,

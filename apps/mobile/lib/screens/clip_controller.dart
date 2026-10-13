@@ -23,6 +23,10 @@ enum ClipPhase {
   offline,
   allowanceExhausted,
   error,
+
+  /// The selection is longer than the phrase limit, so the reader is asked to
+  /// narrow it (`FEAT-007`). No lookup starts.
+  selectionTooLong,
 }
 
 /// How the reader marked a clip.
@@ -89,6 +93,9 @@ class ClipViewController extends ChangeNotifier {
   /// The word to show, preferring the result's normalised form.
   String get word => _result?.displayWord ?? _selection.text;
 
+  /// Whether the selection is a short phrase rather than a single word.
+  bool get isPhrase => _selection.kind == LookupKind.phrase;
+
   /// The gloss phrase to show, from the chosen sense or the first sense.
   String? get phrase {
     final sense = _chosenSense ?? _firstSense;
@@ -149,6 +156,13 @@ class ClipViewController extends ChangeNotifier {
       return;
     }
 
+    // A selection over the phrase limit starts no lookup; the reader is asked
+    // to narrow it instead (`FEAT-007`).
+    if (_selection.overLimit) {
+      _setPhase(ClipPhase.selectionTooLong);
+      return;
+    }
+
     if (announceStart) {
       services.analytics.lookupStarted(
         kind: _selection.kind ?? LookupKind.word,
@@ -158,6 +172,18 @@ class ClipViewController extends ChangeNotifier {
 
     _entitlement = await services.entitlements.current();
     if (_disposed) return;
+
+    // A phrase clip is kept only on the device and never enters the shared
+    // library, so a phrase this device has already looked up is served from
+    // its own history without a new generation (`FEAT-007`).
+    if (_selection.kind == LookupKind.phrase) {
+      final saved = await _savedClipFor(_selection);
+      if (_disposed) return;
+      if (saved != null) {
+        _serveSavedClip(saved);
+        return;
+      }
+    }
 
     if (!services.connectivity.isOnline) {
       await _serveFromHistoryOrOffline();
@@ -364,25 +390,36 @@ class ClipViewController extends ChangeNotifier {
   }
 
   Future<void> _serveFromHistoryOrOffline() async {
-    final saved = await _savedClipFor(_selection.text);
+    final saved = await _savedClipFor(_selection);
     if (_disposed) return;
     if (saved != null) {
-      _fromHistory = true;
-      _result = _placeholderResult(sense: saved);
-      _chosenSense = _result!.senses.first;
-      _setPhase(ClipPhase.playing);
-      _autoplayOrHold();
+      _serveSavedClip(saved);
       return;
     }
     _setPhase(ClipPhase.offline);
   }
 
-  Future<Sense?> _savedClipFor(String word) async {
+  /// Plays [sense], which came from the device's own history rather than a
+  /// fresh lookup, and records it as a saved-clip replay.
+  void _serveSavedClip(Sense sense) {
+    _fromHistory = true;
+    _result = _placeholderResult(sense: sense);
+    _chosenSense = _result!.senses.first;
+    _setPhase(ClipPhase.playing);
+    _autoplayOrHold();
+  }
+
+  /// The clip saved for [selection] on this device, or null.
+  ///
+  /// Matching on the selection's kind and text keeps a phrase served only by
+  /// its own phrase entry; a word and a phrase that share text stay separate.
+  Future<Sense?> _savedClipFor(CaptureSelection selection) async {
     final entries = await services.historyStore.all();
     final match = entries
         .where(
           (entry) =>
-              entry.word.toLowerCase() == word.toLowerCase() &&
+              entry.kind == selection.kind &&
+              entry.word.toLowerCase() == selection.text.toLowerCase() &&
               entry.clipUrl != null,
         )
         .firstOrNull;

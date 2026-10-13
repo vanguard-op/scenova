@@ -76,6 +76,8 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
     _controller.addListener(_onControllerChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      // The "pick a shorter phrase" state carries the notice itself.
+      if (_controller.phase == ClipPhase.selectionTooLong) return;
       final notice = _controller.selection.notice;
       if (notice != null) _showMessage(notice);
     });
@@ -182,6 +184,7 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
   Widget _content(BuildContext context) {
     final tokens = ScenovaTokens.of(context);
     final inExtension = widget.presentation == ClipPresentation.extension;
+    final isPhrase = _controller.isPhrase;
     switch (_controller.phase) {
       case ClipPhase.loading:
         return Column(
@@ -209,6 +212,21 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
           onAction: widget.onDismiss,
         );
 
+      case ClipPhase.selectionTooLong:
+        // A selection over the phrase limit starts no lookup; the reader is
+        // asked to narrow it (`FEAT-007`).
+        return EmptyState(
+          icon: AppIcons.search,
+          headline: 'Pick a shorter phrase',
+          body:
+              'Scenova looks up single words and short phrases — up to six '
+              'words. Your selection was '
+              '${_controller.selection.truncatedFrom} words. Select up to six '
+              'and open Scenova again.',
+          actionLabel: inExtension ? 'Close' : 'Back to Home',
+          onAction: widget.onDismiss,
+        );
+
       case ClipPhase.offline:
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -221,8 +239,13 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
             SizedBox(height: tokens.spacing.lg),
             EmptyState(
               icon: AppIcons.offline,
-              headline: 'This word is not saved on this device',
-              body: inExtension
+              headline: isPhrase
+                  ? 'This phrase is not saved on this device'
+                  : 'This word is not saved on this device',
+              body: isPhrase
+                  ? 'A phrase clip needs a connection to be made. Look it up '
+                        'again when you are back online.'
+                  : inExtension
                   ? 'Look it up again when you are back online.'
                   : 'Look it up again when you are back online, or browse the '
                         'lookups you have saved.',
@@ -289,6 +312,9 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
           player: ClipPlayer(
             status: ClipPlayerStatus.unavailable,
             caption: _controller.word,
+            unavailableMessage: isPhrase
+                ? 'No clip for this phrase yet.'
+                : null,
             onRetry: _controller.retry,
           ),
         );

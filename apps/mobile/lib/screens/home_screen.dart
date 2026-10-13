@@ -124,10 +124,14 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() => _validationMessage = 'Type or paste a word to look up.');
       return;
     }
-    setState(() => _validationMessage = null);
     if (selection.overLimit) {
-      _entry.text = selection.text;
+      // A selection over the phrase limit is not looked up; the reader is
+      // asked to narrow it in place rather than losing their edit
+      // (`FEAT-007`).
+      setState(() => _validationMessage = selection.notice);
+      return;
     }
+    setState(() => _validationMessage = null);
     widget.router.openSelection(selection);
   }
 
