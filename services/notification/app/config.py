@@ -32,6 +32,14 @@ DEFAULT_PUSH_TIMEOUT_SECONDS = 5.0
 # A bound on queued notices, so a long push outage cannot grow the queue without
 # limit. This is backpressure, not loss.
 DEFAULT_PENDING_NOTICE_LIMIT = 1000
+# How often a queued notice is retried while the service runs. A provider outage
+# delays a notice; this is what turns the queue back into a delivery rather than
+# a leak (architecture "Notification Service"). Zero disables the loop.
+DEFAULT_PUSH_DRAIN_INTERVAL_SECONDS = 30.0
+# The configured provider. An empty value selects the logging seam, which is the
+# local default until the provider is wired; `firebase` selects Firebase Cloud
+# Messaging (the platform's configured provider).
+DEFAULT_PUSH_PROVIDER = ""
 
 
 @dataclass(frozen=True)
@@ -45,10 +53,21 @@ class Settings:
     require_internal_auth: bool = True
     lookup_base_url: str = f"http://127.0.0.1:{DEFAULT_LOOKUP_PORT}"
     lookup_timeout_seconds: float = DEFAULT_LOOKUP_TIMEOUT_SECONDS
-    # The push provider's base URL; empty selects the logging seam rather than an
-    # outbound call, until the provider is wired.
+    # The push provider's base URL for the generic HTTP seam. Empty (with the
+    # provider left unset) selects the logging seam rather than an outbound call.
+    # The platform's configured provider is Firebase Cloud Messaging, selected by
+    # `push_provider` below.
     push_base_url: str = ""
     push_timeout_seconds: float = DEFAULT_PUSH_TIMEOUT_SECONDS
+    # The configured push provider. `firebase` sends through Firebase Cloud
+    # Messaging (HTTP v1); anything else falls back to the generic seam or the
+    # logging seam.
+    push_provider: str = DEFAULT_PUSH_PROVIDER
+    # The Firebase Cloud Messaging send endpoint. A product-wide constant the
+    # platform declares; sends are authorized from Application Default
+    # Credentials, so no credential is stored here (NFR-024).
+    push_fcm_base_url: str = ""
+    push_drain_interval_seconds: float = DEFAULT_PUSH_DRAIN_INTERVAL_SECONDS
     rate_limit_per_minute: int = DEFAULT_RATE_LIMIT_PER_MINUTE
     rate_limit_window_seconds: int = DEFAULT_RATE_LIMIT_WINDOW_SECONDS
     pending_notice_limit: int = DEFAULT_PENDING_NOTICE_LIMIT
@@ -78,6 +97,13 @@ class Settings:
             push_base_url=_env_str(source, "PUSH_BASE_URL", ""),
             push_timeout_seconds=_env_float(
                 source, "NOTIFICATION_PUSH_TIMEOUT_SECONDS", DEFAULT_PUSH_TIMEOUT_SECONDS
+            ),
+            push_provider=_env_str(source, "PUSH_PROVIDER", DEFAULT_PUSH_PROVIDER).strip().lower(),
+            push_fcm_base_url=_env_str(source, "PUSH_FCM_BASE_URL", ""),
+            push_drain_interval_seconds=_env_float(
+                source,
+                "NOTIFICATION_PUSH_DRAIN_INTERVAL_SECONDS",
+                DEFAULT_PUSH_DRAIN_INTERVAL_SECONDS,
             ),
             rate_limit_per_minute=_env_int(
                 source, "NOTIFICATION_RATE_LIMIT_PER_MINUTE", DEFAULT_RATE_LIMIT_PER_MINUTE

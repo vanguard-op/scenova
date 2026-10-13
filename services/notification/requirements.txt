@@ -2,10 +2,14 @@
 # and a clean dependency scan (NFR-028). httpx2 backs the in-process API tests
 # through Starlette's TestClient and the outbound calls to the lookup and push
 # services; pyjwt with cryptography verifies Firebase ID tokens, as the gateway
-# and the other client-facing intakes do. The platform installs service
-# requirements into one shared venv (`make setup`).
+# and the other client-facing intakes do; google-auth mints the short-lived
+# OAuth 2.0 token a Firebase Cloud Messaging send requires from Application
+# Default Credentials, so no static push credential is stored or rotated
+# (NFR-024). The platform installs service requirements into one shared venv
+# (`make setup`).
 fastapi==0.143.0
 uvicorn==0.54.0
 pydantic==2.14.1
 httpx2==2.13.1
 pyjwt[crypto]==2.15.1
+google-auth==2.62.0

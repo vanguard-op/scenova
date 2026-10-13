@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 
 from fastapi.testclient import TestClient
@@ -48,19 +49,37 @@ class FakeLookupDirectory:
 
 
 class FakePushSender:
-    """A sender that records every notice, and can be scripted to fail."""
+    """A sender that records every notice, and can be scripted to fail.
+
+    `sent_event` is set on every successful send, so a test can wait for a
+    delivery rather than poll for one.
+    """
 
     def __init__(self, *, unavailable: bool = False) -> None:
         self.sent: list[tuple[str, Platform, ClipReadyNotice]] = []
         self.unavailable = unavailable
+        self.sent_event = asyncio.Event()
 
     async def send(self, *, token: str, platform: Platform, notice: ClipReadyNotice) -> None:
         if self.unavailable:
             raise PushUnavailableError("The push provider is unreachable.")
         self.sent.append((token, platform, notice))
+        self.sent_event.set()
 
     async def aclose(self) -> None:
         return None
+
+
+class FakeTokenProvider:
+    """A token provider that returns a fixed access token without any network."""
+
+    def __init__(self, value: str = "ya29.test-token") -> None:
+        self.token_value = value
+        self.calls = 0
+
+    def token(self) -> str:
+        self.calls += 1
+        return self.token_value
 
 
 @dataclass
@@ -113,8 +132,13 @@ def make_client(
     service: NotificationService | None = None,
     settings: Settings | None = None,
     rate_limit: int = 120,
+    run_drain_loop: bool = False,
 ) -> TestClient:
-    """A client for the service with the dev verifier and a frozen clock limiter."""
+    """A client for the service with the dev verifier and a frozen clock limiter.
+
+    The queued-notice retry is off by default so a test drives the queue
+    deterministically; the drain has its own test.
+    """
 
     resolved_settings = settings or Settings()
     resolved_service = service or build_fake_service(resolved_settings)
@@ -125,6 +149,7 @@ def make_client(
             limiter=InMemoryFixedWindowRateLimiter(
                 limit=rate_limit, window_seconds=60, clock=lambda: 0.0
             ),
+            run_drain_loop=run_drain_loop,
         )
     )
 

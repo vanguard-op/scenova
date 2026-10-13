@@ -10,12 +10,14 @@ event that will never come.
 finishes (architecture "Notification Service": `Gen --> Notify`). It sends one
 notice per registered device; a push provider that cannot be reached leaves the
 notice queued rather than lost, and `drain_pending` retries the queue once the
-provider is back. Each finished job is claimed once, so a retried ingest never
-sends a second notice.
+provider is back. `PushDrainLoop` runs that retry while the service is up, so the
+queue is a delay and not a leak. Each finished job is claimed once, so a retried
+ingest never sends a second notice.
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections import deque
 
@@ -30,6 +32,7 @@ from .models import (
 )
 from .push import (
     ClipReadyNotice,
+    FcmPushSender,
     HttpPushSender,
     LoggingPushSender,
     PushSender,
@@ -179,17 +182,35 @@ class NotificationService:
         self._pending.append((registration, notice))
 
 
-def build_default_service(settings: Settings) -> NotificationService:
-    """Build the service with its registration store and the lookup and push clients."""
+def build_push_sender(settings: Settings) -> PushSender:
+    """Build the sender for the configured push provider.
 
-    sender: PushSender
+    Firebase Cloud Messaging is the platform's configured provider; a send
+    through it is authorized from Application Default Credentials, so no
+    credential is carried in configuration (NFR-024). When the provider is
+    Firebase but no send endpoint is declared, or when a generic endpoint is
+    configured instead (the seam a test double stands behind), that endpoint is
+    used. With nothing configured the logging seam stands in, so the service
+    still boots and the delivery is observable.
+    """
+
+    if settings.push_provider == "firebase" and settings.push_fcm_base_url:
+        return FcmPushSender(
+            base_url=settings.push_fcm_base_url,
+            project_id=settings.firebase_project_id,
+            timeout_seconds=settings.push_timeout_seconds,
+        )
     if settings.push_base_url:
-        sender = HttpPushSender(
+        return HttpPushSender(
             base_url=settings.push_base_url,
             timeout_seconds=settings.push_timeout_seconds,
         )
-    else:
-        sender = LoggingPushSender()
+    return LoggingPushSender()
+
+
+def build_default_service(settings: Settings) -> NotificationService:
+    """Build the service with its registration store, lookup client, and push sender."""
+
     return NotificationService(
         store=InMemoryRegistrationStore(),
         lookups=HttpLookupDirectory(
@@ -197,9 +218,35 @@ def build_default_service(settings: Settings) -> NotificationService:
             internal_audience=settings.internal_audience,
             timeout_seconds=settings.lookup_timeout_seconds,
         ),
-        sender=sender,
+        sender=build_push_sender(settings),
         pending_limit=settings.pending_notice_limit,
     )
+
+
+class PushDrainLoop:
+    """Retries queued notices on an interval while the service runs.
+
+    architecture.md "Notification Service": if the push service is down,
+    notifications are queued rather than lost. The queue only means that while
+    something drains it, so this loop retries the queue, oldest first, and stops
+    at the first send the provider still will not take. A drain that raises never
+    stops the loop, since a queued notice is only delayed, not abandoned.
+    """
+
+    def __init__(self, service: NotificationService, *, interval_seconds: float) -> None:
+        self._service = service
+        self._interval = max(0.1, interval_seconds)
+
+    async def run(self) -> None:
+        while True:
+            await asyncio.sleep(self._interval)
+            try:
+                delivered = await self._service.drain_pending()
+            except Exception:
+                logger.exception("the queued-notice drain failed; it will be retried")
+                continue
+            if delivered:
+                logger.info("delivered %d queued clip-ready notices", delivered)
 
 
 def _readable_token(token: str) -> bool:

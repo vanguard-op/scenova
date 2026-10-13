@@ -8,8 +8,9 @@ clip finishes; it is internal-only and never reachable from the client.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from typing import Annotated
 
 from fastapi import FastAPI, Header, Request
@@ -21,7 +22,7 @@ from .config import Settings
 from .errors import NotificationError, RateLimitedError, UnauthorizedError
 from .models import ClipReadyRequest, ClipReadyResponse, RegisterRequest, RegisterResponse
 from .ratelimit import InMemoryFixedWindowRateLimiter, RateLimiter
-from .service import NotificationService, build_default_service
+from .service import NotificationService, PushDrainLoop, build_default_service
 
 
 def create_app(
@@ -29,8 +30,15 @@ def create_app(
     service: NotificationService | None = None,
     verifier: TokenVerifier | None = None,
     limiter: RateLimiter | None = None,
+    *,
+    run_drain_loop: bool = True,
 ) -> FastAPI:
-    """Build the notification service application."""
+    """Build the notification service application.
+
+    `run_drain_loop` starts the queued-notice retry while the service runs, so a
+    provider outage delays a notice rather than losing it. Tests that drive the
+    queue directly turn it off.
+    """
 
     resolved_settings = settings or Settings.from_env()
     resolved_service = service or build_default_service(resolved_settings)
@@ -39,12 +47,27 @@ def create_app(
         limit=resolved_settings.rate_limit_per_minute,
         window_seconds=resolved_settings.rate_limit_window_seconds,
     )
+    drain_loop = (
+        PushDrainLoop(
+            resolved_service,
+            interval_seconds=resolved_settings.push_drain_interval_seconds,
+        )
+        if run_drain_loop and resolved_settings.push_drain_interval_seconds > 0
+        else None
+    )
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        drain_task = (
+            asyncio.create_task(drain_loop.run(), name="push-drain") if drain_loop else None
+        )
         try:
             yield
         finally:
+            if drain_task is not None:
+                drain_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await drain_task
             await resolved_service.aclose()
 
     app = FastAPI(
