@@ -28,14 +28,15 @@ labels = {
 }
 
 services = {
-  gateway     = { public = true }
-  lookup      = { public = false }
-  pipeline    = { public = false }
-  library     = { public = false }
-  entitlement = { public = false }
-  feedback    = { public = false }
-  analytics   = { public = false }
-  model       = { public = false }
+  gateway      = { public = true }
+  lookup       = { public = false }
+  pipeline     = { public = false }
+  library      = { public = false }
+  entitlement  = { public = false }
+  feedback     = { public = false }
+  analytics    = { public = false }
+  model        = { public = false }
+  notification = { public = false }
 }
 
 flags = {

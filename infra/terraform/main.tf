@@ -145,6 +145,19 @@ locals {
   }
 
   service_extra_env = {
+    # The notification service is the only sender to the push notification
+    # service (architecture.md "External Integrations": push, outbound, medium
+    # criticality, FEAT-008). The provider is Firebase Cloud Messaging, the
+    # Google-managed push service behind the Firebase project the client already
+    # uses for identity (D-005); the send endpoint is a product-wide constant and
+    # the project id is shared as FIREBASE_PROJECT_ID (common_env). No credential
+    # is carried in the environment: the send is authorized by a short-lived
+    # OAuth 2.0 token minted from the runtime service account through ADC, so
+    # there is no static secret to store or rotate (NFR-024).
+    notification = {
+      PUSH_PROVIDER     = "firebase"
+      PUSH_FCM_BASE_URL = "https://fcm.googleapis.com"
+    }
     model = {
       GEMINI_TIMEOUT_SECONDS            = "30"
       GEMINI_MAX_ATTEMPTS               = "3"
@@ -159,6 +172,9 @@ locals {
     pipeline = { DATABASE_URL = module.secrets.secret_ids["database-url"] }
     library  = { DATABASE_URL = module.secrets.secret_ids["database-url"] }
     feedback = { DATABASE_URL = module.secrets.secret_ids["database-url"] }
+    # Push registrations attach the reader's token to a lookup (C-008), which the
+    # notification service reads back when that lookup's generation completes.
+    notification = { DATABASE_URL = module.secrets.secret_ids["database-url"] }
     entitlement = {
       DATABASE_URL            = module.secrets.secret_ids["database-url"]
       REVENUECAT_API_KEY      = module.secrets.secret_ids["revenuecat-api-key"]
@@ -220,6 +236,18 @@ resource "google_service_account_iam_member" "pipeline_act_as_tasks" {
   service_account_id = google_service_account.tasks.name
   role               = "roles/iam.serviceAccountUser"
   member             = "serviceAccount:${local.runtime_emails["pipeline"]}"
+}
+
+# The notification service is the only principal allowed to send to the push
+# notification service (architecture.md "External Integrations"). Firebase Cloud
+# Messaging authorizes a send with a short-lived OAuth 2.0 token from the runtime
+# service account, so no static credential is issued (NFR-024);
+# `roles/firebasecloudmessaging.admin` is the predefined role carrying the send
+# permission `cloudmessaging.messages.create` and is granted to no other service.
+resource "google_project_iam_member" "notification_push_sender" {
+  project = var.project_id
+  role    = "roles/firebasecloudmessaging.admin"
+  member  = "serviceAccount:${local.runtime_emails["notification"]}"
 }
 
 # --- Audit logging (NFR-029) --------------------------------------------------
