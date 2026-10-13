@@ -1,0 +1,30 @@
+{
+  "nfrId": "NFR-051",
+  "capability": "Word-clip generation",
+  "smoke": true,
+  "modelPin": "gemini-omni-1.1-flash",
+  "phrase": "a key in the door",
+  "targetDurationSeconds": 4.0,
+  "statusCode": 201,
+  "contract": {
+    "clipId": "470c2693a66a449fa1e09dbb1a84cfbc",
+    "storageKey": "clips/470c2693a66a449fa1e09dbb1a84cfbc.mp4",
+    "url": "https://cdn.scenova.example/clips/470c2693a66a449fa1e09dbb1a84cfbc.mp4",
+    "durationSeconds": 4.0,
+    "resolution": "360p",
+    "hasAudio": true,
+    "synthIdWatermark": true
+  },
+  "media": {
+    "brand": "mp42",
+    "containerDurationSeconds": 4.032,
+    "width": 640,
+    "height": 360,
+    "hasVideoTrack": true,
+    "hasAudioTrack": true,
+    "bytes": 1325688
+  },
+  "meetsContract": true,
+  "failures": [],
+  "generatedAt": "2026-10-13T19:22:12.432575+00:00"
+}

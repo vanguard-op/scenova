@@ -1,0 +1,53 @@
+NFR-051 word-clip live smoke — provenance
+
+Bar       docs/Scenova/nfr.md, NFR-051 (FEAT-005). Metric: share of clips a rater
+          judges to depict the phrase's meaning. Threshold >= 0.80. This smoke does
+          not measure that bar: it is the live-path smoke that must pass before the
+          judged NFR-051 run is worth spending (nfr.md "Model Quality & Cost";
+          DELIVERY.md D-020 leaves NFR-051 unmeasured and the generation path's
+          release flagged until it is).
+Model     gemini-omni-1.1-flash — the pinned video model for word clips (nfr.md
+          "Model Quality & Cost"; architecture.md "Model Version & Fallback").
+Run date  2026-10-13.
+
+What ran
+One clip through the shipped C-005 surface: the real `app.main:app` router, the
+real `app.clip.service.ClipService` (duration clamp, prompt artifact
+word-clip-v2), and the real `app.provider.GeminiClipModel` against the pinned
+model. Only the object-storage boundary — the documented `ClipStore` protocol —
+is substituted by an in-memory recording store, because the gate environment
+holds no Cloud Storage credential; the recorded bytes are what the smoke
+measures. The clip's input is the first item of the NFR-051 golden set
+(qa/golden/word_clip.jsonl): "a key in the door", target duration 4s.
+
+Artifacts
+- qa/clip_smoke.py               The smoke harness and the `python -m qa.clip_smoke`
+                                 entry point. It parses the returned MP4 for its
+                                 real container duration, resolution, and tracks.
+- qa/test_clip_smoke.py          The model-marked gate checks over the harness.
+- qa/reports/NFR-051-smoke.json  This run: the served contract, the measured media,
+                                 and whether the clip met the contract.
+
+Result
+- status 201; body carries every C-005 field.
+- served durationSeconds 4.0; resolution 360p; hasAudio true; synthIdWatermark true.
+- media: 640x360, video and audio tracks, container duration 4.032s, 1,325,688 bytes.
+- Exactly one clip was produced and stored. The clip met the contract.
+
+Note on the duration
+The contract field is the value the service serves; the encoded clip's real
+container duration is measured separately because a provider that ignored the
+requested length would still leave the served field plausible. The measured
+4.032s trails the 4s target by under one frame of the container's frame grid, so
+the smoke allows one frame of encoder rounding around the three-to-four-second
+range and records the exact value here. The pipeline withholds any clip whose
+served duration falls outside three to four seconds (services/pipeline/app), so
+the product's own gate is the served field; this smoke adds the media check.
+
+Not covered here
+- The judged NFR-051 bar (>= 0.80 over 100 rated clips) is still unmeasured; this
+  smoke proves the live path, not the quality.
+- The provider-declines fallback and the ten-second background hand-off are
+  exercised at the integration layer against the model double
+  (tests/test_generation_loop.py) and in the model-serving unit suite; they need
+  no live provider.
