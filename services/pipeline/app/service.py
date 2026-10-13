@@ -29,10 +29,21 @@ from .clip_client import (
     HttpClipClient,
 )
 from .config import Settings
-from .errors import InvalidRequestError, MissingPhraseError, TargetDurationError
+from .errors import (
+    InvalidRequestError,
+    JobNotFoundError,
+    MissingPhraseError,
+    TargetDurationError,
+)
 from .jobs import ClipAsset, GenerationJob, LibraryEntry
 from .library import InMemoryLibraryWriter, LibraryWriter
-from .models import CreateJobRequest, CreateJobResponse, JobStatus, Kind
+from .models import (
+    CreateJobRequest,
+    CreateJobResponse,
+    JobStatus,
+    JobStatusResponse,
+    Kind,
+)
 from .notifier import LoggingNotifier, Notifier
 from .queue import InMemoryJobQueue, JobQueue
 
@@ -157,6 +168,19 @@ class GenerationService:
         """Release the model client's connections."""
 
         await self._clip_generator.aclose()
+
+    async def get_status(self, job_id: str) -> JobStatusResponse:
+        """Report a job's state so a stalled generation can be resolved (C-006).
+
+        The lookup service consults this on a lookup poll: a job that ends
+        `failed` or `declined` never produced a clip, so the reader's lookup
+        resolves to the fallback instead of waiting forever.
+        """
+
+        job = await self._queue.get(job_id)
+        if job is None:
+            raise JobNotFoundError("No generation job exists for this id.")
+        return JobStatusResponse(jobId=job.id, lookupId=job.lookup_id, status=job.status)
 
     async def _admit(self) -> bool:
         """Reserve one clip call against the generation budget, if one is set."""

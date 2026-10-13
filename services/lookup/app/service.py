@@ -32,6 +32,7 @@ from .generation import (
     GenerationAlreadyEnqueuedError,
     GenerationClient,
     GenerationJob,
+    GenerationJobStatus,
     GenerationUnavailableError,
     HttpGenerationClient,
     phrase_job_id,
@@ -65,11 +66,15 @@ INVENTORY_UNAVAILABLE_NOTICE = (
 GENERATION_UNAVAILABLE_NOTICE = (
     "We couldn't start a clip for this one. Please try again in a moment."
 )
+GENERATION_FAILED_NOTICE = "We couldn't make a clip for this one. Please try again."
 EMPTY_NOTICE = "There was nothing to look up in that selection."
 
 # A phrase has no sense, but C-003 requires a sense label; this marks the job as
 # the phrase path.
 PHRASE_SENSE_LABEL = "phrase"
+
+# A job in one of these states produced no clip and never will (C-006).
+_STOPPED_WITHOUT_CLIP = frozenset({GenerationJobStatus.FAILED, GenerationJobStatus.DECLINED})
 
 
 class LookupService:
@@ -162,6 +167,7 @@ class LookupService:
         senses = tuple([await self._sense(lemma, record) for record in records])
         status = _word_status(request.consentModelProcessing, senses)
         lookup_id = _new_id()
+        job_ids: tuple[str, ...] = ()
         if status is LookupStatus.GENERATING:
             missing = [
                 record for record, sense in zip(records, senses, strict=True) if sense.clip is None
@@ -176,7 +182,19 @@ class LookupService:
             if not await self._enqueue(jobs):
                 status = LookupStatus.FALLBACK
                 notice = GENERATION_UNAVAILABLE_NOTICE
-        return _stored(lookup_id, request, raw_selection, Kind.WORD, lemma, status, senses, notice)
+            else:
+                job_ids = tuple(job.job_id for job in jobs)
+        return _stored(
+            lookup_id,
+            request,
+            raw_selection,
+            Kind.WORD,
+            lemma,
+            status,
+            senses,
+            notice,
+            generation_job_ids=job_ids,
+        )
 
     async def _phrase_lookup(
         self, request: CreateLookupRequest, raw_selection: str, phrase: str
@@ -207,6 +225,7 @@ class LookupService:
                 LookupStatus.GENERATING,
                 (),
                 None,
+                generation_job_ids=(job.job_id,),
             )
         return _stored(
             lookup_id,
@@ -246,17 +265,65 @@ class LookupService:
         return True
 
     async def _refresh(self, stored: StoredLookup) -> StoredLookup:
-        """Serve a clip the library has gained since the lookup was recorded."""
+        """Resolve a poll against the library and the pipeline's job states.
 
-        if stored.kind is not Kind.WORD or not stored.senses:
-            return stored
+        A clip the library gained is served; a generation that stopped without a
+        clip (C-006 failed or declined, or a job the pipeline no longer knows)
+        resolves the lookup to the fallback (FEAT-005).
+        """
+
+        if stored.kind is Kind.PHRASE:
+            return await self._refresh_phrase(stored)
+        if stored.kind is Kind.WORD and stored.senses:
+            return await self._refresh_word(stored)
+        return stored
+
+    async def _refresh_word(self, stored: StoredLookup) -> StoredLookup:
         lemma = stored.normalised_lemma or stored.raw_selection
         senses = tuple([await self._refresh_sense(lemma, sense) for sense in stored.senses])
+        if all(sense.clip is not None for sense in senses):
+            if senses == stored.senses and stored.status is LookupStatus.SERVED:
+                return stored
+            return replace(stored, senses=senses, status=LookupStatus.SERVED)
+        if stored.status is LookupStatus.GENERATING and await self._generation_stopped(
+            stored.generation_job_ids
+        ):
+            return replace(
+                stored,
+                senses=senses,
+                status=LookupStatus.FALLBACK,
+                notice=GENERATION_FAILED_NOTICE,
+            )
         if senses == stored.senses:
             return stored
-        if all(sense.clip is not None for sense in senses):
-            return replace(stored, senses=senses, status=LookupStatus.SERVED)
         return replace(stored, senses=senses)
+
+    async def _refresh_phrase(self, stored: StoredLookup) -> StoredLookup:
+        if stored.status is LookupStatus.GENERATING and await self._generation_stopped(
+            stored.generation_job_ids
+        ):
+            return replace(stored, status=LookupStatus.FALLBACK, notice=GENERATION_FAILED_NOTICE)
+        return stored
+
+    async def _generation_stopped(self, job_ids: tuple[str, ...]) -> bool:
+        """True when a generation stopped without a clip and none is still running.
+
+        A job the pipeline no longer knows (C-006 404) has stopped too. A
+        transient pipeline error is not a failure: the lookup keeps generating
+        rather than dropping the reader to the fallback on a blip.
+        """
+
+        stopped = False
+        for job_id in job_ids:
+            try:
+                status = await self._generation.status(job_id)
+            except GenerationUnavailableError:
+                return False
+            if status is None or status in _STOPPED_WITHOUT_CLIP:
+                stopped = True
+            elif status in (GenerationJobStatus.QUEUED, GenerationJobStatus.RUNNING):
+                return False
+        return stopped
 
     async def _refresh_sense(self, lemma: str, sense: Sense) -> Sense:
         if sense.clip is not None:
@@ -370,6 +437,8 @@ def _stored(
     status: LookupStatus,
     senses: tuple[Sense, ...],
     notice: str | None,
+    *,
+    generation_job_ids: tuple[str, ...] = (),
 ) -> StoredLookup:
     return StoredLookup(
         id=lookup_id,
@@ -382,4 +451,5 @@ def _stored(
         senses=senses,
         notice=notice,
         created_at=datetime.now(UTC).isoformat(),
+        generation_job_ids=generation_job_ids,
     )

@@ -26,6 +26,9 @@ class StoredLookup:
     senses: tuple[Sense, ...]
     notice: str | None
     created_at: str
+    # The pipeline jobs this lookup is waiting on, so a poll can ask whether any
+    # has stopped without a clip (C-006, FEAT-005).
+    generation_job_ids: tuple[str, ...] = ()
 
     def to_response(self, correlation_id: str) -> LookupResponse:
         return LookupResponse(

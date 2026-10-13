@@ -1,4 +1,4 @@
-"""Client for the generation pipeline (C-003, FEAT-003, FEAT-005).
+"""Client for the generation pipeline (C-003, C-006, FEAT-003, FEAT-005).
 
 On a library miss the lookup service hands generation to the pipeline: a missing
 word sense becomes a word job, and a short phrase becomes a phrase job. The
@@ -11,6 +11,10 @@ id is derived from the library key (lemma, sense, part of speech) rather than
 from the lookup. The pipeline refuses a repeated job id with 409, which the
 service reads as "already generating" instead of an error. The selected word is
 personal data, so the id is an opaque digest of the key and never the word.
+
+A generation can also end without a clip. On a later lookup poll the service
+asks the pipeline for the job's state (C-006); a job that failed or was declined
+resolves the reader's lookup to the fallback (FEAT-005).
 """
 
 from __future__ import annotations
@@ -18,6 +22,7 @@ from __future__ import annotations
 import hashlib
 import logging
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Protocol
 
 import httpx2
@@ -39,6 +44,16 @@ class GenerationUnavailableError(Exception):
 
 class GenerationAlreadyEnqueuedError(Exception):
     """A job with this id is already enqueued; another lookup shares it."""
+
+
+class GenerationJobStatus(StrEnum):
+    """A generation job's state as the pipeline reports it (C-006)."""
+
+    QUEUED = "queued"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    DECLINED = "declined"
 
 
 @dataclass(frozen=True)
@@ -74,10 +89,14 @@ class GenerationJob:
 
 
 class GenerationClient(Protocol):
-    """Port for the generation pipeline (C-003)."""
+    """Port for the generation pipeline (C-003, C-006)."""
 
     async def enqueue(self, job: GenerationJob) -> None:
         """Hand one job to the pipeline, or raise when it cannot be accepted."""
+        ...
+
+    async def status(self, job_id: str) -> GenerationJobStatus | None:
+        """The pipeline's state for a job, or None when it knows no such job."""
         ...
 
     async def aclose(self) -> None: ...
@@ -130,8 +149,32 @@ class HttpGenerationClient:
         logger.warning("generation enqueue refused with status %s", response.status_code)
         raise GenerationUnavailableError("The generation pipeline could not accept the job.")
 
+    async def status(self, job_id: str) -> GenerationJobStatus | None:
+        try:
+            response = await self._client.get(
+                f"/internal/generation-jobs/{job_id}",
+                headers={"x-internal-audience": self._internal_audience},
+            )
+        except httpx2.HTTPError as exc:
+            raise GenerationUnavailableError("The generation pipeline is unreachable.") from exc
+
+        if response.status_code == 200:
+            return _job_status(response)
+        if response.status_code == 404:
+            # The pipeline no longer knows the job; it has stopped for good.
+            return None
+        logger.warning("generation status refused with status %s", response.status_code)
+        raise GenerationUnavailableError("The generation pipeline could not report the job.")
+
     async def aclose(self) -> None:
         await self._client.aclose()
+
+
+def _job_status(response: httpx2.Response) -> GenerationJobStatus:
+    try:
+        return GenerationJobStatus(response.json()["status"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise GenerationUnavailableError("The pipeline returned an unreadable job.") from exc
 
 
 def _digest(key: str) -> str:

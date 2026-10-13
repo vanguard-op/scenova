@@ -123,3 +123,28 @@ def test_an_unavailable_queue_is_a_service_unavailable() -> None:
 
     assert response.status_code == 503
     assert response.json()["code"] == "queue_unavailable"
+
+
+def test_get_job_reports_the_contract_shape() -> None:
+    with _client(rig().service) as client:
+        client.post("/internal/generation-jobs", json=_payload(), headers=_INTERNAL)
+        response = client.get("/internal/generation-jobs/job-1", headers=_INTERNAL)
+
+    assert response.status_code == 200
+    assert response.json() == {"jobId": "job-1", "lookupId": "lk_1", "status": "queued"}
+
+
+def test_get_job_rejects_a_missing_audience() -> None:
+    with _client(rig().service) as client:
+        response = client.get("/internal/generation-jobs/job-1")
+
+    assert response.status_code == 401
+    assert response.json()["code"] == "unauthorized"
+
+
+def test_get_an_unknown_job_is_not_found() -> None:
+    with _client(rig().service) as client:
+        response = client.get("/internal/generation-jobs/job-missing", headers=_INTERNAL)
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "job_not_found"

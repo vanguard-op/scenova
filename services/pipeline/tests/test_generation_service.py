@@ -12,6 +12,7 @@ from pipeline.app.clip_client import ClipDeclinedError, ClipTimeoutError, ClipUn
 from pipeline.app.errors import (
     InvalidRequestError,
     JobAlreadyEnqueuedError,
+    JobNotFoundError,
     MissingPhraseError,
     QueueUnavailableError,
     TargetDurationError,
@@ -196,3 +197,43 @@ async def test_the_generation_budget_cap_stops_further_generation() -> None:
 async def test_running_an_unknown_job_is_an_invalid_request() -> None:
     with pytest.raises(InvalidRequestError):
         await rig().service.run("job-missing")
+
+
+@pytest.mark.asyncio
+async def test_a_job_reports_its_queued_state() -> None:
+    test_rig = rig()
+    await test_rig.service.submit(request())
+
+    status = await test_rig.service.get_status("job-1")
+
+    assert status.jobId == "job-1"
+    assert status.lookupId == "lk_1"
+    assert status.status == JobStatus.QUEUED
+
+
+@pytest.mark.asyncio
+async def test_a_declined_job_reports_declined() -> None:
+    test_rig = rig(generator=FakeClipGenerator(error=ClipDeclinedError("declined")))
+    await test_rig.service.submit(request())
+    await test_rig.service.run("job-1")
+
+    status = await test_rig.service.get_status("job-1")
+
+    assert status.status == JobStatus.DECLINED
+
+
+@pytest.mark.asyncio
+async def test_a_failed_job_reports_failed() -> None:
+    test_rig = rig(generator=FakeClipGenerator(error=ClipTimeoutError("timeout")))
+    await test_rig.service.submit(request())
+    await test_rig.service.run("job-1")
+
+    status = await test_rig.service.get_status("job-1")
+
+    assert status.status == JobStatus.FAILED
+
+
+@pytest.mark.asyncio
+async def test_the_state_of_an_unknown_job_is_not_found() -> None:
+    with pytest.raises(JobNotFoundError):
+        await rig().service.get_status("job-missing")

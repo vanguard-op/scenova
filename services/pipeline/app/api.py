@@ -18,7 +18,7 @@ from fastapi.responses import JSONResponse
 
 from .config import Settings
 from .errors import PipelineError, UnauthorizedError
-from .models import CreateJobRequest, CreateJobResponse
+from .models import CreateJobRequest, CreateJobResponse, JobStatusResponse
 from .service import GenerationService, build_default_service
 
 
@@ -67,6 +67,14 @@ def create_app(
     ) -> CreateJobResponse:
         _require_internal(resolved_settings, x_internal_audience)
         return await resolved_service.submit(payload)
+
+    @app.get("/internal/generation-jobs/{job_id}")
+    async def get_job(
+        job_id: str,
+        x_internal_audience: Annotated[str | None, Header()] = None,
+    ) -> JobStatusResponse:
+        _require_internal(resolved_settings, x_internal_audience)
+        return await resolved_service.get_status(job_id)
 
     return app
 

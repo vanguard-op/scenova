@@ -10,6 +10,11 @@ from lookup.app.errors import (
     LookupNotFoundError,
     PhraseLimitExceededError,
 )
+from lookup.app.generation import (
+    GenerationJobStatus,
+    GenerationUnavailableError,
+    word_job_id,
+)
 from lookup.app.inventory import (
     InventoryUnavailableError,
     ResolvedWord,
@@ -20,6 +25,7 @@ from lookup.app.library import InMemoryLibrary, LibraryClip, LibraryEntry, Libra
 from lookup.app.models import CreateLookupRequest, Kind, LookupStatus, PartOfSpeech
 from lookup.app.service import (
     BEST_GUESS_NOTICE,
+    GENERATION_FAILED_NOTICE,
     GENERATION_UNAVAILABLE_NOTICE,
     INVENTORY_UNAVAILABLE_NOTICE,
     PHRASE_SENSE_LABEL,
@@ -420,3 +426,127 @@ async def test_a_phrase_poll_stays_generating() -> None:
 
     assert polled.kind == Kind.PHRASE
     assert polled.status == LookupStatus.GENERATING
+
+
+@pytest.mark.asyncio
+async def test_a_poll_consults_the_job_the_pipeline_was_given() -> None:
+    generation = RecordingGenerationClient()
+    service = _service(generation=generation)
+    created = await service.create_lookup(_request("coming"), "corr")
+
+    await service.get_lookup(created.lookupId, "reader-1", "corr-2")
+
+    assert generation.status_calls == [word_job_id("come", "arrive", PartOfSpeech.VERB)]
+
+
+@pytest.mark.asyncio
+async def test_a_failed_generation_resolves_a_poll_to_the_fallback() -> None:
+    generation = RecordingGenerationClient()
+    service = _service(generation=generation)
+    created = await service.create_lookup(_request("coming"), "corr")
+    generation.statuses[generation.jobs[0].job_id] = GenerationJobStatus.FAILED
+
+    polled = await service.get_lookup(created.lookupId, "reader-1", "corr-2")
+
+    assert polled.status == LookupStatus.FALLBACK
+    assert polled.notice == GENERATION_FAILED_NOTICE
+    # The word and phrase still show; only the clip is unavailable.
+    assert polled.normalisedLemma == "come"
+    assert polled.senses[0].glossPhrase == "to move toward or reach a place"
+    assert polled.senses[0].clip is None
+
+
+@pytest.mark.asyncio
+async def test_a_declined_generation_resolves_a_poll_to_the_fallback() -> None:
+    generation = RecordingGenerationClient()
+    service = _service(generation=generation)
+    created = await service.create_lookup(_request("coming"), "corr")
+    generation.statuses[generation.jobs[0].job_id] = GenerationJobStatus.DECLINED
+
+    polled = await service.get_lookup(created.lookupId, "reader-1", "corr-2")
+
+    assert polled.status == LookupStatus.FALLBACK
+    assert polled.notice == GENERATION_FAILED_NOTICE
+
+
+@pytest.mark.asyncio
+async def test_a_job_the_pipeline_forgot_resolves_a_poll_to_the_fallback() -> None:
+    generation = RecordingGenerationClient()
+    service = _service(generation=generation)
+    created = await service.create_lookup(_request("coming"), "corr")
+    generation.statuses[generation.jobs[0].job_id] = None
+
+    polled = await service.get_lookup(created.lookupId, "reader-1", "corr-2")
+
+    assert polled.status == LookupStatus.FALLBACK
+
+
+@pytest.mark.asyncio
+async def test_a_generation_still_running_keeps_a_poll_generating() -> None:
+    generation = RecordingGenerationClient()
+    service = _service(generation=generation)
+    created = await service.create_lookup(_request("coming"), "corr")
+    generation.statuses[generation.jobs[0].job_id] = GenerationJobStatus.RUNNING
+
+    polled = await service.get_lookup(created.lookupId, "reader-1", "corr-2")
+
+    assert polled.status == LookupStatus.GENERATING
+
+
+@pytest.mark.asyncio
+async def test_a_status_consult_that_fails_keeps_a_poll_generating() -> None:
+    generation = RecordingGenerationClient(status_error=GenerationUnavailableError("unreachable"))
+    service = _service(generation=generation)
+    created = await service.create_lookup(_request("coming"), "corr")
+
+    polled = await service.get_lookup(created.lookupId, "reader-1", "corr-2")
+
+    assert polled.status == LookupStatus.GENERATING
+
+
+@pytest.mark.asyncio
+async def test_a_clip_gained_after_a_failed_generation_is_still_served() -> None:
+    library = InMemoryLibrary()
+    generation = RecordingGenerationClient()
+    service = _service(library=library, generation=generation)
+    created = await service.create_lookup(_request("coming"), "corr")
+    generation.statuses[generation.jobs[0].job_id] = GenerationJobStatus.FAILED
+
+    library.add(
+        "come",
+        "arrive",
+        PartOfSpeech.VERB,
+        _entry("e-come", "to move toward or reach a place"),
+    )
+    polled = await service.get_lookup(created.lookupId, "reader-1", "corr-2")
+
+    assert polled.status == LookupStatus.SERVED
+    assert polled.senses[0].clip is not None
+
+
+@pytest.mark.asyncio
+async def test_a_failed_phrase_generation_resolves_a_poll_to_the_fallback() -> None:
+    generation = RecordingGenerationClient()
+    service = _service(generation=generation)
+    created = await service.create_lookup(_request("kick the bucket"), "corr")
+    generation.statuses[generation.jobs[0].job_id] = GenerationJobStatus.DECLINED
+
+    polled = await service.get_lookup(created.lookupId, "reader-1", "corr-2")
+
+    assert polled.kind == Kind.PHRASE
+    assert polled.status == LookupStatus.FALLBACK
+    assert polled.notice == GENERATION_FAILED_NOTICE
+
+
+@pytest.mark.asyncio
+async def test_a_failed_generation_stays_failed_on_a_later_poll() -> None:
+    generation = RecordingGenerationClient()
+    service = _service(generation=generation)
+    created = await service.create_lookup(_request("coming"), "corr")
+    generation.statuses[generation.jobs[0].job_id] = GenerationJobStatus.FAILED
+
+    first = await service.get_lookup(created.lookupId, "reader-1", "corr-2")
+    second = await service.get_lookup(created.lookupId, "reader-1", "corr-3")
+
+    assert first.status == LookupStatus.FALLBACK
+    assert second.status == LookupStatus.FALLBACK

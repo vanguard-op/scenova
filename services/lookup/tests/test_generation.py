@@ -1,4 +1,4 @@
-"""Client tests for the generation pipeline (C-003) and the shared job ids."""
+"""Client tests for the generation pipeline (C-003, C-006) and the shared job ids."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ import pytest
 from lookup.app.generation import (
     GenerationAlreadyEnqueuedError,
     GenerationJob,
+    GenerationJobStatus,
     GenerationUnavailableError,
     HttpGenerationClient,
     phrase_job_id,
@@ -107,6 +108,65 @@ async def test_a_transport_failure_is_treated_as_unavailable() -> None:
 
     with pytest.raises(GenerationUnavailableError):
         await client.enqueue(_job())
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_a_job_status_is_read_from_the_pipeline() -> None:
+    seen: dict[str, object] = {}
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen["path"] = request.url.path
+        seen["audience"] = request.headers.get("x-internal-audience")
+        return httpx2.Response(
+            200,
+            json={"jobId": "gen_abc", "lookupId": "lk_1", "status": "declined"},
+        )
+
+    client = _client(handler)
+    status = await client.status("gen_abc")
+
+    assert status is GenerationJobStatus.DECLINED
+    assert seen["path"] == "/internal/generation-jobs/gen_abc"
+    assert seen["audience"] == "scenova-internal"
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_a_job_the_pipeline_does_not_know_reports_none() -> None:
+    client = _client(lambda _request: httpx2.Response(404, json={"code": "job_not_found"}))
+
+    assert await client.status("gen_gone") is None
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_a_transport_failure_on_a_status_consult_is_unavailable() -> None:
+    def handler(_request: httpx2.Request) -> httpx2.Response:
+        raise httpx2.ConnectError("connection refused")
+
+    client = _client(handler)
+
+    with pytest.raises(GenerationUnavailableError):
+        await client.status("gen_abc")
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_an_unexpected_status_code_on_a_consult_is_unavailable() -> None:
+    client = _client(lambda _request: httpx2.Response(503, json={"code": "unavailable"}))
+
+    with pytest.raises(GenerationUnavailableError):
+        await client.status("gen_abc")
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_an_unreadable_status_body_is_unavailable() -> None:
+    client = _client(lambda _request: httpx2.Response(200, json={"jobId": "gen_abc"}))
+
+    with pytest.raises(GenerationUnavailableError):
+        await client.status("gen_abc")
     await client.aclose()
 
 

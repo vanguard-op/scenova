@@ -59,3 +59,10 @@ class QueueUnavailableError(PipelineError):
 
     status_code = 503
     code = "queue_unavailable"
+
+
+class JobNotFoundError(PipelineError):
+    """No generation job exists for the id."""
+
+    status_code = 404
+    code = "job_not_found"

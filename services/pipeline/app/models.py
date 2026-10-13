@@ -66,3 +66,13 @@ class CreateJobResponse(BaseModel):
 
     jobId: str
     status: Literal["queued", "running"]
+
+
+class JobStatusResponse(BaseModel):
+    """The C-006 response body: a job's state, including its terminal outcomes."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    jobId: str
+    lookupId: str
+    status: JobStatus
