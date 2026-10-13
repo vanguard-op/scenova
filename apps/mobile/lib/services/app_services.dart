@@ -9,6 +9,7 @@ import 'analytics_api.dart';
 import 'capture_channel.dart';
 import 'connectivity.dart';
 import 'entitlement_provider.dart';
+import 'feature_flags.dart';
 import 'history_store.dart';
 import 'identity.dart';
 import 'lookup_api.dart';
@@ -16,6 +17,7 @@ import 'push_registration_api.dart';
 import 'push_registrar.dart';
 import 'push_tokens.dart';
 import 'settings_controller.dart';
+import 'settings_store.dart';
 
 /// The collaborators the presentation layer reads.
 ///
@@ -32,6 +34,7 @@ class ScenovaServices {
     required this.captureChannel,
     required this.analytics,
     required this.pushRegistrar,
+    required this.featureFlags,
     this.locale = 'en',
   });
 
@@ -52,6 +55,9 @@ class ScenovaServices {
   /// Registers the device for a clip-ready notice (`C-008`).
   final PushRegistrar pushRegistrar;
 
+  /// The client-side release flags the build honours (`release.md`).
+  final FeatureFlags featureFlags;
+
   /// The reader's locale, sent with a lookup.
   final String locale;
 
@@ -61,6 +67,8 @@ class ScenovaServices {
     String locale = 'en',
     Entitlement entitlement = Entitlement.unmeteredGuest,
     List<HistoryEntry> history = const <HistoryEntry>[],
+    SettingsStore? settingsStore,
+    FeatureFlags? featureFlags,
   }) {
     // The live intakes carry reader input over the network, so the gateway must
     // be reached over TLS (`NFR-022`). A build that points at a plaintext remote
@@ -85,6 +93,7 @@ class ScenovaServices {
       // Onboarding's enable step is shown; the platform sets this once the
       // action or extension is on.
       actionEnabled: false,
+      store: settingsStore ?? SharedPreferencesSettingsStore(),
     );
 
     return ScenovaServices(
@@ -129,6 +138,7 @@ class ScenovaServices {
             : DevelopmentPushTokenProvider(),
         connectivity: connectivity,
       ),
+      featureFlags: featureFlags ?? RemoteConfigFeatureFlags(),
       locale: locale,
     );
   }

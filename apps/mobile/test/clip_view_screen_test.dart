@@ -9,6 +9,7 @@ import 'package:scenova/screens/clip_controller.dart';
 import 'package:scenova/screens/clip_view_screen.dart';
 import 'package:scenova/services/app_services.dart';
 import 'package:scenova/services/capture_intake.dart';
+import 'package:scenova/services/feature_flags.dart';
 import 'package:scenova/services/history_store.dart';
 import 'package:scenova/services/lookup_api.dart';
 import 'package:scenova/services/push_registration_api.dart';
@@ -648,6 +649,66 @@ void main() {
     expect(find.text('No clip for this phrase yet.'), findsOneWidget);
     expect(find.text('Try again'), findsOneWidget);
     expect(await services.historyStore.all(), isEmpty);
+    await teardown(tester);
+  });
+
+  testWidgets('the wait threshold is told at ten seconds, not the next poll', (
+    tester,
+  ) async {
+    // A three-second poll against a ten-second threshold: counting poll ticks
+    // would tell the reader at twelve seconds. The wait is a wall-clock
+    // deadline, so it is told at ten.
+    final services = buildServices(api: MockLookupApi(pollsUntilReady: 100000));
+    final controller = controllerFor(
+      services,
+      'xylograph',
+      pollInterval: const Duration(seconds: 3),
+      noticeThreshold: const Duration(seconds: 10),
+    );
+
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+    await tester.pump();
+    expect(controller.phase, ClipPhase.generating);
+
+    // Three poll ticks in — nine seconds — and the notice is not due yet.
+    await tester.pump(const Duration(seconds: 9));
+    await tester.pump();
+    expect(controller.pastWaitThreshold, isFalse);
+    expect(find.text('Still making your clip'), findsNothing);
+
+    // One second later the wait has passed, before the next poll at twelve.
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
+    expect(controller.pastWaitThreshold, isTrue);
+    expect(find.text('Still making your clip'), findsOneWidget);
+
+    // The lookup is still generating, so stop its timers before the test ends.
+    controller.dispose();
+    await teardown(tester);
+  });
+
+  testWidgets('with the in-context view off the reader sees word and phrase', (
+    tester,
+  ) async {
+    final services = buildServices(
+      api: MockLookupApi(),
+      featureFlags: const FixedFeatureFlags(clipViewEnabled: false),
+    );
+    final controller = controllerFor(services, 'come');
+    addTearDown(controller.dispose);
+
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+    await tester.pump();
+
+    expect(controller.phase, ClipPhase.wordAndPhrase);
+    expect(find.text('come'), findsWidgets);
+    expect(find.text(_libraryPhrase), findsOneWidget);
+    // No clip is offered and nothing plays.
+    expect(controller.playing, isFalse);
+    expect(findIcon(AppIcons.pause), findsNothing);
+    expect(findIcon(AppIcons.play), findsNothing);
     await teardown(tester);
   });
 }

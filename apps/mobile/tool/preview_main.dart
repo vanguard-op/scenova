@@ -20,6 +20,7 @@ import 'package:scenova/services/capture_channel.dart';
 import 'package:scenova/services/capture_intake.dart';
 import 'package:scenova/services/connectivity.dart';
 import 'package:scenova/services/entitlement_provider.dart';
+import 'package:scenova/services/feature_flags.dart';
 import 'package:scenova/services/history_store.dart';
 import 'package:scenova/services/identity.dart';
 import 'package:scenova/services/lookup_api.dart';
@@ -179,6 +180,13 @@ List<(String, Widget)> _frames() {
       ),
     ),
     ('Clip — fallback', _clip('quixotic')),
+    (
+      'Clip — in-context view off (word and phrase only)',
+      _clip(
+        'come',
+        featureFlags: const FixedFeatureFlags(clipViewEnabled: false),
+      ),
+    ),
     ('Clip — offline', _clip('quixotic', online: false)),
     (
       'Clip — phrase clip (generated, kept on the device)',
@@ -276,6 +284,7 @@ Widget _clip(
   Duration? pollInterval,
   Duration? noticeThreshold,
   List<HistoryEntry> history = const <HistoryEntry>[],
+  FeatureFlags featureFlags = const FixedFeatureFlags(),
 }) {
   final services = _services(
     api: api,
@@ -283,6 +292,7 @@ Widget _clip(
     entitlement: entitlement,
     settings: settings,
     history: history,
+    featureFlags: featureFlags,
   );
   return ScenovaScope(
     services: services,
@@ -353,6 +363,7 @@ ScenovaServices _services({
   bool online = true,
   Entitlement entitlement = Entitlement.unmeteredGuest,
   SettingsController? settings,
+  FeatureFlags featureFlags = const FixedFeatureFlags(),
 }) {
   final connectivity = ManualConnectivity(online: online);
   final settingsController = settings ?? SettingsController();
@@ -377,6 +388,7 @@ ScenovaServices _services({
       tokens: DevelopmentPushTokenProvider(token: 'preview-push'),
       connectivity: connectivity,
     ),
+    featureFlags: featureFlags,
     locale: 'en-GB',
   );
 }

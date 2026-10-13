@@ -139,6 +139,31 @@ abstract final class AppConfig {
   static bool get useFirebaseMessaging =>
       pushMode == 'firebase' || (pushMode.isEmpty && kReleaseMode);
 
+  /// Whether the in-context clip view is shown before a runtime flag value has
+  /// been fetched (`enable_clip_view`).
+  ///
+  /// `release.md` starts the flag Off for its dark launch, but the Reading Loop
+  /// phase has rolled it out to the Internal audience and every environment sets
+  /// it on. The client's fallback matches that rolled-out state, so a fetch that
+  /// has not landed keeps the shipped feature working; the kill switch is a
+  /// Remote Config value of `false`. A local run can force the fallback with
+  /// `--dart-define=SCENOVA_CLIP_VIEW=false`.
+  static const bool clipViewEnabledByDefault = bool.fromEnvironment(
+    'SCENOVA_CLIP_VIEW',
+    defaultValue: true,
+  );
+
+  /// How long a Remote Config fetch may take before it is abandoned.
+  static const Duration remoteConfigFetchTimeout = Duration(seconds: 10);
+
+  /// The shortest gap between Remote Config fetches.
+  ///
+  /// A kill switch has to reach a running client inside the release's
+  /// thirty-minute recovery target, so Remote Config's twelve-hour default cache
+  /// is too coarse; a shorter window lets a disable land while staying inside
+  /// the source's throttle.
+  static const Duration remoteConfigFetchInterval = Duration(minutes: 15);
+
   /// The wait after which the reader is told a clip is still being made and
   /// offered a notification when it is ready.
   static const Duration generatingNoticeThreshold = Duration(seconds: 10);

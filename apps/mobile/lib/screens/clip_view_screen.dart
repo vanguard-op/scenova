@@ -324,6 +324,9 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
           ),
         );
 
+      case ClipPhase.wordAndPhrase:
+        return _wordAndPhrase(context);
+
       case ClipPhase.fallback:
         return _withHeaderAndActions(
           context,
@@ -394,6 +397,35 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
           SizedBox(height: tokens.spacing.lg),
           action,
         ],
+        SizedBox(height: tokens.spacing.lg),
+        _actions(context),
+      ],
+    );
+  }
+
+  /// The word and its phrase with no clip, shown while the in-context view is
+  /// switched off at runtime (`enable_clip_view`).
+  Widget _wordAndPhrase(BuildContext context) {
+    final tokens = ScenovaTokens.of(context);
+    final colors = ScenovaColors.of(context);
+    final styles = ScenovaTextStyles.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        _heading(context),
+        SizedBox(height: tokens.spacing.lg),
+        WordPhraseHeader(
+          word: _controller.word,
+          phrase: _controller.phrase,
+          note: _controller.note,
+          compact: true,
+        ),
+        SizedBox(height: tokens.spacing.md),
+        Text(
+          'Clips are paused right now. The word and its meaning are still here.',
+          style: styles.bodySmall.copyWith(color: colors.textSecondary),
+        ),
         SizedBox(height: tokens.spacing.lg),
         _actions(context),
       ],

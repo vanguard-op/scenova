@@ -28,6 +28,10 @@ enum ClipPhase {
   /// The selection is longer than the phrase limit, so the reader is asked to
   /// narrow it (`FEAT-007`). No lookup starts.
   selectionTooLong,
+
+  /// The in-context view is switched off at runtime (`enable_clip_view`), so
+  /// the reader sees the selected word and its phrase with no clip.
+  wordAndPhrase,
 }
 
 /// How the reader marked a clip.
@@ -71,7 +75,8 @@ class ClipViewController extends ChangeNotifier {
   Entitlement _entitlement = Entitlement.unmeteredGuest;
   String? _errorMessage;
   Timer? _pollTimer;
-  int _generatingPolls = 0;
+  Timer? _noticeTimer;
+  Timer? _timeoutTimer;
   bool _disposed = false;
 
   bool _playing = false;
@@ -113,6 +118,9 @@ class ClipViewController extends ChangeNotifier {
   /// best-guess note when the word is outside the sense inventory. The sense
   /// label is a human label and is never read as a signal.
   String? get note => _result?.notice;
+
+  /// Whether the in-context view is shown at all (`enable_clip_view`).
+  bool get _clipViewEnabled => services.featureFlags.clipViewEnabled;
 
   Sense? get _firstSense =>
       (_result?.senses.isEmpty ?? true) ? null : _result!.senses.first;
@@ -176,8 +184,9 @@ class ClipViewController extends ChangeNotifier {
 
     // A phrase clip is kept only on the device and never enters the shared
     // library, so a phrase this device has already looked up is served from
-    // its own history without a new generation (`FEAT-007`).
-    if (_selection.kind == LookupKind.phrase) {
+    // its own history without a new generation (`FEAT-007`). With the clip view
+    // switched off there is no clip to serve, so the phrase resolves normally.
+    if (_selection.kind == LookupKind.phrase && _clipViewEnabled) {
       final saved = await _savedClipFor(_selection);
       if (_disposed) return;
       if (saved != null) {
@@ -286,6 +295,16 @@ class ClipViewController extends ChangeNotifier {
   void _applyResult(LookupResult result) {
     _result = result;
 
+    // With the in-context view switched off (`enable_clip_view`) the reader
+    // still gets the word and its phrase, but no clip is played and no
+    // generation is polled for. A served lookup is still saved, so the word and
+    // phrase reach the reader's history.
+    if (!_clipViewEnabled) {
+      if (result.status == LookupStatus.served) unawaited(_saveToHistory());
+      _setPhase(ClipPhase.wordAndPhrase);
+      return;
+    }
+
     // A served lookup whose sense carries a library entry is a library hit; the
     // entry id is the join key the report uses.
     if (result.status == LookupStatus.served) {
@@ -352,28 +371,35 @@ class ClipViewController extends ChangeNotifier {
   }
 
   void _startPoll() {
-    _generatingPolls = 0;
     _pollTimer = Timer.periodic(_pollInterval, (_) => unawaited(_poll()));
+    // The wait threshold and the timeout are wall-clock deadlines, not
+    // multiples of the poll interval: the reader is told at ten seconds, not at
+    // the first poll after it, and the lookup stops when its own deadline
+    // passes rather than when a poll happens to notice.
+    _noticeTimer = Timer(_noticeThreshold, _markPastThreshold);
+    _timeoutTimer = Timer(_pollTimeout, _timeout);
+  }
+
+  /// The wait passed without the clip being ready, so the reader is told it is
+  /// still being made.
+  void _markPastThreshold() {
+    if (_disposed || _phase != ClipPhase.generating || _pastThreshold) return;
+    _pastThreshold = true;
+    notifyListeners();
+  }
+
+  /// The lookup has been generating for longer than the client will wait.
+  void _timeout() {
+    if (_disposed || _phase != ClipPhase.generating) return;
+    _cancelPoll();
+    _errorMessage = 'The clip is taking longer than usual.';
+    _setPhase(ClipPhase.error);
   }
 
   Future<void> _poll() async {
     final lookupId = _result?.lookupId;
     if (lookupId == null) {
       _cancelPoll();
-      return;
-    }
-    // The wait is measured in poll intervals so it is independent of the wall
-    // clock and reproducible in tests.
-    _generatingPolls++;
-    final elapsed = _pollInterval * _generatingPolls;
-    if (elapsed >= _noticeThreshold && !_pastThreshold) {
-      _pastThreshold = true;
-      notifyListeners();
-    }
-    if (elapsed >= _pollTimeout) {
-      _cancelPoll();
-      _errorMessage = 'The clip is taking longer than usual.';
-      _setPhase(ClipPhase.error);
       return;
     }
     try {
@@ -396,11 +422,13 @@ class ClipViewController extends ChangeNotifier {
   }
 
   Future<void> _serveFromHistoryOrOffline() async {
-    final saved = await _savedClipFor(_selection);
-    if (_disposed) return;
-    if (saved != null) {
-      _serveSavedClip(saved);
-      return;
+    if (_clipViewEnabled) {
+      final saved = await _savedClipFor(_selection);
+      if (_disposed) return;
+      if (saved != null) {
+        _serveSavedClip(saved);
+        return;
+      }
     }
     _setPhase(ClipPhase.offline);
   }
@@ -488,7 +516,10 @@ class ClipViewController extends ChangeNotifier {
   void _cancelPoll() {
     _pollTimer?.cancel();
     _pollTimer = null;
-    _generatingPolls = 0;
+    _noticeTimer?.cancel();
+    _noticeTimer = null;
+    _timeoutTimer?.cancel();
+    _timeoutTimer = null;
   }
 
   @override

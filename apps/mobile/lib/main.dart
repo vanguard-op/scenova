@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'app.dart';
@@ -7,19 +9,23 @@ import 'models/history_entry.dart';
 import 'models/lookup.dart';
 import 'services/app_services.dart';
 import 'services/extension_channel.dart';
+import 'services/settings_store.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final locale = WidgetsBinding.instance.platformDispatcher.locale
       .toLanguageTag();
-  runApp(
-    ScenovaApp(
-      services: ScenovaServices.development(
-        locale: locale,
-        history: _seedHistory(),
-      ),
-    ),
+  final services = ScenovaServices.development(
+    locale: locale,
+    history: _seedHistory(),
   );
+  // The reader's stored settings are read before the first frame, so the app
+  // opens on the surface they left it on rather than back at Onboarding. The
+  // release flags refresh in the background: the fallback is the healthy state,
+  // so the first frame never waits on the network for a kill switch.
+  await services.settings.load();
+  unawaited(services.featureFlags.refresh());
+  runApp(ScenovaApp(services: services));
 }
 
 /// The iOS share extension's entrypoint (`FEAT-002`).
@@ -35,7 +41,13 @@ void clipExtensionMain() {
       .toLanguageTag();
   runApp(
     ClipExtensionApp(
-      services: ScenovaServices.development(locale: locale),
+      // The extension runs in its own process and starts from the same defaults
+      // as a fresh app, so it keeps its settings in memory rather than reading
+      // the app's suite.
+      services: ScenovaServices.development(
+        locale: locale,
+        settingsStore: InMemorySettingsStore(),
+      ),
       extensionChannel: ExtensionChannel(),
     ),
   );

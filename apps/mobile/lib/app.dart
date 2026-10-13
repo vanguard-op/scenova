@@ -59,6 +59,9 @@ class _ScenovaAppState extends State<ScenovaApp> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       widget.services.analytics.appOpened(source: AppOpenSource.resume);
       unawaited(widget.services.analytics.flush());
+      // A kill switch disabled while the app was backgrounded takes effect on
+      // the next lookup rather than the next release.
+      unawaited(widget.services.featureFlags.refresh());
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
       // Deliver what has been recorded before the app may be stopped.

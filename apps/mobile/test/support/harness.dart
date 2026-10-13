@@ -17,6 +17,7 @@ import 'package:scenova/services/app_services.dart';
 import 'package:scenova/services/capture_channel.dart';
 import 'package:scenova/services/connectivity.dart';
 import 'package:scenova/services/entitlement_provider.dart';
+import 'package:scenova/services/feature_flags.dart';
 import 'package:scenova/services/history_store.dart';
 import 'package:scenova/services/identity.dart';
 import 'package:scenova/services/lookup_api.dart';
@@ -38,6 +39,7 @@ ScenovaServices buildServices({
   IdentityProvider? identity,
   AnalyticsApi? analyticsApi,
   PushRegistrationApi? pushApi,
+  FeatureFlags? featureFlags,
   String locale = 'en',
 }) {
   final connectivity = ManualConnectivity(online: online);
@@ -63,6 +65,7 @@ ScenovaServices buildServices({
       tokens: DevelopmentPushTokenProvider(token: 'test-push-token'),
       connectivity: connectivity,
     ),
+    featureFlags: featureFlags ?? const FixedFeatureFlags(),
     locale: locale,
   );
 }
@@ -83,6 +86,7 @@ Future<Harness> pumpHarness(
   bool online = true,
   SettingsController? settings,
   Entitlement entitlement = Entitlement.unmeteredGuest,
+  FeatureFlags? featureFlags,
 }) async {
   final services = buildServices(
     api: api,
@@ -90,6 +94,7 @@ Future<Harness> pumpHarness(
     online: online,
     settings: settings,
     entitlement: entitlement,
+    featureFlags: featureFlags,
   );
   final router = AppRouter(services: services);
   await tester.pumpWidget(
@@ -154,10 +159,14 @@ void usePhoneWindow(WidgetTester tester) {
 Future<ScenovaServices> pumpOnboarding(
   WidgetTester tester, {
   SettingsController? settings,
+  FeatureFlags? featureFlags,
   VoidCallback? onComplete,
 }) async {
   usePhoneWindow(tester);
-  final services = buildServices(settings: settings);
+  final services = buildServices(
+    settings: settings,
+    featureFlags: featureFlags,
+  );
   await tester.pumpWidget(
     ScenovaScope(
       services: services,

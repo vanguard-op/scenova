@@ -1,10 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+
+import 'settings_store.dart';
 
 /// Reader preferences that the clip view, the entry gate, and the app shell
 /// read.
 ///
 /// Clip behaviour lives here so the in-context card honours it wherever it is
 /// opened. The Preferences screen (a later surface) will edit the same state.
+///
+/// Every change is written through to the [SettingsStore], so a reader's setup
+/// and preferences survive an app restart rather than returning to Onboarding.
 class SettingsController extends ChangeNotifier {
   SettingsController({
     bool platformReduceMotion = false,
@@ -12,12 +19,54 @@ class SettingsController extends ChangeNotifier {
     bool consentModelProcessing = true,
     bool actionEnabled = true,
     bool onboardingComplete = false,
-  }) {
+    SettingsStore? store,
+  }) : _store = store ?? InMemorySettingsStore() {
     _platformReduceMotion = platformReduceMotion;
     _soundOn = soundOn;
     _consentModelProcessing = consentModelProcessing;
     _actionEnabled = actionEnabled;
     _onboardingComplete = onboardingComplete;
+  }
+
+  final SettingsStore _store;
+
+  /// The last write handed to the store, so a caller can await it before
+  /// asserting what was persisted. Writes are chained in order.
+  Future<void> _write = Future<void>.value();
+
+  /// Resolves once every settings write so far has reached the store.
+  @visibleForTesting
+  Future<void> get pendingWrite => _write;
+
+  /// Reads the stored settings into the controller.
+  ///
+  /// Called once at startup, before the first frame, so the app opens on the
+  /// surface the reader left it on. The platform's reduce-motion setting and the
+  /// entry gate's state are not read here: the platform owns both and the app
+  /// re-checks them each launch.
+  Future<void> load() async {
+    final snapshot = await _store.load();
+    _soundOn = snapshot.soundOn;
+    _consentModelProcessing = snapshot.consentModelProcessing;
+    _reduceMotionOverride = snapshot.reduceMotionOverride;
+    _onboardingComplete = snapshot.onboardingComplete;
+    notifyListeners();
+  }
+
+  /// Queues the current settings for the store.
+  void _persist() {
+    final snapshot = SettingsSnapshot(
+      onboardingComplete: _onboardingComplete,
+      consentModelProcessing: _consentModelProcessing,
+      soundOn: _soundOn,
+      reduceMotionOverride: _reduceMotionOverride,
+    );
+    // The write is best-effort and chained in order. A write that fails must not
+    // break the chain for the ones after it, and must not surface as an
+    // unhandled error; the reader's choice still applies for this session.
+    _write = _write
+        .then((_) => _store.save(snapshot))
+        .catchError((Object _) {});
   }
 
   bool _platformReduceMotion = false;
@@ -45,6 +94,7 @@ class SettingsController extends ChangeNotifier {
   set onboardingComplete(bool value) {
     if (_onboardingComplete == value) return;
     _onboardingComplete = value;
+    _persist();
     notifyListeners();
   }
 
@@ -55,6 +105,7 @@ class SettingsController extends ChangeNotifier {
   set reduceMotionOverride(bool? value) {
     if (_reduceMotionOverride == value) return;
     _reduceMotionOverride = value;
+    _persist();
     notifyListeners();
   }
 
@@ -63,6 +114,7 @@ class SettingsController extends ChangeNotifier {
   set soundOn(bool value) {
     if (_soundOn == value) return;
     _soundOn = value;
+    _persist();
     notifyListeners();
   }
 
@@ -75,11 +127,13 @@ class SettingsController extends ChangeNotifier {
   set consentModelProcessing(bool value) {
     if (_consentModelProcessing == value) return;
     _consentModelProcessing = value;
+    _persist();
     notifyListeners();
   }
 
   /// Whether the platform entry point (Android selection action, iOS extension)
-  /// is enabled. When it is not, the entry gate shows how to enable it.
+  /// is enabled. When it is not, the entry gate shows how to enable it. The
+  /// platform owns this, so it is not stored with the reader's preferences.
   bool get actionEnabled => _actionEnabled;
   set actionEnabled(bool value) {
     if (_actionEnabled == value) return;
