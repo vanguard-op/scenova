@@ -55,8 +55,29 @@ Response 202: accepted: integer
 Errors: 400 (unknown event name; a property carrying personal data), 401 (missing or invalid token), 429 (rate limited)
 
 ### C-008: POST /v1/push-registrations
-Status: Frozen
+Status: Frozen (revision 1)
 Auth: Firebase ID token in `Authorization` (anonymous before sign-in); rate-limited at the gateway
-Request: token: string (the platform push token), platform: android|ios
+Request: token: string (the platform push token), platform: android|ios, lookupId: string (the lookup the reader asked to be notified about)
 Response 202: registered: boolean
-Errors: 400 (missing or unreadable token, unknown platform), 401 (missing or invalid token), 429 (rate limited). The notification service pushes a clip-ready notice to this token when a generation the reader is waiting on completes.
+Errors: 400 (missing or unreadable token, unknown platform, unknown lookup), 401 (missing or invalid token), 429 (rate limited). The notification service pushes a clip-ready notice to this token when that lookup's generation completes.
+
+### C-009: POST /internal/library/entries
+Status: Frozen (revision 1)
+Auth: internal service identity; never reachable from the client
+Request: entry: { id: string, lemma: string, partOfSpeech: string, senseLabel: string, glossPhrase: string (at most 60), glossPhraseIsFallback: boolean, clipAssetId: string, status: active|held|retired, source: seeded|generated, createdAt: string, updatedAt: string }, asset: { id: string, durationSeconds: number (over 0, at most 4), resolution: "360p", storageKey: string, url: string, hasAudio: boolean, synthIdWatermark: boolean, createdAt: string }
+Response 202: entryId: string, status: active|held|retired
+Errors: 400 (missing key fields or clip), 401 (not an internal caller), 503 (library unavailable). Upserts by the lemma and sense key.
+
+### C-010: GET /internal/library/entries
+Status: Frozen (revision 1)
+Auth: internal service identity; never reachable from the client
+Request: lemma: string, senseLabel: string, partOfSpeech: string (query)
+Response 200: entry: { entryId: string, status: active|held|retired, glossPhrase: string, glossPhraseIsFallback: boolean, clip: { url: string, durationSeconds: number, resolution: "360p", hasAudio: boolean } }|null
+Errors: 401 (not an internal caller), 503 (library unavailable). Only an `active` entry is served; `held` and `retired` read as null to the lookup, which then regenerates.
+
+### C-011: PATCH /internal/library/entries/{entryId}
+Status: Frozen
+Auth: internal service identity; never reachable from the client
+Request: entryId: string (path), status: active|held|retired
+Response 200: entryId: string, status: active|held|retired
+Errors: 400 (unknown status), 401 (not an internal caller), 404 (unknown entry), 503 (library unavailable).

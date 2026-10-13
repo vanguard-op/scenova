@@ -86,11 +86,16 @@ docs/           BPRD (product-shaper)
 ### Active Phase: Phase 2: The Reading Loop
 | Task | Feature | Owner | Status | Contract |
 |---|---|---|---|---|
-| T-043 | FEAT-006 | backend-engineer | Ready | C-001, C-002, C-003, C-006 |
-| T-044 | FEAT-007 | ai-engineer | Ready | C-005 |
-| T-045 | FEAT-008 | backend-engineer | Ready | C-008 |
-| T-046 | FEAT-008 | frontend-engineer | Ready | C-001, C-002, C-008 |
-| T-047 | FEAT-007 | frontend-engineer | Ready | C-001, C-002 |
+| T-043 | FEAT-006 | backend-engineer | Done | C-001, C-002, C-003, C-006 |
+| T-044 | FEAT-007 | ai-engineer | Done | C-005 |
+| T-045 | FEAT-008 | backend-engineer | Done | C-008 |
+| T-046 | FEAT-008 | frontend-engineer | Done | C-001, C-002, C-008 |
+| T-047 | FEAT-007, FEAT-008 | frontend-engineer | Done | C-001, C-002, C-008 |
+| T-048 | FEAT-006 | qa-engineer | Done | C-009, C-010, C-011 |
+| T-049 | — | infra-engineer | Done | C-008 |
+| T-050 | FEAT-008 | backend-engineer | Done | C-008 |
+| T-051 | FEAT-006 | qa-engineer | Done | C-009, C-010, C-011 |
+| T-052 | FEAT-008 | frontend-engineer | In Progress | C-008 |
 
 ## Decisions Log
 | # | Decision | Rationale | By |
