@@ -86,17 +86,27 @@ docs/           BPRD (product-shaper)
 ### Active Phase: Phase 1: Foundations
 | Task | Feature | Owner | Status | Contract |
 |---|---|---|---|---|
+| T-001 | — | infra-engineer | Done | — |
 | T-002 | FEAT-001 | frontend-engineer | Done | C-001, C-002 |
 | T-003 | FEAT-003 | backend-engineer | Done | C-001, C-002 |
 | T-004 | FEAT-004 | ai-engineer | Done | C-004 |
 | T-005 | FEAT-005 | ai-engineer | Done | C-005 |
 | T-006 | FEAT-005 | backend-engineer | Done | C-003, C-005 |
+| T-007 | — | infra-engineer | Done | — |
 | T-008 | FEAT-003, FEAT-005 | backend-engineer | Done | C-002, C-003, C-005 |
 | T-009 | FEAT-005 | backend-engineer | Done | C-002, C-006 |
-| T-010 | FEAT-004 | ai-engineer | In Progress | C-004 |
+| T-010 | FEAT-004 | ai-engineer | Done | C-004 |
 | T-011 | FEAT-002 | frontend-engineer | Done | C-001, C-002 |
 | T-012 | FEAT-002 | frontend-engineer | Done | C-001, C-002 |
 | T-013 | FEAT-001, FEAT-002, FEAT-012 | frontend-engineer | Done | C-001 |
+| T-014 | — | visual-artist | Done | — |
+| T-015 | — | visual-artist | Done | — |
+| T-016 | — | frontend-engineer | Done | — |
+| T-018 | — | infra-engineer | Done | — |
+| T-019 | FEAT-005 | backend-engineer | Done | C-001, C-003, C-006 |
+| T-020 | FEAT-001, FEAT-002 | frontend-engineer | Done | C-001, C-002 |
+| T-021 | FEAT-005 | ai-engineer | Done | C-005 |
+| T-022 | FEAT-005 | qa-engineer | In Progress | C-005 |
 
 ## Decisions Log
 | # | Decision | Rationale | By |

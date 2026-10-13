@@ -38,7 +38,7 @@ Status: Frozen
 Auth: internal service identity (called by the generation pipeline only)
 Request: phrase: string, targetDurationSeconds: number (at most 4), modelPin: string
 Response 201: clipId: string, storageKey: string, url: string, durationSeconds: number, resolution: "360p", hasAudio: boolean, synthIdWatermark: boolean
-Errors: 401 (not an internal caller), 422 (provider declined the phrase; no clip produced), 504 (provider timeout), 503 (provider unavailable). The caller maps 422, 504, and 503 to the reader's fallback.
+Errors: 400 (target duration over four seconds), 401 (not an internal caller), 422 (provider declined the phrase; no clip produced), 504 (provider timeout), 503 (provider unavailable). The caller maps 422, 504, and 503 to the reader's fallback.
 
 ### C-006: GET /internal/generation-jobs/{jobId}
 Status: Frozen
