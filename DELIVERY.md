@@ -1,7 +1,7 @@
 # DELIVERY — Scenova
 
 ## Source of Truth
-`docs/Scenova/` (BPRD), a nested git repo. Content revision `df34986b0735`; docs commit `89596c71341f`. Read-only for the squad; `product-shaper` is the only writer. The roadmap owns the build order.
+`docs/Scenova/` (BPRD), a nested git repo. Content revision `339f8c3717cb`; docs commit `09100d66619c`. Read-only for the squad; `product-shaper` is the only writer. The roadmap owns the build order.
 
 ## Team & File Ownership
 | Owner | Owns |
@@ -86,11 +86,15 @@ docs/           BPRD (product-shaper)
 ### Active Phase: Phase 1: Foundations
 | Task | Feature | Owner | Status | Contract |
 |---|---|---|---|---|
-| T-002 | FEAT-001, FEAT-002 | frontend-engineer | Ready | C-001, C-002 |
-| T-003 | FEAT-003 | backend-engineer | Ready | C-001, C-002 |
-| T-004 | FEAT-004 | ai-engineer | Ready | C-004 |
-| T-005 | FEAT-005 | ai-engineer | Ready | C-005 |
-| T-006 | FEAT-005 | backend-engineer | Ready | C-003, C-005 |
+| T-002 | FEAT-001 | frontend-engineer | Done | C-001, C-002 |
+| T-003 | FEAT-003 | backend-engineer | Done | C-001, C-002 |
+| T-004 | FEAT-004 | ai-engineer | Done | C-004 |
+| T-005 | FEAT-005 | ai-engineer | Done | C-005 |
+| T-006 | FEAT-005 | backend-engineer | Done | C-003, C-005 |
+| T-008 | FEAT-003, FEAT-005 | backend-engineer | Done | C-002, C-003, C-005 |
+| T-009 | FEAT-005 | backend-engineer | Done | C-002, C-006 |
+| T-010 | FEAT-004 | ai-engineer | In Progress | C-004 |
+| T-011 | FEAT-002 | frontend-engineer | In Progress | C-001, C-002 |
 
 ## Decisions Log
 | # | Decision | Rationale | By |
@@ -106,6 +110,8 @@ docs/           BPRD (product-shaper)
 | D-009 | Lemma and sense source: open-source lemmatiser with a WordNet-style sense inventory | Self-hostable, no per-call cost; matches the docs' note that open sources exist | user |
 | D-010 | Phase 1 doc gaps settled: ten-second generation wait threshold; two-to-six-word phrase limit; model pinned to `gemini-omni-1.1-flash` | The docs were silent on each; settled via `product-shaper` at the user's direction | user |
 | D-011 | Pre-account authentication: anonymous Firebase ID token, upgraded to the reader's account at sign-in | The gateway must enforce authentication before accounts ship, without the client holding a server secret | lead |
+| D-012 | Contract revision 1 to C-001 and C-002: the reader-facing best-guess signal is `notice` (not a `senseLabel` sentinel); errors carry a `{code, message}` body; 503 is added as retryable | Both services already emit this shape; the sentinel was an undocumented coupling. Only the client needs re-aligning | lead |
+| D-013 | Brand-doc gaps: motion timings stay build-layer-owned; the semantic families' 100/300/700/900 shades are completed; the gloss fallback is made grammatical | The branding reference deliberately excludes motion tokens, so the derived values stand; the shade and fallback gaps were real and are now settled | user |
 
 ## Definition of Done
 - **Task:** the acceptance criteria in the cited feature doc are met; the frozen contract is conformed; unit tests pass; format, lint, analyze, and build are clean; work is committed to the dev branch and confined to `Own`.
