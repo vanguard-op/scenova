@@ -11,7 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from .errors import ModelError
-from .routers import phrase
+from .routers import clip, phrase
 
 
 def create_app() -> FastAPI:
@@ -34,6 +34,7 @@ def create_app() -> FastAPI:
         )
 
     app.include_router(phrase.router)
+    app.include_router(clip.router)
 
     @app.get("/healthz")
     async def healthz() -> dict[str, str]:

@@ -31,3 +31,24 @@ class ProviderUnavailableError(ModelError):
 
     status_code = 503
     code = "provider_unavailable"
+
+
+class ProviderDeclinedError(ModelError):
+    """The provider declined the phrase, so no clip was produced (C-005)."""
+
+    status_code = 422
+    code = "provider_declined"
+
+
+class ProviderTimeoutError(ModelError):
+    """The provider did not finish the clip inside the timeout (C-005)."""
+
+    status_code = 504
+    code = "provider_timeout"
+
+
+class StorageUnavailableError(ModelError):
+    """The generated clip could not be stored, so there is nothing to serve."""
+
+    status_code = 503
+    code = "storage_unavailable"

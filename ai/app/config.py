@@ -14,6 +14,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from functools import lru_cache
+from typing import Literal
 
 # The version the quality bar was measured on (architecture "Model Version &
 # Fallback"); no other version is used unless a fresh evaluation pins one.
@@ -30,6 +31,22 @@ MAX_PHRASE_WORDS = 6
 MAX_PHRASE_CHARS = 120
 REGENERATION_ATTEMPTS = 2
 RETRY_BACKOFF_SECONDS = 0.25
+
+# Word-clip generation is pinned as well. The output contract is a 360p clip no
+# longer than four seconds (FEAT-005), and clips are muted unless sound is asked
+# for explicitly (product behaviour rules), so both are constants, not knobs.
+ClipResolution = Literal["360p"]
+CLIP_TARGET_RESOLUTION: ClipResolution = "360p"
+CLIP_MAX_DURATION_SECONDS = 4
+CLIP_MIN_DURATION_SECONDS = 1
+CLIP_MIME_TYPE = "video/mp4"
+CLIP_GENERATE_AUDIO = False
+CLIP_STORAGE_PREFIX = "clips/"
+
+# Video generation is a long-running provider operation: the service submits it
+# and polls until it completes, bounded by one overall timeout.
+DEFAULT_CLIP_VIDEO_TIMEOUT_SECONDS = 120.0
+DEFAULT_CLIP_POLL_INTERVAL_SECONDS = 2.0
 
 
 def _env_str(name: str, default: str) -> str:
@@ -80,6 +97,15 @@ class Settings:
     temperature: float
     top_p: float
     max_output_tokens: int
+    clip_bucket: str
+    clip_cdn_base_url: str
+    clip_storage_prefix: str
+    clip_target_resolution: ClipResolution
+    clip_min_duration_seconds: int
+    clip_max_duration_seconds: int
+    clip_video_timeout_seconds: float
+    clip_poll_interval_seconds: float
+    clip_generate_audio: bool
 
 
 def load_settings() -> Settings:
@@ -100,6 +126,15 @@ def load_settings() -> Settings:
         temperature=TEMPERATURE,
         top_p=TOP_P,
         max_output_tokens=MAX_OUTPUT_TOKENS,
+        clip_bucket=_env_str("CLIP_BUCKET", ""),
+        clip_cdn_base_url=_env_str("CLIP_CDN_BASE_URL", ""),
+        clip_storage_prefix=CLIP_STORAGE_PREFIX,
+        clip_target_resolution=CLIP_TARGET_RESOLUTION,
+        clip_min_duration_seconds=CLIP_MIN_DURATION_SECONDS,
+        clip_max_duration_seconds=CLIP_MAX_DURATION_SECONDS,
+        clip_video_timeout_seconds=DEFAULT_CLIP_VIDEO_TIMEOUT_SECONDS,
+        clip_poll_interval_seconds=DEFAULT_CLIP_POLL_INTERVAL_SECONDS,
+        clip_generate_audio=CLIP_GENERATE_AUDIO,
     )
 
 

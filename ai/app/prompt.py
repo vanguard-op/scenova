@@ -13,6 +13,7 @@ from pathlib import Path
 
 PROMPT_DIR = Path(__file__).resolve().parent.parent / "prompts"
 DEFAULT_PROMPT_PATH = PROMPT_DIR / "gloss_phrase.v1.txt"
+DEFAULT_CLIP_PROMPT_PATH = PROMPT_DIR / "word_clip.v1.txt"
 
 _SYSTEM_MARKER = "[system]"
 _USER_MARKER = "[user]"
@@ -26,17 +27,10 @@ class PromptTemplate:
     system: str
     user: str
 
-    def render(self, *, lemma: str, part_of_speech: str, sense_hint: str) -> tuple[str, str]:
+    def render(self, **fields: str) -> tuple[str, str]:
         """Return the (system, user) pair with the request's fields filled in."""
 
-        return (
-            self.system,
-            self.user.format(
-                lemma=lemma,
-                part_of_speech=part_of_speech,
-                sense_hint=sense_hint,
-            ),
-        )
+        return self.system, self.user.format(**fields)
 
 
 def load_prompt(path: Path | None = None) -> PromptTemplate:
