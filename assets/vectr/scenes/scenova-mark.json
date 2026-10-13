@@ -1,0 +1,25 @@
+{
+  "id": "scenova-mark",
+  "projectId": "project",
+  "name": "Scenova mark",
+  "formatVersion": "0.2",
+  "paletteId": "brand",
+  "title": "Scenova mark",
+  "description": "Abstract brand mark: three short horizontal strokes in a row, the middle one peeled upward into a shallow arc.",
+  "canvas": { "width": 1024, "height": 1024, "background": "transparent" },
+  "elements": [
+    {
+      "id": "mark-master",
+      "sceneId": "scenova-mark",
+      "order": 0,
+      "kind": "instance",
+      "name": "Mark",
+      "geometry": {},
+      "transform": { "translateX": 512, "translateY": 512, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "opacity": 1,
+      "visible": true,
+      "definitionRef": "mark",
+      "bindings": [ { "name": "colour", "value": "ink" } ]
+    }
+  ]
+}

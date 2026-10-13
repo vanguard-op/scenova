@@ -1,0 +1,21 @@
+{
+  "id": "icon-play-filled",
+  "projectId": "project",
+  "name": "Play, filled",
+  "parameters": [],
+  "origin": { "x": 0, "y": 0 },
+  "elements": [
+    {
+      "id": "icon-play-filled-triangle",
+      "definitionId": "icon-play-filled",
+      "order": 0,
+      "kind": "polygon",
+      "name": "Play triangle",
+      "geometry": { "points": [[7, 5.5], [17, 12], [7, 18.5]] },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "fill": { "kind": "token", "ref": "icon-active" },
+      "opacity": 1,
+      "visible": true
+    }
+  ]
+}

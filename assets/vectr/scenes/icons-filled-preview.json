@@ -1,0 +1,20 @@
+{
+  "id": "icons-filled-preview",
+  "projectId": "project",
+  "name": "Icons preview sheet, filled",
+  "formatVersion": "0.2",
+  "paletteId": "brand",
+  "title": "Scenova icon set, filled preview",
+  "canvas": { "width": 240, "height": 240, "background": "transparent" },
+  "elements": [
+    { "id": "prevf-eye", "sceneId": "icons-filled-preview", "order": 0, "kind": "instance", "name": "Eye", "geometry": {}, "transform": { "translateX": 10, "translateY": 10, "rotate": 0, "scaleX": 1, "scaleY": 1 }, "opacity": 1, "visible": true, "definitionRef": "icon-eye-filled" },
+    { "id": "prevf-play", "sceneId": "icons-filled-preview", "order": 1, "kind": "instance", "name": "Play", "geometry": {}, "transform": { "translateX": 90, "translateY": 10, "rotate": 0, "scaleX": 1, "scaleY": 1 }, "opacity": 1, "visible": true, "definitionRef": "icon-play-filled" },
+    { "id": "prevf-pause", "sceneId": "icons-filled-preview", "order": 2, "kind": "instance", "name": "Pause", "geometry": {}, "transform": { "translateX": 170, "translateY": 10, "rotate": 0, "scaleX": 1, "scaleY": 1 }, "opacity": 1, "visible": true, "definitionRef": "icon-pause-filled" },
+    { "id": "prevf-replay", "sceneId": "icons-filled-preview", "order": 3, "kind": "instance", "name": "Replay", "geometry": {}, "transform": { "translateX": 10, "translateY": 90, "rotate": 0, "scaleX": 1, "scaleY": 1 }, "opacity": 1, "visible": true, "definitionRef": "icon-replay-filled" },
+    { "id": "prevf-listen", "sceneId": "icons-filled-preview", "order": 4, "kind": "instance", "name": "Listen", "geometry": {}, "transform": { "translateX": 90, "translateY": 90, "rotate": 0, "scaleX": 1, "scaleY": 1 }, "opacity": 1, "visible": true, "definitionRef": "icon-listen-filled" },
+    { "id": "prevf-save", "sceneId": "icons-filled-preview", "order": 5, "kind": "instance", "name": "Save", "geometry": {}, "transform": { "translateX": 170, "translateY": 90, "rotate": 0, "scaleX": 1, "scaleY": 1 }, "opacity": 1, "visible": true, "definitionRef": "icon-save-filled" },
+    { "id": "prevf-report", "sceneId": "icons-filled-preview", "order": 6, "kind": "instance", "name": "Report", "geometry": {}, "transform": { "translateX": 10, "translateY": 170, "rotate": 0, "scaleX": 1, "scaleY": 1 }, "opacity": 1, "visible": true, "definitionRef": "icon-report-filled" },
+    { "id": "prevf-history", "sceneId": "icons-filled-preview", "order": 7, "kind": "instance", "name": "History", "geometry": {}, "transform": { "translateX": 90, "translateY": 170, "rotate": 0, "scaleX": 1, "scaleY": 1 }, "opacity": 1, "visible": true, "definitionRef": "icon-history-filled" },
+    { "id": "prevf-settings", "sceneId": "icons-filled-preview", "order": 8, "kind": "instance", "name": "Settings", "geometry": {}, "transform": { "translateX": 170, "translateY": 170, "rotate": 0, "scaleX": 1, "scaleY": 1 }, "opacity": 1, "visible": true, "definitionRef": "icon-settings-filled" }
+  ]
+}

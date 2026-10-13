@@ -1,0 +1,33 @@
+{
+  "id": "icon-replay",
+  "projectId": "project",
+  "name": "Replay",
+  "parameters": [],
+  "origin": { "x": 0, "y": 0 },
+  "elements": [
+    {
+      "id": "icon-replay-arc",
+      "definitionId": "icon-replay",
+      "order": 0,
+      "kind": "path",
+      "name": "Circular arc",
+      "geometry": { "pathData": "M 15.75 5.5 A 7.5 7.5 0 1 1 8.25 5.5" },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "stroke": { "profileId": "icon-stroke", "paint": { "kind": "token", "ref": "icon-default" } },
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "id": "icon-replay-head",
+      "definitionId": "icon-replay",
+      "order": 1,
+      "kind": "path",
+      "name": "Arrowhead",
+      "geometry": { "pathData": "M 3.9 5.2 L 8.3 5.5 L 6.4 9.6" },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "stroke": { "profileId": "icon-stroke", "paint": { "kind": "token", "ref": "icon-default" } },
+      "opacity": 1,
+      "visible": true
+    }
+  ]
+}

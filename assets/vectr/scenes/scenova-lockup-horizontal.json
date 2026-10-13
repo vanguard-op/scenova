@@ -1,0 +1,46 @@
+{
+  "id": "scenova-lockup-horizontal",
+  "projectId": "project",
+  "name": "Scenova horizontal lockup",
+  "formatVersion": "0.2",
+  "paletteId": "brand",
+  "title": "Scenova horizontal lockup",
+  "description": "The mark leading the Scenova wordmark, optically centred on the cap height.",
+  "canvas": { "width": 1024, "height": 320, "background": "transparent" },
+  "elements": [
+    {
+      "id": "lockup-mark",
+      "sceneId": "scenova-lockup-horizontal",
+      "order": 0,
+      "kind": "instance",
+      "name": "Mark",
+      "geometry": {},
+      "transform": { "translateX": 277, "translateY": 148, "rotate": 0, "scaleX": 0.466, "scaleY": 0.466 },
+      "opacity": 1,
+      "visible": true,
+      "definitionRef": "mark",
+      "bindings": [ { "name": "colour", "value": "ink" } ]
+    },
+    {
+      "id": "lockup-wordmark",
+      "sceneId": "scenova-lockup-horizontal",
+      "order": 1,
+      "kind": "text",
+      "name": "Wordmark",
+      "geometry": {
+        "text": "Scenova",
+        "fontSize": 110,
+        "x": 715,
+        "y": 200,
+        "align": "center",
+        "lineHeight": 110,
+        "letterSpacing": 0
+      },
+      "fontId": "lora-lockup",
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "fill": { "kind": "token", "ref": "ink" },
+      "opacity": 1,
+      "visible": true
+    }
+  ]
+}

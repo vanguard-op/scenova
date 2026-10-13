@@ -1,0 +1,33 @@
+{
+  "id": "icon-report-filled",
+  "projectId": "project",
+  "name": "Report, filled",
+  "parameters": [],
+  "origin": { "x": 0, "y": 0 },
+  "elements": [
+    {
+      "id": "icon-report-filled-pole",
+      "definitionId": "icon-report-filled",
+      "order": 0,
+      "kind": "rect",
+      "name": "Flag pole",
+      "geometry": { "x": 5, "y": 4, "width": 2, "height": 16, "rx": 1, "ry": 1 },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "fill": { "kind": "token", "ref": "icon-active" },
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "id": "icon-report-filled-flag",
+      "definitionId": "icon-report-filled",
+      "order": 1,
+      "kind": "path",
+      "name": "Flag",
+      "geometry": { "pathData": "M 6 5 L 16.5 5 L 14 8.5 L 16.5 12 L 6 12 Z" },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "fill": { "kind": "token", "ref": "icon-active" },
+      "opacity": 1,
+      "visible": true
+    }
+  ]
+}

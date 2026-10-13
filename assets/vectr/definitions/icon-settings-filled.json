@@ -1,0 +1,81 @@
+{
+  "id": "icon-settings-filled",
+  "projectId": "project",
+  "name": "Settings, filled",
+  "parameters": [],
+  "origin": { "x": 0, "y": 0 },
+  "elements": [
+    {
+      "id": "icon-settings-filled-track-1",
+      "definitionId": "icon-settings-filled",
+      "order": 0,
+      "kind": "rect",
+      "name": "Slider one track",
+      "geometry": { "x": 3.5, "y": 5.75, "width": 17, "height": 1.5, "rx": 0.75, "ry": 0.75 },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "fill": { "kind": "token", "ref": "icon-active" },
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "id": "icon-settings-filled-track-2",
+      "definitionId": "icon-settings-filled",
+      "order": 1,
+      "kind": "rect",
+      "name": "Slider two track",
+      "geometry": { "x": 3.5, "y": 11.25, "width": 17, "height": 1.5, "rx": 0.75, "ry": 0.75 },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "fill": { "kind": "token", "ref": "icon-active" },
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "id": "icon-settings-filled-track-3",
+      "definitionId": "icon-settings-filled",
+      "order": 2,
+      "kind": "rect",
+      "name": "Slider three track",
+      "geometry": { "x": 3.5, "y": 16.75, "width": 17, "height": 1.5, "rx": 0.75, "ry": 0.75 },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "fill": { "kind": "token", "ref": "icon-active" },
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "id": "icon-settings-filled-knob-1",
+      "definitionId": "icon-settings-filled",
+      "order": 3,
+      "kind": "ellipse",
+      "name": "Slider one knob",
+      "geometry": { "x": 13, "y": 4.5, "width": 4, "height": 4 },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "fill": { "kind": "token", "ref": "icon-active" },
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "id": "icon-settings-filled-knob-2",
+      "definitionId": "icon-settings-filled",
+      "order": 4,
+      "kind": "ellipse",
+      "name": "Slider two knob",
+      "geometry": { "x": 6, "y": 10, "width": 4, "height": 4 },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "fill": { "kind": "token", "ref": "icon-active" },
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "id": "icon-settings-filled-knob-3",
+      "definitionId": "icon-settings-filled",
+      "order": 5,
+      "kind": "ellipse",
+      "name": "Slider three knob",
+      "geometry": { "x": 14, "y": 15.5, "width": 4, "height": 4 },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "fill": { "kind": "token", "ref": "icon-active" },
+      "opacity": 1,
+      "visible": true
+    }
+  ]
+}

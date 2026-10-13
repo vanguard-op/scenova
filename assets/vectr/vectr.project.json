@@ -1,0 +1,15 @@
+{
+  "defaultPaletteId": "brand",
+  "defaultRecipeId": "flat",
+  "defaultSceneId": "scenova-mark",
+  "formatVersion": "0.2",
+  "id": "project",
+  "name": "Scenova brand",
+  "output": {
+    "background": "transparent",
+    "density": 1,
+    "format": "svg",
+    "height": 512,
+    "width": 512
+  }
+}

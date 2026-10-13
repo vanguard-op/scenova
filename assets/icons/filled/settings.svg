@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <title>settings</title>
+  <desc>Settings, active</desc>
+  <g id="icon-settings-filled" data-name="settings">
+    <title>Settings, active</title>
+    <g id="icon-settings-filled-track-1-icon-settings-filled" data-name="Slider one track">
+      <title>Slider one track</title>
+      <rect x="3.5" y="5.75" width="17" height="1.5" rx="0.75" ry="0.75" fill="#5C4BC4"/>
+    </g>
+    <g id="icon-settings-filled-track-2-icon-settings-filled" data-name="Slider two track">
+      <title>Slider two track</title>
+      <rect x="3.5" y="11.25" width="17" height="1.5" rx="0.75" ry="0.75" fill="#5C4BC4"/>
+    </g>
+    <g id="icon-settings-filled-track-3-icon-settings-filled" data-name="Slider three track">
+      <title>Slider three track</title>
+      <rect x="3.5" y="16.75" width="17" height="1.5" rx="0.75" ry="0.75" fill="#5C4BC4"/>
+    </g>
+    <g id="icon-settings-filled-knob-1-icon-settings-filled" data-name="Slider one knob">
+      <title>Slider one knob</title>
+      <ellipse cx="15" cy="6.5" rx="2" ry="2" fill="#5C4BC4"/>
+    </g>
+    <g id="icon-settings-filled-knob-2-icon-settings-filled" data-name="Slider two knob">
+      <title>Slider two knob</title>
+      <ellipse cx="8" cy="12" rx="2" ry="2" fill="#5C4BC4"/>
+    </g>
+    <g id="icon-settings-filled-knob-3-icon-settings-filled" data-name="Slider three knob">
+      <title>Slider three knob</title>
+      <ellipse cx="16" cy="17.5" rx="2" ry="2" fill="#5C4BC4"/>
+    </g>
+  </g>
+</svg>

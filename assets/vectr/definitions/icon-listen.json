@@ -1,0 +1,33 @@
+{
+  "id": "icon-listen",
+  "projectId": "project",
+  "name": "Listen",
+  "parameters": [],
+  "origin": { "x": 0, "y": 0 },
+  "elements": [
+    {
+      "id": "icon-listen-speaker",
+      "definitionId": "icon-listen",
+      "order": 0,
+      "kind": "path",
+      "name": "Speaker",
+      "geometry": { "pathData": "M 3.5 9.5 L 7 9.5 L 11 6 L 11 18 L 7 14.5 L 3.5 14.5 Z" },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "stroke": { "profileId": "icon-stroke", "paint": { "kind": "token", "ref": "icon-default" } },
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "id": "icon-listen-wave",
+      "definitionId": "icon-listen",
+      "order": 1,
+      "kind": "path",
+      "name": "Sound wave",
+      "geometry": { "pathData": "M 14 9.5 C 15.5 11 15.5 13 14 14.5" },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "stroke": { "profileId": "icon-stroke", "paint": { "kind": "token", "ref": "icon-default" } },
+      "opacity": 1,
+      "visible": true
+    }
+  ]
+}

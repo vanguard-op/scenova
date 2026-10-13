@@ -1,0 +1,8 @@
+{
+  "id": "lora-lockup",
+  "sceneId": "scenova-lockup-horizontal",
+  "kind": "font",
+  "path": "assets/Lora-Bold.ttf",
+  "license": "SIL Open Font License 1.1",
+  "description": "Lora Bold, the display serif, for the horizontal lockup wordmark"
+}

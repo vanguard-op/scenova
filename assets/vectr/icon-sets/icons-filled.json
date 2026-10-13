@@ -1,0 +1,21 @@
+{
+  "id": "icons-filled",
+  "projectId": "project",
+  "name": "Scenova icons, filled",
+  "canvas": { "width": 24, "height": 24, "background": "transparent" },
+  "strokeProfileId": "icon-stroke",
+  "paletteId": "brand",
+  "recipeId": "flat",
+  "namePattern": "{name}",
+  "icons": [
+    { "name": "eye", "definitionRef": "icon-eye-filled", "accessibleName": "See it, active" },
+    { "name": "play", "definitionRef": "icon-play-filled", "accessibleName": "Play, active" },
+    { "name": "pause", "definitionRef": "icon-pause-filled", "accessibleName": "Pause, active" },
+    { "name": "replay", "definitionRef": "icon-replay-filled", "accessibleName": "Replay, active" },
+    { "name": "listen", "definitionRef": "icon-listen-filled", "accessibleName": "Listen, active" },
+    { "name": "save", "definitionRef": "icon-save-filled", "accessibleName": "Save, active" },
+    { "name": "report", "definitionRef": "icon-report-filled", "accessibleName": "Report, active" },
+    { "name": "history", "definitionRef": "icon-history-filled", "accessibleName": "History, active" },
+    { "name": "settings", "definitionRef": "icon-settings-filled", "accessibleName": "Settings, active" }
+  ]
+}

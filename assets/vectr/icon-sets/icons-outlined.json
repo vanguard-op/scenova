@@ -1,0 +1,21 @@
+{
+  "id": "icons-outlined",
+  "projectId": "project",
+  "name": "Scenova icons, outlined",
+  "canvas": { "width": 24, "height": 24, "background": "transparent" },
+  "strokeProfileId": "icon-stroke",
+  "paletteId": "brand",
+  "recipeId": "flat",
+  "namePattern": "{name}",
+  "icons": [
+    { "name": "eye", "definitionRef": "icon-eye", "accessibleName": "See it" },
+    { "name": "play", "definitionRef": "icon-play", "accessibleName": "Play" },
+    { "name": "pause", "definitionRef": "icon-pause", "accessibleName": "Pause" },
+    { "name": "replay", "definitionRef": "icon-replay", "accessibleName": "Replay" },
+    { "name": "listen", "definitionRef": "icon-listen", "accessibleName": "Listen" },
+    { "name": "save", "definitionRef": "icon-save", "accessibleName": "Save" },
+    { "name": "report", "definitionRef": "icon-report", "accessibleName": "Report" },
+    { "name": "history", "definitionRef": "icon-history", "accessibleName": "History" },
+    { "name": "settings", "definitionRef": "icon-settings", "accessibleName": "Settings" }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "id": "icon-stroke",
+  "projectId": "project",
+  "name": "Icon stroke",
+  "width": 2,
+  "cap": "round",
+  "join": "round"
+}

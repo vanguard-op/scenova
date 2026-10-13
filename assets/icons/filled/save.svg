@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <title>save</title>
+  <desc>Save, active</desc>
+  <g id="icon-save-filled" data-name="save">
+    <title>Save, active</title>
+    <g id="icon-save-filled-ribbon-icon-save-filled" data-name="Bookmark ribbon">
+      <title>Bookmark ribbon</title>
+      <path d="M 6.5 4 L 17.5 4 L 17.5 20 L 12 15.5 L 6.5 20 Z" fill="#5C4BC4"/>
+    </g>
+  </g>
+</svg>

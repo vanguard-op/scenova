@@ -1,0 +1,25 @@
+{
+  "id": "scenova-mark-knockout",
+  "projectId": "project",
+  "name": "Scenova mark, knockout",
+  "formatVersion": "0.2",
+  "paletteId": "brand",
+  "title": "Scenova mark, knockout",
+  "description": "The Scenova mark reversed to the ink token's dark value for dark surfaces.",
+  "canvas": { "width": 1024, "height": 1024, "background": "transparent" },
+  "elements": [
+    {
+      "id": "mark-knockout",
+      "sceneId": "scenova-mark-knockout",
+      "order": 0,
+      "kind": "instance",
+      "name": "Mark",
+      "geometry": {},
+      "transform": { "translateX": 512, "translateY": 512, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "opacity": 1,
+      "visible": true,
+      "definitionRef": "mark",
+      "bindings": [ { "name": "colour", "value": "ink-dark" } ]
+    }
+  ]
+}

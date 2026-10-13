@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <title>pause</title>
+  <desc>Pause, active</desc>
+  <g id="icon-pause-filled" data-name="pause">
+    <title>Pause, active</title>
+    <g id="icon-pause-filled-left-icon-pause-filled" data-name="Left bar">
+      <title>Left bar</title>
+      <rect x="8.5" y="5.5" width="3" height="13" rx="1.5" ry="1.5" fill="#5C4BC4"/>
+    </g>
+    <g id="icon-pause-filled-right-icon-pause-filled" data-name="Right bar">
+      <title>Right bar</title>
+      <rect x="12.5" y="5.5" width="3" height="13" rx="1.5" ry="1.5" fill="#5C4BC4"/>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,57 @@
+{
+  "id": "icon-history",
+  "projectId": "project",
+  "name": "History",
+  "parameters": [],
+  "origin": { "x": 0, "y": 0 },
+  "elements": [
+    {
+      "id": "icon-history-face",
+      "definitionId": "icon-history",
+      "order": 0,
+      "kind": "path",
+      "name": "Clock face",
+      "geometry": { "pathData": "M 4.95 9.43 A 7.5 7.5 0 1 0 12 4.5" },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "stroke": { "profileId": "icon-stroke", "paint": { "kind": "token", "ref": "icon-default" } },
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "id": "icon-history-head",
+      "definitionId": "icon-history",
+      "order": 1,
+      "kind": "path",
+      "name": "Counter-clockwise arrowhead",
+      "geometry": { "pathData": "M 15.7 7.1 L 12 4.5 L 15.7 1.9" },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "stroke": { "profileId": "icon-stroke", "paint": { "kind": "token", "ref": "icon-default" } },
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "id": "icon-history-hand-h",
+      "definitionId": "icon-history",
+      "order": 2,
+      "kind": "line",
+      "name": "Hour hand",
+      "geometry": { "points": [[12, 12], [15.2, 12]] },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "stroke": { "profileId": "icon-stroke", "paint": { "kind": "token", "ref": "icon-default" } },
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "id": "icon-history-hand-v",
+      "definitionId": "icon-history",
+      "order": 3,
+      "kind": "line",
+      "name": "Minute hand",
+      "geometry": { "points": [[12, 12], [12, 7.8]] },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "stroke": { "profileId": "icon-stroke", "paint": { "kind": "token", "ref": "icon-default" } },
+      "opacity": 1,
+      "visible": true
+    }
+  ]
+}

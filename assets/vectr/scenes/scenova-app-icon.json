@@ -1,0 +1,25 @@
+{
+  "id": "scenova-app-icon",
+  "projectId": "project",
+  "name": "Scenova app icon",
+  "formatVersion": "0.2",
+  "paletteId": "brand",
+  "title": "Scenova app icon",
+  "description": "The Scenova mark in ink on the field surface.",
+  "canvas": { "width": 1024, "height": 1024, "background": "field" },
+  "elements": [
+    {
+      "id": "app-icon-mark",
+      "sceneId": "scenova-app-icon",
+      "order": 0,
+      "kind": "instance",
+      "name": "Mark",
+      "geometry": {},
+      "transform": { "translateX": 512, "translateY": 512, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "opacity": 1,
+      "visible": true,
+      "definitionRef": "mark",
+      "bindings": [ { "name": "colour", "value": "ink" } ]
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "id": "scenova-mark-one-colour",
+  "projectId": "project",
+  "name": "Scenova mark, one colour",
+  "formatVersion": "0.2",
+  "paletteId": "brand",
+  "title": "Scenova mark, one colour",
+  "description": "The Scenova mark in a single ink tone.",
+  "canvas": { "width": 1024, "height": 1024, "background": "transparent" },
+  "elements": [
+    {
+      "id": "mark-one-colour",
+      "sceneId": "scenova-mark-one-colour",
+      "order": 0,
+      "kind": "instance",
+      "name": "Mark",
+      "geometry": {},
+      "transform": { "translateX": 512, "translateY": 512, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "opacity": 1,
+      "visible": true,
+      "definitionRef": "mark",
+      "bindings": [ { "name": "colour", "value": "ink" } ]
+    }
+  ]
+}

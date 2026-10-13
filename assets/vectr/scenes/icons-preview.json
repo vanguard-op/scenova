@@ -1,0 +1,20 @@
+{
+  "id": "icons-preview",
+  "projectId": "project",
+  "name": "Icons preview sheet",
+  "formatVersion": "0.2",
+  "paletteId": "brand",
+  "title": "Scenova icon set, preview",
+  "canvas": { "width": 240, "height": 240, "background": "transparent" },
+  "elements": [
+    { "id": "prev-eye", "sceneId": "icons-preview", "order": 0, "kind": "instance", "name": "Eye", "geometry": {}, "transform": { "translateX": 10, "translateY": 10, "rotate": 0, "scaleX": 1, "scaleY": 1 }, "opacity": 1, "visible": true, "definitionRef": "icon-eye" },
+    { "id": "prev-play", "sceneId": "icons-preview", "order": 1, "kind": "instance", "name": "Play", "geometry": {}, "transform": { "translateX": 90, "translateY": 10, "rotate": 0, "scaleX": 1, "scaleY": 1 }, "opacity": 1, "visible": true, "definitionRef": "icon-play" },
+    { "id": "prev-pause", "sceneId": "icons-preview", "order": 2, "kind": "instance", "name": "Pause", "geometry": {}, "transform": { "translateX": 170, "translateY": 10, "rotate": 0, "scaleX": 1, "scaleY": 1 }, "opacity": 1, "visible": true, "definitionRef": "icon-pause" },
+    { "id": "prev-replay", "sceneId": "icons-preview", "order": 3, "kind": "instance", "name": "Replay", "geometry": {}, "transform": { "translateX": 10, "translateY": 90, "rotate": 0, "scaleX": 1, "scaleY": 1 }, "opacity": 1, "visible": true, "definitionRef": "icon-replay" },
+    { "id": "prev-listen", "sceneId": "icons-preview", "order": 4, "kind": "instance", "name": "Listen", "geometry": {}, "transform": { "translateX": 90, "translateY": 90, "rotate": 0, "scaleX": 1, "scaleY": 1 }, "opacity": 1, "visible": true, "definitionRef": "icon-listen" },
+    { "id": "prev-save", "sceneId": "icons-preview", "order": 5, "kind": "instance", "name": "Save", "geometry": {}, "transform": { "translateX": 170, "translateY": 90, "rotate": 0, "scaleX": 1, "scaleY": 1 }, "opacity": 1, "visible": true, "definitionRef": "icon-save" },
+    { "id": "prev-report", "sceneId": "icons-preview", "order": 6, "kind": "instance", "name": "Report", "geometry": {}, "transform": { "translateX": 10, "translateY": 170, "rotate": 0, "scaleX": 1, "scaleY": 1 }, "opacity": 1, "visible": true, "definitionRef": "icon-report" },
+    { "id": "prev-history", "sceneId": "icons-preview", "order": 7, "kind": "instance", "name": "History", "geometry": {}, "transform": { "translateX": 90, "translateY": 170, "rotate": 0, "scaleX": 1, "scaleY": 1 }, "opacity": 1, "visible": true, "definitionRef": "icon-history" },
+    { "id": "prev-settings", "sceneId": "icons-preview", "order": 8, "kind": "instance", "name": "Settings", "geometry": {}, "transform": { "translateX": 170, "translateY": 170, "rotate": 0, "scaleX": 1, "scaleY": 1 }, "opacity": 1, "visible": true, "definitionRef": "icon-settings" }
+  ]
+}

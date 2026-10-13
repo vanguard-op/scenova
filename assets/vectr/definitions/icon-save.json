@@ -1,0 +1,21 @@
+{
+  "id": "icon-save",
+  "projectId": "project",
+  "name": "Save",
+  "parameters": [],
+  "origin": { "x": 0, "y": 0 },
+  "elements": [
+    {
+      "id": "icon-save-ribbon",
+      "definitionId": "icon-save",
+      "order": 0,
+      "kind": "path",
+      "name": "Bookmark ribbon",
+      "geometry": { "pathData": "M 6.5 4 L 17.5 4 L 17.5 20 L 12 15.5 L 6.5 20 Z" },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "stroke": { "profileId": "icon-stroke", "paint": { "kind": "token", "ref": "icon-default" } },
+      "opacity": 1,
+      "visible": true
+    }
+  ]
+}

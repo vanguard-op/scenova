@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <title>eye</title>
+  <desc>See it</desc>
+  <g id="icon-eye" data-name="eye">
+    <title>See it</title>
+    <g id="icon-eye-outline-icon-eye" data-name="Eye outline">
+      <title>Eye outline</title>
+      <path d="M 2.5 12 C 6 6.5 18 6.5 21.5 12 C 18 17.5 6 17.5 2.5 12 Z" fill="none" stroke="#504C5C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <g id="icon-eye-pupil-icon-eye" data-name="Pupil">
+      <title>Pupil</title>
+      <ellipse cx="12" cy="12" rx="2.5" ry="2.5" fill="none" stroke="#504C5C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

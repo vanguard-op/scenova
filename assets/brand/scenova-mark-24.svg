@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <title>Scenova mark at 24px</title>
+  <desc>The Scenova mark uniformly scaled to a 24px canvas, detail stripped.</desc>
+  <g id="mark-24" data-name="Mark">
+    <g id="mark-dash-left-mark-24" data-name="Outer stroke, left">
+      <title>Outer stroke, left</title>
+      <polyline points="-349,45 -179,45" fill="none" stroke="#1A1820" stroke-width="80" stroke-linecap="round" stroke-linejoin="round" transform="matrix(0.02345 0 0 0.02345 12 12)"/>
+    </g>
+    <g id="mark-arc-mark-24" data-name="Middle stroke, peeled upward">
+      <title>Middle stroke, peeled upward</title>
+      <path d="M -85 45 C -20 38 25 8 85 -45" fill="none" stroke="#1A1820" stroke-width="80" stroke-linecap="round" stroke-linejoin="round" transform="matrix(0.02345 0 0 0.02345 12 12)"/>
+    </g>
+    <g id="mark-dash-right-mark-24" data-name="Outer stroke, right">
+      <title>Outer stroke, right</title>
+      <polyline points="179,45 349,45" fill="none" stroke="#1A1820" stroke-width="80" stroke-linecap="round" stroke-linejoin="round" transform="matrix(0.02345 0 0 0.02345 12 12)"/>
+    </g>
+  </g>
+</svg>

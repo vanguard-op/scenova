@@ -1,0 +1,33 @@
+{
+  "id": "icon-pause-filled",
+  "projectId": "project",
+  "name": "Pause, filled",
+  "parameters": [],
+  "origin": { "x": 0, "y": 0 },
+  "elements": [
+    {
+      "id": "icon-pause-filled-left",
+      "definitionId": "icon-pause-filled",
+      "order": 0,
+      "kind": "rect",
+      "name": "Left bar",
+      "geometry": { "x": 8.5, "y": 5.5, "width": 3, "height": 13, "rx": 1.5, "ry": 1.5 },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "fill": { "kind": "token", "ref": "icon-active" },
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "id": "icon-pause-filled-right",
+      "definitionId": "icon-pause-filled",
+      "order": 1,
+      "kind": "rect",
+      "name": "Right bar",
+      "geometry": { "x": 12.5, "y": 5.5, "width": 3, "height": 13, "rx": 1.5, "ry": 1.5 },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "fill": { "kind": "token", "ref": "icon-active" },
+      "opacity": 1,
+      "visible": true
+    }
+  ]
+}

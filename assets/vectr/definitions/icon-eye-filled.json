@@ -1,0 +1,47 @@
+{
+  "id": "icon-eye-filled",
+  "projectId": "project",
+  "name": "Eye, filled",
+  "parameters": [],
+  "origin": { "x": 0, "y": 0 },
+  "elements": [
+    {
+      "id": "icon-eye-filled-body",
+      "definitionId": "icon-eye-filled",
+      "order": 0,
+      "kind": "boolean",
+      "name": "Eye",
+      "geometry": { "operation": "subtract" },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "fill": { "kind": "token", "ref": "icon-active" },
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "id": "icon-eye-fill-almond",
+      "definitionId": "icon-eye-filled",
+      "parentId": "icon-eye-filled-body",
+      "order": 0,
+      "kind": "path",
+      "name": "Eye almond",
+      "geometry": { "pathData": "M 2.5 12 C 6 6.5 18 6.5 21.5 12 C 18 17.5 6 17.5 2.5 12 Z" },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "fill": { "kind": "token", "ref": "icon-active" },
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "id": "icon-eye-fill-pupil",
+      "definitionId": "icon-eye-filled",
+      "parentId": "icon-eye-filled-body",
+      "order": 1,
+      "kind": "ellipse",
+      "name": "Pupil",
+      "geometry": { "x": 9.5, "y": 9.5, "width": 5, "height": 5 },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "fill": { "kind": "token", "ref": "icon-active" },
+      "opacity": 1,
+      "visible": true
+    }
+  ]
+}

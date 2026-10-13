@@ -1,0 +1,21 @@
+{
+  "id": "icons-disabled",
+  "projectId": "project",
+  "name": "Scenova icons, disabled",
+  "canvas": { "width": 24, "height": 24, "background": "transparent" },
+  "strokeProfileId": "icon-stroke",
+  "paletteId": "icons-disabled-tone",
+  "recipeId": "flat",
+  "namePattern": "{name}",
+  "icons": [
+    { "name": "eye", "definitionRef": "icon-eye", "accessibleName": "See it, disabled" },
+    { "name": "play", "definitionRef": "icon-play", "accessibleName": "Play, disabled" },
+    { "name": "pause", "definitionRef": "icon-pause", "accessibleName": "Pause, disabled" },
+    { "name": "replay", "definitionRef": "icon-replay", "accessibleName": "Replay, disabled" },
+    { "name": "listen", "definitionRef": "icon-listen", "accessibleName": "Listen, disabled" },
+    { "name": "save", "definitionRef": "icon-save", "accessibleName": "Save, disabled" },
+    { "name": "report", "definitionRef": "icon-report", "accessibleName": "Report, disabled" },
+    { "name": "history", "definitionRef": "icon-history", "accessibleName": "History, disabled" },
+    { "name": "settings", "definitionRef": "icon-settings", "accessibleName": "Settings, disabled" }
+  ]
+}

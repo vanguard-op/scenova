@@ -1,0 +1,8 @@
+{
+  "id": "mark-stroke",
+  "projectId": "project",
+  "name": "Mark stroke",
+  "width": 80,
+  "cap": "round",
+  "join": "round"
+}

@@ -1,0 +1,33 @@
+{
+  "id": "icon-eye",
+  "projectId": "project",
+  "name": "Eye",
+  "parameters": [],
+  "origin": { "x": 0, "y": 0 },
+  "elements": [
+    {
+      "id": "icon-eye-outline",
+      "definitionId": "icon-eye",
+      "order": 0,
+      "kind": "path",
+      "name": "Eye outline",
+      "geometry": { "pathData": "M 2.5 12 C 6 6.5 18 6.5 21.5 12 C 18 17.5 6 17.5 2.5 12 Z" },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "stroke": { "profileId": "icon-stroke", "paint": { "kind": "token", "ref": "icon-default" } },
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "id": "icon-eye-pupil",
+      "definitionId": "icon-eye",
+      "order": 1,
+      "kind": "ellipse",
+      "name": "Pupil",
+      "geometry": { "x": 9.5, "y": 9.5, "width": 5, "height": 5 },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "stroke": { "profileId": "icon-stroke", "paint": { "kind": "token", "ref": "icon-default" } },
+      "opacity": 1,
+      "visible": true
+    }
+  ]
+}

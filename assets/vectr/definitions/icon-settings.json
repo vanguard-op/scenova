@@ -1,0 +1,117 @@
+{
+  "id": "icon-settings",
+  "projectId": "project",
+  "name": "Settings",
+  "parameters": [],
+  "origin": { "x": 0, "y": 0 },
+  "elements": [
+    {
+      "id": "icon-settings-track-1a",
+      "definitionId": "icon-settings",
+      "order": 0,
+      "kind": "line",
+      "name": "Slider one, left track",
+      "geometry": { "points": [[3.5, 6.5], [13, 6.5]] },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "stroke": { "profileId": "icon-stroke", "paint": { "kind": "token", "ref": "icon-default" } },
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "id": "icon-settings-track-1b",
+      "definitionId": "icon-settings",
+      "order": 1,
+      "kind": "line",
+      "name": "Slider one, right track",
+      "geometry": { "points": [[17, 6.5], [20.5, 6.5]] },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "stroke": { "profileId": "icon-stroke", "paint": { "kind": "token", "ref": "icon-default" } },
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "id": "icon-settings-knob-1",
+      "definitionId": "icon-settings",
+      "order": 2,
+      "kind": "ellipse",
+      "name": "Slider one knob",
+      "geometry": { "x": 13, "y": 4.5, "width": 4, "height": 4 },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "stroke": { "profileId": "icon-stroke", "paint": { "kind": "token", "ref": "icon-default" } },
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "id": "icon-settings-track-2a",
+      "definitionId": "icon-settings",
+      "order": 3,
+      "kind": "line",
+      "name": "Slider two, left track",
+      "geometry": { "points": [[3.5, 12], [6, 12]] },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "stroke": { "profileId": "icon-stroke", "paint": { "kind": "token", "ref": "icon-default" } },
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "id": "icon-settings-track-2b",
+      "definitionId": "icon-settings",
+      "order": 4,
+      "kind": "line",
+      "name": "Slider two, right track",
+      "geometry": { "points": [[10, 12], [20.5, 12]] },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "stroke": { "profileId": "icon-stroke", "paint": { "kind": "token", "ref": "icon-default" } },
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "id": "icon-settings-knob-2",
+      "definitionId": "icon-settings",
+      "order": 5,
+      "kind": "ellipse",
+      "name": "Slider two knob",
+      "geometry": { "x": 6, "y": 10, "width": 4, "height": 4 },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "stroke": { "profileId": "icon-stroke", "paint": { "kind": "token", "ref": "icon-default" } },
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "id": "icon-settings-track-3a",
+      "definitionId": "icon-settings",
+      "order": 6,
+      "kind": "line",
+      "name": "Slider three, left track",
+      "geometry": { "points": [[3.5, 17.5], [14, 17.5]] },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "stroke": { "profileId": "icon-stroke", "paint": { "kind": "token", "ref": "icon-default" } },
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "id": "icon-settings-track-3b",
+      "definitionId": "icon-settings",
+      "order": 7,
+      "kind": "line",
+      "name": "Slider three, right track",
+      "geometry": { "points": [[18, 17.5], [20.5, 17.5]] },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "stroke": { "profileId": "icon-stroke", "paint": { "kind": "token", "ref": "icon-default" } },
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "id": "icon-settings-knob-3",
+      "definitionId": "icon-settings",
+      "order": 8,
+      "kind": "ellipse",
+      "name": "Slider three knob",
+      "geometry": { "x": 14, "y": 15.5, "width": 4, "height": 4 },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "stroke": { "profileId": "icon-stroke", "paint": { "kind": "token", "ref": "icon-default" } },
+      "opacity": 1,
+      "visible": true
+    }
+  ]
+}

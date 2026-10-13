@@ -1,0 +1,47 @@
+{
+  "id": "mark",
+  "projectId": "project",
+  "name": "Scenova mark",
+  "parameters": [
+    { "name": "colour", "type": "token", "default": "ink" }
+  ],
+  "origin": { "x": 0, "y": 0 },
+  "elements": [
+    {
+      "id": "mark-dash-left",
+      "definitionId": "mark",
+      "order": 0,
+      "kind": "line",
+      "name": "Outer stroke, left",
+      "geometry": { "points": [[-349, 45], [-179, 45]] },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "stroke": { "profileId": "mark-stroke", "paint": { "param": "colour" } },
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "id": "mark-arc",
+      "definitionId": "mark",
+      "order": 1,
+      "kind": "path",
+      "name": "Middle stroke, peeled upward",
+      "geometry": { "pathData": "M -85 45 C -20 38 25 8 85 -45" },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "stroke": { "profileId": "mark-stroke", "paint": { "param": "colour" } },
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "id": "mark-dash-right",
+      "definitionId": "mark",
+      "order": 2,
+      "kind": "line",
+      "name": "Outer stroke, right",
+      "geometry": { "points": [[179, 45], [349, 45]] },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "stroke": { "profileId": "mark-stroke", "paint": { "param": "colour" } },
+      "opacity": 1,
+      "visible": true
+    }
+  ]
+}

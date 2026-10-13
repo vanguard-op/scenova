@@ -1,0 +1,72 @@
+{
+  "id": "icon-replay-filled",
+  "projectId": "project",
+  "name": "Replay, filled",
+  "parameters": [],
+  "origin": { "x": 0, "y": 0 },
+  "elements": [
+    {
+      "id": "icon-replay-filled-ring",
+      "definitionId": "icon-replay-filled",
+      "order": 0,
+      "kind": "boolean",
+      "name": "Ring with gap",
+      "geometry": { "operation": "subtract" },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "fill": { "kind": "token", "ref": "icon-active" },
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "id": "icon-replay-ring-outer",
+      "definitionId": "icon-replay-filled",
+      "parentId": "icon-replay-filled-ring",
+      "order": 0,
+      "kind": "ellipse",
+      "name": "Outer edge",
+      "geometry": { "x": 4.5, "y": 4.5, "width": 15, "height": 15 },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "fill": { "kind": "token", "ref": "icon-active" },
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "id": "icon-replay-ring-inner",
+      "definitionId": "icon-replay-filled",
+      "parentId": "icon-replay-filled-ring",
+      "order": 1,
+      "kind": "ellipse",
+      "name": "Inner edge",
+      "geometry": { "x": 8.5, "y": 8.5, "width": 7, "height": 7 },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "fill": { "kind": "token", "ref": "icon-active" },
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "id": "icon-replay-ring-gap",
+      "definitionId": "icon-replay-filled",
+      "parentId": "icon-replay-filled-ring",
+      "order": 2,
+      "kind": "polygon",
+      "name": "Gap",
+      "geometry": { "points": [[12, 12], [7.5, 3.5], [16.5, 3.5]] },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "fill": { "kind": "token", "ref": "icon-active" },
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "id": "icon-replay-filled-head",
+      "definitionId": "icon-replay-filled",
+      "order": 1,
+      "kind": "polygon",
+      "name": "Arrowhead",
+      "geometry": { "points": [[16.15, 4.81], [19.51, 9.99], [13.35, 9.66]] },
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "fill": { "kind": "token", "ref": "icon-active" },
+      "opacity": 1,
+      "visible": true
+    }
+  ]
+}

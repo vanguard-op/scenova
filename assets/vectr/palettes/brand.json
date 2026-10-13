@@ -1,0 +1,20 @@
+{
+  "id": "brand",
+  "projectId": "project",
+  "name": "Scenova brand",
+  "tokens": [
+    { "name": "ink", "value": "#1A1820", "description": "grey-900 light: primary text and the mark" },
+    { "name": "ink-dark", "value": "#F4F3F7", "description": "grey-900 dark: knockout mark and dark-mode text" },
+    { "name": "field", "value": "#F7F6F9", "description": "grey-50 light: app-icon field / page surface" },
+    { "name": "field-dark", "value": "#1B1A20", "description": "grey-50 dark: dark app-icon field" },
+    { "name": "plate", "value": "#EEEBFA", "description": "primary-100 light: plate behind the mark over a reading page" },
+    { "name": "plate-dark", "value": "#262151", "description": "primary-100 dark: dark plate" },
+    { "name": "icon-default", "value": "#504C5C", "description": "grey-600 light: default (inactive) icon tone" },
+    { "name": "icon-default-dark", "value": "#A7A3B2", "description": "grey-600 dark" },
+    { "name": "icon-active", "value": "#5C4BC4", "description": "primary-500 light: active icon tone" },
+    { "name": "icon-active-dark", "value": "#8578E4", "description": "primary-500 dark" },
+    { "name": "icon-disabled", "value": "#8C8896", "description": "grey-400 light: disabled icon tone" },
+    { "name": "icon-disabled-dark", "value": "#625E6C", "description": "grey-400 dark" },
+    { "name": "paper", "value": "#FFFFFF", "description": "pure white, for knockout on colour" }
+  ]
+}

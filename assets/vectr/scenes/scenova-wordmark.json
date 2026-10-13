@@ -1,0 +1,33 @@
+{
+  "id": "scenova-wordmark",
+  "projectId": "project",
+  "name": "Scenova wordmark",
+  "formatVersion": "0.2",
+  "paletteId": "brand",
+  "title": "Scenova wordmark",
+  "description": "The Scenova wordmark set in Lora.",
+  "canvas": { "width": 1024, "height": 320, "background": "transparent" },
+  "elements": [
+    {
+      "id": "wordmark-text",
+      "sceneId": "scenova-wordmark",
+      "order": 0,
+      "kind": "text",
+      "name": "Wordmark",
+      "geometry": {
+        "text": "Scenova",
+        "fontSize": 170,
+        "x": 512,
+        "y": 220,
+        "align": "center",
+        "lineHeight": 170,
+        "letterSpacing": 0
+      },
+      "fontId": "lora-wordmark",
+      "transform": { "translateX": 0, "translateY": 0, "rotate": 0, "scaleX": 1, "scaleY": 1 },
+      "fill": { "kind": "token", "ref": "ink" },
+      "opacity": 1,
+      "visible": true
+    }
+  ]
+}
