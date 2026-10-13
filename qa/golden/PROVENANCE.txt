@@ -21,10 +21,13 @@ Item identity: an item is addressed by the join of its input fields (see
 ai/quality/bar.py, item_key). Ratings, recorded runs, and reported failures all
 use that identity, so a rater's verdict attaches to the exact item it judged.
 
-Judging: the bar is judged by two trained raters with a third as adjudicator
-(nfr.md). A rating is a boolean, or {"raters": [bool, ...], "adjudicator": bool}
-when the raters disagree. NFR-050's mechanical rubric (fewer than seven words,
-common words) is checked in the run before the rater's meaning check.
+Judging: one trained rater judges each item against the rubric; the bar is a
+single-rater measurement, and quality and model engineering re-judge every item
+the rater marks short of the rubric and a fixed sample of the rest, the
+adjudicated verdict being the one the run counts (nfr.md). A rating is a boolean
+(the rater's verdict), or {"rater": bool, "adjudicator": bool} where the
+adjudicator has ruled. NFR-050's mechanical rubric (seven words or fewer, common
+words) is checked in the run before the rater's meaning check.
 
 A run of the evaluation is `python -m quality --bar NFR-050` from the repo root
 with ai/ on the path; see ai/quality/__main__.py. A run against the pinned model

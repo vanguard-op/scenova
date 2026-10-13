@@ -220,7 +220,7 @@ def write_review_sheet(
     outputs: Sequence[dict[str, object]],
     key: ItemKey,
 ) -> None:
-    """Write the items and their outputs for raters to judge."""
+    """Write the items and their outputs for the rater to judge."""
 
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as handle:
@@ -242,7 +242,7 @@ def load_replay(path: Path) -> dict[str, dict[str, object]]:
 
 
 def load_ratings(path: Path) -> dict[str, object]:
-    """Load a ratings file: item identity to a boolean or a rater vote mapping."""
+    """Load a ratings file: item identity to a rater verdict, or adjudicated verdict."""
 
     loaded = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(loaded, dict):

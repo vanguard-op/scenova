@@ -113,30 +113,38 @@ def test_a_mechanical_miss_is_not_overridden_by_a_rater() -> None:
     assert verdict.passed is False
 
 
-def test_disagreeing_raters_need_an_adjudicator() -> None:
-    verdict = _decide({_KEY: {"raters": [True, False]}})(_ITEM, _generated("a key in the door"))
-
-    assert verdict.passed is False
-    assert verdict.reason is not None and "adjudicator" in verdict.reason
-
-
-def test_an_adjudicator_resolves_disagreeing_raters() -> None:
-    ratings = {_KEY: {"raters": [True, False], "adjudicator": True}}
+def test_the_adjudicated_verdict_is_counted_over_the_rater() -> None:
+    ratings = {_KEY: {"rater": False, "adjudicator": True}}
 
     assert _decide(ratings)(_ITEM, _generated("a key in the door")).passed is True
 
 
-def test_unanimous_raters_pass() -> None:
-    assert (
-        _decide({_KEY: {"raters": [True, True]}})(_ITEM, _generated("a key in the door")).passed
-        is True
-    )
+def test_an_adjudicated_rejection_misses() -> None:
+    ratings = {_KEY: {"rater": True, "adjudicator": False}}
+
+    verdict = _decide(ratings)(_ITEM, _generated("a key in the door"))
+
+    assert verdict.passed is False
+    assert verdict.reason == "adjudicator rejected"
+
+
+def test_a_lone_adjudicator_verdict_is_counted() -> None:
+    ratings = {_KEY: {"adjudicator": True}}
+
+    assert _decide(ratings)(_ITEM, _generated("a key in the door")).passed is True
+
+
+def test_a_rater_verdict_stands_without_adjudication() -> None:
+    assert _decide({_KEY: {"rater": True}})(_ITEM, _generated("a key in the door")).passed is True
 
 
 def test_resolve_rating_reads_the_shapes() -> None:
     assert resolve_rating(True) == Judgement(True, None)
     assert resolve_rating(None).reason == "unrated"
-    assert resolve_rating({"raters": [False, False]}).passed is False
+    assert resolve_rating({"rater": False, "adjudicator": True}).passed is True
+    assert resolve_rating({"rater": True, "adjudicator": False}).passed is False
+    assert resolve_rating({"rater": True}).passed is True
+    assert resolve_rating({}).passed is False
     assert resolve_rating("nonsense").passed is False
 
 

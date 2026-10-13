@@ -8,13 +8,13 @@ Options:
   --bar       the bar to run (NFR-050, NFR-051, NFR-053)
   --replay    score a previously recorded run instead of calling the provider
   --record    write this run's outputs so it can be replayed offline
-  --sheet     write a review sheet of items and outputs for the raters
-  --ratings   the raters' judgements, keyed by item identity
+  --sheet     write a review sheet of items and outputs for the rater
+  --ratings   the rater's judgement (with any adjudication), keyed by item identity
   --out       write the report here (JSON); printed to stdout otherwise
 
 A phrase bar (NFR-050) runs its mechanical rubric with or without ratings; the
 report says which. A clip bar (NFR-051, NFR-053) has no mechanical judge, so
-without ratings it produces a sheet for the raters and stops.
+without ratings it produces a sheet for the rater and stops.
 
 Exit codes: 0 a run completed; 2 the run could not be completed (missing input,
 unknown bar, or a clip bar with no ratings).
@@ -36,9 +36,9 @@ from .judge import Decide, clip_judge, phrase_judge
 from .produce import Producer, ReplayProducer, live_clip_producer, live_phrase_producer
 from .run import load_ratings, load_replay, produce_all, run_bar, write_report
 
-_RUBRIC_ONLY = "rubric only (pre-screen; raters required for the bar)"
-_RUBRIC_AND_RATERS = "rubric and raters"
-_RATERS = "raters"
+_RUBRIC_ONLY = "rubric only (pre-screen; a rater is required for the bar)"
+_RUBRIC_AND_RATER = "rubric and rater"
+_RATER = "rater"
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -46,8 +46,8 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--bar", required=True, help="NFR-050, NFR-051, or NFR-053")
     parser.add_argument("--replay", help="score a recorded run instead of calling the provider")
     parser.add_argument("--record", help="write this run's outputs for later replay")
-    parser.add_argument("--sheet", help="write a review sheet for the raters")
-    parser.add_argument("--ratings", help="the raters' judgements, keyed by item identity")
+    parser.add_argument("--sheet", help="write a review sheet for the rater")
+    parser.add_argument("--ratings", help="the rater's judgement, keyed by item identity")
     parser.add_argument("--out", help="write the report here as JSON")
     return parser
 
@@ -69,7 +69,7 @@ def _phrase_decide(bar: Bar, ratings: dict[str, object] | None) -> tuple[Decide,
         max_chars=settings.max_phrase_chars,
         ratings=ratings,
     )
-    return decide, (_RUBRIC_AND_RATERS if ratings else _RUBRIC_ONLY)
+    return decide, (_RUBRIC_AND_RATER if ratings else _RUBRIC_ONLY)
 
 
 def _clip_decide(bar: Bar, ratings: dict[str, object] | None) -> Decide | None:
@@ -124,7 +124,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         clip_decide = _clip_decide(bar, ratings)
         if clip_decide is None:
             # No mechanical judge exists for a clip bar: produce the sheet for
-            # the raters, and report that the bar was not measured.
+            # the rater, and report that the bar was not measured.
             try:
                 produce_all(bar, producer, record=record, sheet=sheet)
             except GoldenSetMissing as exc:
@@ -137,7 +137,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return 2
-        decide, judged_by = clip_decide, _RATERS
+        decide, judged_by = clip_decide, _RATER
 
     try:
         report = run_bar(

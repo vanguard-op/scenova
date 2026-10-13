@@ -89,7 +89,7 @@ def _run(
         bar_by_id("NFR-050"),
         decide=decide or _decide(),
         producer=producer or _producer(),
-        judged_by="rubric only (pre-screen; raters required for the bar)",
+        judged_by="rubric only (pre-screen; a rater is required for the bar)",
         model_pin=PHRASE_PIN,
         items=_ITEMS,
         record=record,
@@ -178,9 +178,20 @@ def test_the_review_sheet_can_be_written_directly(tmp_path: Path) -> None:
 
 def test_load_ratings_reads_a_json_object(tmp_path: Path) -> None:
     path = tmp_path / "ratings.json"
-    path.write_text(json.dumps({"key|noun|opens a lock": True}), encoding="utf-8")
+    path.write_text(
+        json.dumps(
+            {
+                "key|noun|opens a lock": True,
+                "door|noun|enters a room": {"rater": False, "adjudicator": True},
+            }
+        ),
+        encoding="utf-8",
+    )
 
-    assert load_ratings(path) == {"key|noun|opens a lock": True}
+    ratings = load_ratings(path)
+
+    assert ratings["key|noun|opens a lock"] is True
+    assert ratings["door|noun|enters a room"] == {"rater": False, "adjudicator": True}
 
 
 def test_load_ratings_rejects_a_non_object(tmp_path: Path) -> None:

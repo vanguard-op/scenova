@@ -8,10 +8,13 @@ judgement. A run never invents a rater: with no ratings a phrase item is judged
 on the mechanical rubric alone (a pre-screen, reported as such), and a clip item
 cannot be judged at all.
 
-Ratings follow `nfr.md`: two trained raters with a third as adjudicator. A rating
-is a boolean, or a mapping of rater votes that resolves to one verdict — the
-shared verdict when the raters agree, otherwise the adjudicator's. An unresolved
-or missing rating is a miss, never a silent pass.
+Ratings follow `nfr.md`: one trained rater judges each item against the rubric,
+and quality and model engineering re-judge every item the rater marks short of
+the rubric and a fixed sample of the rest. The bar is that single-rater
+measurement, and the adjudicated verdict is the one the run counts, so a rating
+is a boolean (the rater's verdict), or a `{"rater": bool, "adjudicator": bool}`
+mapping where the adjudicator has ruled. An unresolved or missing rating is a
+miss, never a silent pass.
 """
 
 from __future__ import annotations
@@ -51,25 +54,24 @@ def _flag(outcome: Mapping[str, object], field: str) -> bool:
 
 
 def resolve_rating(entry: object) -> Judgement:
-    """Resolve one item's rater entry to a verdict (two raters, one adjudicator)."""
+    """Resolve one item's rater entry to a verdict (one rater; adjudication wins).
+
+    The run counts the adjudicated verdict, so where the adjudicator has ruled
+    it overrides the rater; where none has, the single rater's verdict stands.
+    """
 
     if entry is None:
         return Judgement(False, "unrated")
     if isinstance(entry, bool):
         return Judgement(entry, None if entry else "rater rejected")
     if isinstance(entry, Mapping):
-        raw_votes = entry.get("raters")
-        votes = (
-            [vote for vote in raw_votes if isinstance(vote, bool)]
-            if isinstance(raw_votes, list)
-            else []
-        )
-        if votes and all(vote == votes[0] for vote in votes):
-            return Judgement(votes[0], None if votes[0] else "raters rejected")
         adjudicator = entry.get("adjudicator")
         if isinstance(adjudicator, bool):
             return Judgement(adjudicator, None if adjudicator else "adjudicator rejected")
-        return Judgement(False, "raters disagreed without an adjudicator")
+        rater = entry.get("rater")
+        if isinstance(rater, bool):
+            return Judgement(rater, None if rater else "rater rejected")
+        return Judgement(False, "no rater verdict")
     return Judgement(False, "unreadable rating")
 
 
