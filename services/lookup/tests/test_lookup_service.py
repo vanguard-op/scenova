@@ -25,6 +25,7 @@ from lookup.app.library import InMemoryLibrary, LibraryClip, LibraryEntry, Libra
 from lookup.app.models import CreateLookupRequest, Kind, LookupStatus, PartOfSpeech
 from lookup.app.service import (
     BEST_GUESS_NOTICE,
+    BEST_GUESS_SENSE_LABEL,
     GENERATION_FAILED_NOTICE,
     GENERATION_UNAVAILABLE_NOTICE,
     INVENTORY_UNAVAILABLE_NOTICE,
@@ -147,7 +148,11 @@ async def test_a_word_absent_from_the_inventory_keeps_the_word_and_flags_a_best_
     response = await _service().create_lookup(_request("zephyr"), "corr")
 
     assert response.normalisedLemma == "zephyr"
+    # The reader-facing signal is the notice, never the sense label (C-001
+    # revision 1): the label stays a plain human string.
     assert response.notice == BEST_GUESS_NOTICE
+    assert response.senses[0].senseLabel == BEST_GUESS_SENSE_LABEL
+    assert "guess" not in response.senses[0].senseLabel.casefold()
     assert response.senses[0].partOfSpeech == PartOfSpeech.OTHER
     assert response.senses[0].entryId is None
 

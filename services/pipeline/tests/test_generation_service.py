@@ -194,6 +194,35 @@ async def test_the_generation_budget_cap_stops_further_generation() -> None:
 
 
 @pytest.mark.asyncio
+async def test_the_generation_flag_off_stops_a_job_without_a_clip() -> None:
+    # release.md "Rollout Phases & Feature Flags": the enable_generation kill
+    # switch stops new generation, so the provider is never called and the job
+    # ends without a clip for the caller to show as the fallback.
+    test_rig = rig(enable_generation=False)
+    await test_rig.service.submit(request())
+
+    job = await test_rig.service.run("job-1")
+
+    assert job.status == JobStatus.FAILED
+    assert job.cost_units == 0.0
+    assert test_rig.generator.calls == []
+    assert test_rig.library.all() == ()
+    assert test_rig.notifier.ready == []
+
+
+@pytest.mark.asyncio
+async def test_a_disabled_generation_still_accepts_the_enqueue() -> None:
+    # The reader is never blocked: the enqueue is accepted (C-003 202) so the
+    # lookup still returns the word and phrase while the job stops without a clip.
+    test_rig = rig(enable_generation=False)
+
+    response = await test_rig.service.submit(request())
+
+    assert response.status == "queued"
+    assert (await test_rig.service.get_status("job-1")).status == JobStatus.QUEUED
+
+
+@pytest.mark.asyncio
 async def test_running_an_unknown_job_is_an_invalid_request() -> None:
     with pytest.raises(InvalidRequestError):
         await rig().service.run("job-missing")

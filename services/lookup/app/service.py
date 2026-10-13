@@ -2,9 +2,9 @@
 
 FEAT-003 lives here. A word lookup reduces to its base form and returns the
 common senses; a word absent from the inventory keeps the word as the key and is
-flagged as a best guess; a two-to-six-word selection is routed to the phrase
-path; punctuation-only selections resolve empty; and an unavailable inventory
-falls back to the word as the key.
+told as a best guess through the `notice`; a two-to-six-word selection is routed
+to the phrase path; punctuation-only selections resolve empty; and an unavailable
+inventory falls back to the word as the key.
 
 FEAT-005 is wired here: a sense the library cannot serve is handed to the
 generation pipeline (C-003), so a later poll of the lookup (C-002) serves the
@@ -68,6 +68,11 @@ GENERATION_UNAVAILABLE_NOTICE = (
 )
 GENERATION_FAILED_NOTICE = "We couldn't make a clip for this one. Please try again."
 EMPTY_NOTICE = "There was nothing to look up in that selection."
+
+# The sense label shown for a word outside the sense inventory. It is a plain
+# human label and never a signal: the reader-facing best-guess advisory travels
+# in `notice` (C-001 revision 1), so the label stays readable copy.
+BEST_GUESS_SENSE_LABEL = "most likely meaning"
 
 # A phrase has no sense, but C-003 requires a sense label; this marks the job as
 # the phrase path.
@@ -399,7 +404,7 @@ def _word_status(consent: bool, senses: tuple[Sense, ...]) -> LookupStatus:
 def _best_guess_sense(token: str) -> SenseRecord:
     return SenseRecord(
         part_of_speech=PartOfSpeech.OTHER,
-        sense_label="best_guess",
+        sense_label=BEST_GUESS_SENSE_LABEL,
         gloss_phrase=token[:60],
         rank=0,
     )

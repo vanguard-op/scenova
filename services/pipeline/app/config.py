@@ -22,6 +22,12 @@ DEFAULT_MODEL_PORT = "8090"
 DEFAULT_MODEL_TIMEOUT_SECONDS = 120.0
 # Clips are capped at four seconds so they resolve within a reader's glance.
 CLIP_MAX_DURATION_SECONDS = 4.0
+# The `enable_generation` release flag (release.md "Rollout Phases & Feature
+# Flags"): the runtime kill switch that stops new generation while the shared
+# library and device history keep serving. It defaults on here so a missing
+# variable never silently disables the feature; every environment supplies its
+# rollout value (off until the phase rolls out) through `FLAG_ENABLE_GENERATION`.
+DEFAULT_ENABLE_GENERATION = True
 
 
 @dataclass(frozen=True)
@@ -35,6 +41,8 @@ class Settings:
     clip_max_duration_seconds: float = CLIP_MAX_DURATION_SECONDS
     # A generation-cost ceiling, in provider clip calls; 0 means no ceiling.
     generation_budget_units: float = 0.0
+    # The generation kill switch; when off, a job stops before any provider call.
+    enable_generation: bool = DEFAULT_ENABLE_GENERATION
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Settings:
@@ -52,6 +60,9 @@ class Settings:
                 source, "PIPELINE_MODEL_TIMEOUT_SECONDS", DEFAULT_MODEL_TIMEOUT_SECONDS
             ),
             generation_budget_units=_env_float(source, "PIPELINE_GENERATION_BUDGET_UNITS", 0.0),
+            enable_generation=_env_bool(
+                source, "FLAG_ENABLE_GENERATION", DEFAULT_ENABLE_GENERATION
+            ),
         )
 
 

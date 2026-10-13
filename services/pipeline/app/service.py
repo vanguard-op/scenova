@@ -6,8 +6,8 @@ library, and notifies the reader when the clip is ready. The reader is never
 blocked: `submit` enqueues and returns, and the job runs in the background.
 
 A decline, a timeout, an unavailable provider, a clip over the four-second cap,
-or an exhausted generation budget leaves no clip stored, so the caller shows the
-fallback.
+an exhausted generation budget, or the `enable_generation` kill switch being off
+leaves no clip stored, so the caller shows the fallback.
 """
 
 from __future__ import annotations
@@ -140,6 +140,13 @@ class GenerationService:
             raise InvalidRequestError("No generation job exists for this id.")
         running = replace(job, status=JobStatus.RUNNING)
         await self._queue.save(running)
+
+        if not self._settings.enable_generation:
+            # The kill switch is off: stop before any provider call, so the job
+            # ends without a clip and the reader's lookup resolves to the
+            # fallback (release.md "Rollout Phases & Feature Flags").
+            logger.info("generation is disabled; job %s stopped without a clip", running.id)
+            return await self._finish(running, JobStatus.FAILED, 0.0)
 
         if not await self._admit():
             return await self._finish(running, JobStatus.FAILED, 0.0)

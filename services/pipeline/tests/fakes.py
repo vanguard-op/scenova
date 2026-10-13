@@ -133,6 +133,7 @@ def rig(
     generator: FakeClipGenerator | None = None,
     queue: JobQueue | None = None,
     budget: float = 0.0,
+    enable_generation: bool = True,
 ) -> Rig:
     resolved_generator = generator if generator is not None else FakeClipGenerator()
     resolved_queue = queue if queue is not None else InMemoryJobQueue()
@@ -143,7 +144,7 @@ def rig(
         clip_generator=resolved_generator,
         library=library,
         notifier=notifier,
-        settings=Settings(generation_budget_units=budget),
+        settings=Settings(generation_budget_units=budget, enable_generation=enable_generation),
         spawner=NullSpawner(),
     )
     return Rig(
