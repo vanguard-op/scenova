@@ -62,6 +62,15 @@ class ScenovaServices {
     Entitlement entitlement = Entitlement.unmeteredGuest,
     List<HistoryEntry> history = const <HistoryEntry>[],
   }) {
+    // The live intakes carry reader input over the network, so the gateway must
+    // be reached over TLS (`NFR-022`). A build that points at a plaintext remote
+    // host fails here rather than on the wire.
+    final useLiveGateway =
+        !AppConfig.useMockLookupApi ||
+        !AppConfig.useMockAnalyticsApi ||
+        !AppConfig.useMockPushApi;
+    if (useLiveGateway) AppConfig.ensureSecureGateway(AppConfig.apiBaseUrl);
+
     // The identity the lookup path presents: an anonymous Firebase ID token in
     // production, and the gateway's pseudonymous dev token on a laptop
     // (`C-001`/`C-002` auth; D-011).

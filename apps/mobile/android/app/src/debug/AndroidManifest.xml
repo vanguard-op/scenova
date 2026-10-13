@@ -4,4 +4,10 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- The local stack the `Makefile` boots is served over plaintext, and the
+         emulator reaches it at 10.0.2.2. A debug build permits cleartext for
+         those hosts only; every other build keeps the platform default and
+         refuses cleartext, so reader input is never sent in the clear to a
+         remote gateway (NFR-022). -->
+    <application android:networkSecurityConfig="@xml/network_security_config" />
 </manifest>

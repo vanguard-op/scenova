@@ -4,34 +4,94 @@ import 'package:flutter/foundation.dart';
 ///
 /// Nothing here is a design value; design values live in `lib/theme/`.
 abstract final class AppConfig {
-  /// The gateway base URL.
-  static const String apiBaseUrl = String.fromEnvironment(
+  /// The gateway URL a build was configured with, or empty when it set none.
+  ///
+  /// A real environment supplies this with
+  /// `--dart-define=SCENOVA_API_BASE_URL=https://…`, and [apiBaseUrl] then uses
+  /// it unchanged.
+  static const String configuredApiBaseUrl = String.fromEnvironment(
     'SCENOVA_API_BASE_URL',
-    defaultValue: 'http://localhost:8080',
   );
 
-  /// The lookup endpoint is not live yet, so the app runs on scripted data that
-  /// speaks the frozen contract. Flip with `--dart-define=SCENOVA_USE_MOCK=false`.
+  /// The base URL the client sends reader input to.
+  ///
+  /// A configured [configuredApiBaseUrl] wins. Otherwise the default addresses
+  /// the local stack the `Makefile` boots, on the host that reaches the
+  /// reader's own machine: `localhost` from a desktop or the iOS simulator, and
+  /// the Android emulator's alias for the host's loopback (`10.0.2.2`), because
+  /// inside the emulator `localhost` names the emulator itself. That stack is
+  /// plaintext; [isSecureGateway] confines plaintext to hosts of this kind, so
+  /// a build pointed at a remote gateway still carries the reader's selection
+  /// over TLS (`NFR-022`).
+  static String get apiBaseUrl => configuredApiBaseUrl.isNotEmpty
+      ? configuredApiBaseUrl
+      : defaultTargetPlatform == TargetPlatform.android
+      ? 'http://10.0.2.2:8080'
+      : 'http://localhost:8080';
+
+  /// The lookup service (`C-001`/`C-002`).
+  ///
+  /// The app talks to the live stack by default. Scripted data that speaks the
+  /// same frozen contract is opt-in for the preview gallery and tests with
+  /// `--dart-define=SCENOVA_USE_MOCK=true`.
   static const bool useMockLookupApi = bool.fromEnvironment(
     'SCENOVA_USE_MOCK',
-    defaultValue: true,
+    defaultValue: false,
   );
 
-  /// The event intake is not live yet, so the app records events in memory
-  /// rather than posting them. Flip with
-  /// `--dart-define=SCENOVA_USE_MOCK_ANALYTICS=false`.
+  /// The event intake (`C-007`). Live by default; opt into the recording intake
+  /// with `--dart-define=SCENOVA_USE_MOCK_ANALYTICS=true`.
   static const bool useMockAnalyticsApi = bool.fromEnvironment(
     'SCENOVA_USE_MOCK_ANALYTICS',
-    defaultValue: true,
+    defaultValue: false,
   );
 
-  /// The push-registrations intake (`C-008`) is not live yet, so the app records
-  /// registrations in memory rather than posting them. Flip with
-  /// `--dart-define=SCENOVA_USE_MOCK_PUSH=false`.
+  /// The push-registrations intake (`C-008`). Live by default; opt into the
+  /// recording intake with `--dart-define=SCENOVA_USE_MOCK_PUSH=true`.
   static const bool useMockPushApi = bool.fromEnvironment(
     'SCENOVA_USE_MOCK_PUSH',
-    defaultValue: true,
+    defaultValue: false,
   );
+
+  /// The hosts that resolve to the developer's own machine, where the local
+  /// stack runs over plaintext. `10.0.2.2` is the Android emulator's alias for
+  /// the host's loopback interface, so it reaches the same machine as
+  /// `localhost` does from a desktop.
+  static const Set<String> _localDevelopmentHosts = <String>{
+    'localhost',
+    '127.0.0.1',
+    '::1',
+    '10.0.2.2',
+  };
+
+  /// Whether [url] may carry reader input — a lookup, an event batch, or a push
+  /// registration (`NFR-022`, no mixed content).
+  ///
+  /// `https` is always accepted. `http` is accepted only for a local
+  /// development host ([_localDevelopmentHosts]); every other plaintext host is
+  /// refused.
+  static bool isSecureGateway(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null || uri.host.isEmpty) return false;
+    return switch (uri.scheme) {
+      'https' => true,
+      'http' => _localDevelopmentHosts.contains(uri.host),
+      _ => false,
+    };
+  }
+
+  /// Refuses a gateway URL that would send reader input in the clear.
+  ///
+  /// Thrown at wiring time so a misconfigured build fails where the cause is
+  /// visible, rather than reaching the network unprotected.
+  static void ensureSecureGateway(String url) {
+    if (isSecureGateway(url)) return;
+    throw ArgumentError.value(
+      url,
+      'SCENOVA_API_BASE_URL',
+      'The live gateway must be reached over https (NFR-022).',
+    );
+  }
 
   /// The app version reported on every event (`C-007`, `appVersion`).
   ///
