@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'app_router.dart';
+import 'models/analytics_event.dart';
+import 'models/lookup.dart';
 import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/placeholder_screen.dart';
@@ -33,6 +37,8 @@ class _ScenovaAppState extends State<ScenovaApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _syncPlatformAccessibility();
     _listenForCaptures();
+    // The app is foregrounded at launch (`EVT-001`).
+    widget.services.analytics.appOpened(source: AppOpenSource.launch);
   }
 
   @override
@@ -48,12 +54,30 @@ class _ScenovaAppState extends State<ScenovaApp> with WidgetsBindingObserver {
   @override
   void didChangeAccessibilityFeatures() => _syncPlatformAccessibility();
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      widget.services.analytics.appOpened(source: AppOpenSource.resume);
+      unawaited(widget.services.analytics.flush());
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      // Deliver what has been recorded before the app may be stopped.
+      unawaited(widget.services.analytics.flush());
+    }
+  }
+
   void _listenForCaptures() {
     widget.services.captureChannel.selections.listen((selection) {
-      _router.openSelection(selection);
+      _router.openSelection(selection, source: _captureSource());
     });
     widget.services.captureChannel.start();
   }
+
+  /// Where a platform selection entered the app.
+  LookupSource _captureSource() =>
+      LookupPlatform.current() == LookupPlatform.android
+      ? LookupSource.androidAction
+      : LookupSource.iosExtension;
 
   void _syncPlatformAccessibility() {
     widget.services.settings.platformReduceMotion = WidgetsBinding

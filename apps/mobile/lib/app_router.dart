@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'models/analytics_event.dart';
 import 'screens/clip_controller.dart';
 import 'screens/clip_view_screen.dart';
 import 'services/app_services.dart';
@@ -45,7 +46,12 @@ class AppRouter {
   ClipViewController? get activeClip => _activeClip;
 
   /// Opens a selection from the entry field or a platform entry point.
-  Future<void> openSelection(CaptureSelection selection) async {
+  ///
+  /// [source] records where it entered the app, for `lookup_started`.
+  Future<void> openSelection(
+    CaptureSelection selection, {
+    LookupSource source = LookupSource.typed,
+  }) async {
     final navigator = navigatorKey.currentState;
     if (navigator == null) return;
 
@@ -71,6 +77,7 @@ class AppRouter {
     final controller = ClipViewController(
       services: services,
       selection: selection,
+      source: source,
     );
     _activeClip = controller;
     await navigator.push(

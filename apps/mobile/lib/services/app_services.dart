@@ -4,6 +4,8 @@ import '../config.dart';
 import '../models/entitlement.dart';
 import '../models/history_entry.dart';
 import '../models/lookup.dart';
+import 'analytics.dart';
+import 'analytics_api.dart';
 import 'capture_channel.dart';
 import 'connectivity.dart';
 import 'entitlement_provider.dart';
@@ -25,6 +27,7 @@ class ScenovaServices {
     required this.settings,
     required this.entitlements,
     required this.captureChannel,
+    required this.analytics,
     this.locale = 'en',
   });
 
@@ -38,6 +41,9 @@ class ScenovaServices {
   final SettingsController settings;
   final EntitlementProvider entitlements;
   final CaptureChannel captureChannel;
+
+  /// Emits the product's events (`C-007`).
+  final AnalyticsClient analytics;
 
   /// The reader's locale, sent with a lookup.
   final String locale;
@@ -56,6 +62,15 @@ class ScenovaServices {
         ? FirebaseIdentity()
         : AnonymousIdentity();
 
+    final connectivity = ManualConnectivity();
+    final settings = SettingsController(
+      onboardingComplete: !AppConfig.runOnboarding,
+      // A fresh install has not enabled the platform entry point yet, so
+      // Onboarding's enable step is shown; the platform sets this once the
+      // action or extension is on.
+      actionEnabled: false,
+    );
+
     return ScenovaServices(
       lookupApi: AppConfig.useMockLookupApi
           ? MockLookupApi(latency: AppConfig.mockLatency)
@@ -66,16 +81,23 @@ class ScenovaServices {
             ),
       identity: identity,
       historyStore: InMemoryHistoryStore(seed: history),
-      connectivity: ManualConnectivity(),
-      settings: SettingsController(
-        onboardingComplete: !AppConfig.runOnboarding,
-        // A fresh install has not enabled the platform entry point yet, so
-        // Onboarding's enable step is shown; the platform sets this once the
-        // action or extension is on.
-        actionEnabled: false,
-      ),
+      connectivity: connectivity,
+      settings: settings,
       entitlements: FixedEntitlementProvider(entitlement),
       captureChannel: CaptureChannel(),
+      analytics: AnalyticsClient(
+        api: AppConfig.useMockAnalyticsApi
+            ? MockAnalyticsApi()
+            : HttpAnalyticsApi(
+                baseUrl: AppConfig.apiBaseUrl,
+                idTokenProvider: identity.idToken,
+              ),
+        settings: settings,
+        connectivity: connectivity,
+        anonymousId: newAnalyticsId(),
+        appVersion: AppConfig.appVersion,
+        locale: locale,
+      ),
       locale: locale,
     );
   }
@@ -84,6 +106,7 @@ class ScenovaServices {
     connectivity.dispose();
     settings.dispose();
     captureChannel.dispose();
+    analytics.dispose();
   }
 }
 

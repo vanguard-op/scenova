@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/analytics_event.dart';
 import '../screens/clip_controller.dart';
 import '../screens/clip_view_screen.dart';
 import '../services/app_services.dart';
@@ -94,6 +95,7 @@ class _ClipExtensionAppState extends State<ClipExtensionApp>
       _controller = ClipViewController(
         services: widget.services,
         selection: selection,
+        source: LookupSource.iosExtension,
       );
     });
   }

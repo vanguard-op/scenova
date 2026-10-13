@@ -47,6 +47,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     // scope is safe to depend on.
     _controller ??= OnboardingController(
       settings: ScenovaScope.of(context).settings,
+      analytics: ScenovaScope.of(context).analytics,
     );
   }
 

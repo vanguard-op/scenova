@@ -13,6 +13,8 @@ import 'package:scenova/screens/clip_controller.dart';
 import 'package:scenova/screens/clip_view_screen.dart';
 import 'package:scenova/screens/home_screen.dart';
 import 'package:scenova/screens/onboarding_screen.dart';
+import 'package:scenova/services/analytics.dart';
+import 'package:scenova/services/analytics_api.dart';
 import 'package:scenova/services/app_services.dart';
 import 'package:scenova/services/capture_channel.dart';
 import 'package:scenova/services/capture_intake.dart';
@@ -314,14 +316,24 @@ ScenovaServices _services({
   Entitlement entitlement = Entitlement.unmeteredGuest,
   SettingsController? settings,
 }) {
+  final connectivity = ManualConnectivity(online: online);
+  final settingsController = settings ?? SettingsController();
   return ScenovaServices(
     lookupApi: api ?? MockLookupApi(),
     identity: AnonymousIdentity(subject: 'preview'),
     historyStore: InMemoryHistoryStore(seed: history),
-    connectivity: ManualConnectivity(online: online),
-    settings: settings ?? SettingsController(),
+    connectivity: connectivity,
+    settings: settingsController,
     entitlements: FixedEntitlementProvider(entitlement),
     captureChannel: CaptureChannel(),
+    analytics: AnalyticsClient(
+      api: MockAnalyticsApi(),
+      settings: settingsController,
+      connectivity: connectivity,
+      anonymousId: 'preview',
+      appVersion: 'preview',
+      locale: 'en-GB',
+    ),
     locale: 'en-GB',
   );
 }

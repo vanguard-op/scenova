@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/analytics_event.dart';
 import '../models/lookup.dart';
 import '../services/app_services.dart';
 import '../services/settings_controller.dart';
@@ -395,7 +396,13 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
                   icon: AppIcons.listen,
                   tooltip: settings.soundOn ? 'Mute' : 'Listen',
                   active: settings.soundOn,
-                  onPressed: () => settings.soundOn = !settings.soundOn,
+                  onPressed: () {
+                    settings.soundOn = !settings.soundOn;
+                    ScenovaScope.of(context).analytics.preferenceChanged(
+                      setting: AnalyticsSetting.sound,
+                      value: settings.soundOn,
+                    );
+                  },
                 ),
               ScenovaIconButton(
                 icon: AppIcons.helpful,
@@ -484,6 +491,7 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
 
   void _enableConsent() {
     _settings.consentModelProcessing = true;
+    ScenovaScope.of(context).analytics.consentChanged(consent: true);
     _controller.retry();
   }
 

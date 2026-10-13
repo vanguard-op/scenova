@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../config.dart';
+import '../models/analytics_event.dart';
 import '../models/entitlement.dart';
 import '../models/lookup.dart';
 import '../services/app_services.dart';
@@ -39,6 +40,7 @@ class ClipViewController extends ChangeNotifier {
   ClipViewController({
     required this.services,
     required CaptureSelection selection,
+    this.source = LookupSource.typed,
     Duration? pollInterval,
     Duration? noticeThreshold,
     Duration? pollTimeout,
@@ -50,6 +52,9 @@ class ClipViewController extends ChangeNotifier {
   }
 
   final ScenovaServices services;
+
+  /// Where this lookup entered the app, for `lookup_started`'s `source`.
+  final LookupSource source;
   final Duration _pollInterval;
   final Duration _noticeThreshold;
   final Duration _pollTimeout;
@@ -67,6 +72,7 @@ class ClipViewController extends ChangeNotifier {
   bool _playing = false;
   bool _willNotify = false;
   bool _noticeShown = false;
+  bool _fromHistory = false;
   FeedbackMark? _feedback;
 
   CaptureSelection get selection => _selection;
@@ -107,12 +113,16 @@ class ClipViewController extends ChangeNotifier {
       _noticeShown && _phase == ClipPhase.generating && !_willNotify;
 
   /// Loads the selection. Called on mount and on reuse.
-  Future<void> load() async {
+  ///
+  /// [announceStart] emits `lookup_started`; a retry of the same lookup passes
+  /// false so the funnel counts the lookup once.
+  Future<void> load({bool announceStart = true}) async {
     _cancelPoll();
     _playing = false;
     _feedback = null;
     _willNotify = false;
     _noticeShown = false;
+    _fromHistory = false;
     _errorMessage = null;
     _chosenSense = null;
     _result = null;
@@ -121,6 +131,13 @@ class ClipViewController extends ChangeNotifier {
     if (_selection.isEmpty) {
       _setPhase(ClipPhase.empty);
       return;
+    }
+
+    if (announceStart) {
+      services.analytics.lookupStarted(
+        kind: _selection.kind ?? LookupKind.word,
+        source: source,
+      );
     }
 
     _entitlement = await services.entitlements.current();
@@ -146,7 +163,7 @@ class ClipViewController extends ChangeNotifier {
     await load();
   }
 
-  Future<void> retry() => load();
+  Future<void> retry() => load(announceStart: false);
 
   /// The reader picked the sense that fits.
   void chooseSense(Sense sense) {
@@ -159,6 +176,7 @@ class ClipViewController extends ChangeNotifier {
   void togglePlay() {
     if (_phase != ClipPhase.playing) return;
     _playing = !_playing;
+    if (_playing) _trackClipPlayed();
     notifyListeners();
   }
 
@@ -170,6 +188,12 @@ class ClipViewController extends ChangeNotifier {
 
   void markFeedback(FeedbackMark mark) {
     _feedback = mark;
+    services.analytics.clipFeedbackGiven(
+      rating: mark == FeedbackMark.helpful
+          ? AnalyticsRating.helpful
+          : AnalyticsRating.notHelpful,
+      clipSource: _clipSource,
+    );
     notifyListeners();
   }
 
@@ -211,9 +235,19 @@ class ClipViewController extends ChangeNotifier {
   void _applyResult(LookupResult result) {
     _result = result;
 
+    // A served lookup whose sense carries a library entry is a library hit; the
+    // entry id is the join key the report uses.
+    if (result.status == LookupStatus.served) {
+      final entryId = result.playableSenses.isEmpty
+          ? null
+          : result.playableSenses.first.entryId;
+      if (entryId != null) services.analytics.lookupServed(entryId: entryId);
+    }
+
     // With the allowance spent the word and phrase still show; no clip is
     // generated until the allowance is restored.
     if (_entitlement.exhausted) {
+      services.analytics.allowanceExhausted(plan: _entitlement.tier.name);
       _setPhase(ClipPhase.allowanceExhausted);
       return;
     }
@@ -246,7 +280,24 @@ class ClipViewController extends ChangeNotifier {
   void _autoplayOrHold() {
     // Reduce motion holds the clip on a still frame and plays on tap.
     _playing = !services.settings.reduceMotion;
+    if (_playing) _trackClipPlayed();
     notifyListeners();
+  }
+
+  /// Records that a clip started playing (`EVT-010`). The source distinguishes
+  /// a library clip from a generated one, and a device replay from history.
+  void _trackClipPlayed() {
+    services.analytics.clipPlayed(
+      clipSource: _clipSource,
+      entryId: (_chosenSense ?? _firstSense)?.entryId,
+    );
+  }
+
+  /// Where the clip that would play came from.
+  ClipSource get _clipSource {
+    if (_fromHistory) return ClipSource.saved;
+    final entryId = (_chosenSense ?? _firstSense)?.entryId;
+    return entryId == null ? ClipSource.generated : ClipSource.library;
   }
 
   void _startPoll() {
@@ -297,6 +348,7 @@ class ClipViewController extends ChangeNotifier {
     final saved = await _savedClipFor(_selection.text);
     if (_disposed) return;
     if (saved != null) {
+      _fromHistory = true;
       _result = _placeholderResult(sense: saved);
       _chosenSense = _result!.senses.first;
       _setPhase(ClipPhase.playing);

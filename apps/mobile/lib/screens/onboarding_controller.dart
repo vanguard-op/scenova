@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../services/analytics.dart';
 import '../services/settings_controller.dart';
 
 /// How many steps setup has.
@@ -27,13 +28,17 @@ enum OnboardingPhase {
 /// Consent is the first capture of the reader's choice for model processing;
 /// the app opens on this screen until setup is marked complete.
 class OnboardingController extends ChangeNotifier {
-  OnboardingController({required SettingsController settings})
+  OnboardingController({required SettingsController settings, this.analytics})
     : _settings = settings {
     _actionEnabled = settings.actionEnabled;
     _consent = settings.consentModelProcessing;
   }
 
   final SettingsController _settings;
+
+  /// Emits setup events (`EVT-002`, `EVT-003`, `EVT-004`); absent in a bare
+  /// controller test.
+  final AnalyticsClient? analytics;
 
   bool _actionEnabled = false;
   bool _consent = true;
@@ -93,6 +98,8 @@ class OnboardingController extends ChangeNotifier {
     if (enabled) {
       _enablingAction = false;
       _showActionReminder = false;
+      // The entry point turned on for the first time this session (`EVT-003`).
+      analytics?.actionEnabled();
     }
     notifyListeners();
   }
@@ -111,6 +118,7 @@ class OnboardingController extends ChangeNotifier {
     if (_consent == value) return;
     _consent = value;
     _settings.consentModelProcessing = value;
+    analytics?.consentChanged(consent: value);
     notifyListeners();
   }
 
@@ -125,6 +133,11 @@ class OnboardingController extends ChangeNotifier {
     // made elsewhere in the session is the one that is stored.
     _settings.consentModelProcessing = _consent;
     _settings.onboardingComplete = true;
+
+    analytics?.onboardingCompleted(
+      actionEnabled: _actionEnabled,
+      consent: _consent,
+    );
 
     // The durable local store and, when the reader is signed in, attaching the
     // consent to the account are awaited here; both are immediate today.

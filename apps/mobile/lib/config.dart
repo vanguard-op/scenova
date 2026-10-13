@@ -17,6 +17,34 @@ abstract final class AppConfig {
     defaultValue: true,
   );
 
+  /// The event intake is not live yet, so the app records events in memory
+  /// rather than posting them. Flip with
+  /// `--dart-define=SCENOVA_USE_MOCK_ANALYTICS=false`.
+  static const bool useMockAnalyticsApi = bool.fromEnvironment(
+    'SCENOVA_USE_MOCK_ANALYTICS',
+    defaultValue: true,
+  );
+
+  /// The app version reported on every event (`C-007`, `appVersion`).
+  ///
+  /// It mirrors the build's version; wiring it to the platform's package info is
+  /// a later seam.
+  static const String appVersion = String.fromEnvironment(
+    'SCENOVA_APP_VERSION',
+    defaultValue: '1.0.0+1',
+  );
+
+  /// The contract's batch cap for the event intake (`C-007`, at most fifty).
+  static const int analyticsBatchSize = 50;
+
+  /// How many queued events trigger a send, so a busy session does not hold
+  /// events until it backgrounds.
+  static const int analyticsFlushThreshold = 20;
+
+  /// A bound on the offline queue, so a long offline stretch cannot grow it
+  /// without limit. This is backpressure, not sampling.
+  static const int analyticsQueueLimit = 500;
+
   /// How the lookup path authenticates (`C-001`/`C-002` auth).
   ///
   /// `dev` presents the pseudonymous `dev:<subject>` token the gateway's own
