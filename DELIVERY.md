@@ -1,7 +1,7 @@
 # DELIVERY — Scenova
 
 ## Source of Truth
-`docs/Scenova/` (BPRD), a nested git repo. Content revision `b4859110fe5a`; docs commit `45896c8410cb`. Read-only for the squad; `product-shaper` is the only writer. The roadmap owns the build order.
+`docs/Scenova/` (BPRD), a git submodule of `vanguard-op/scenova-docs`. Content revision `b4859110fe5a`; submodule pinned at `45896c8410cb`. Read-only for the squad; `product-shaper` is the only writer. The roadmap owns the build order. The lead is the only agent who runs git against the submodule: commit and push `product-shaper`'s changes to the docs repo, then stage the pointer bump in the same commit as the code built against it, and never leave the parent pointing at an unpushed docs commit.
 
 ## Team & File Ownership
 | Owner | Owns |
@@ -60,6 +60,7 @@ docs/           BPRD (product-shaper)
 ## Conventions
 - Commit messages cite durable IDs only (`FEAT-###`, `C-###`); never a task ID, a route filename, or a `.delivery/` path.
 - Engineers commit to the shared dev branch; the lead merges to `main` only at a green phase gate.
+- `docs/` is a submodule: docs changes are committed and pushed to `vanguard-op/scenova-docs`, and the pointer bump is staged in the same commit as the code built against it.
 - Engineers own unit tests; QA owns integration and acceptance tests and the model quality-bar evaluation, and runs at the phase gate.
 - Contracts are frozen in `CONTRACTS.md`; a change is a revision that re-dispatches both sides.
 - Dart: `dart format` and `flutter analyze` clean. Python: `ruff` + `black`, typed.
@@ -106,6 +107,11 @@ docs/           BPRD (product-shaper)
 | T-060 | FEAT-001, FEAT-002, FEAT-008 | frontend-engineer | Done | C-001, C-002, C-007, C-008 |
 | T-061 | FEAT-005, FEAT-006 | ai-engineer | Done | C-005, C-009 |
 | T-062 | FEAT-008 | frontend-engineer | Done | C-001, C-002 |
+| T-063 | FEAT-001, FEAT-002, FEAT-008 | frontend-engineer | Done | C-001, C-002, C-008 |
+| T-064 | FEAT-008 | frontend-engineer | In Progress | C-001, C-002 |
+| T-065 | FEAT-007 | backend-engineer | Done | C-003, C-005 |
+| T-066 | — | infra-engineer | Done | — |
+| T-067 | FEAT-007 | qa-engineer | In Progress | C-003, C-005 |
 
 ## Decisions Log
 | # | Decision | Rationale | By |
