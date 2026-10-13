@@ -16,6 +16,7 @@ import 'package:scenova/services/capture_channel.dart';
 import 'package:scenova/services/connectivity.dart';
 import 'package:scenova/services/entitlement_provider.dart';
 import 'package:scenova/services/history_store.dart';
+import 'package:scenova/services/identity.dart';
 import 'package:scenova/services/lookup_api.dart';
 import 'package:scenova/services/settings_controller.dart';
 import 'package:scenova/theme/app_theme.dart';
@@ -29,10 +30,12 @@ ScenovaServices buildServices({
   bool online = true,
   SettingsController? settings,
   Entitlement entitlement = Entitlement.unmeteredGuest,
+  IdentityProvider? identity,
   String locale = 'en',
 }) {
   return ScenovaServices(
     lookupApi: api ?? MockLookupApi(),
+    identity: identity ?? AnonymousIdentity(),
     historyStore: history ?? InMemoryHistoryStore(),
     connectivity: ManualConnectivity(online: online),
     settings: settings ?? SettingsController(),

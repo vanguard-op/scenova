@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 /// Build-time configuration and product timings.
 ///
 /// Nothing here is a design value; design values live in `lib/theme/`.
@@ -14,6 +16,20 @@ abstract final class AppConfig {
     'SCENOVA_USE_MOCK',
     defaultValue: true,
   );
+
+  /// How the lookup path authenticates (`C-001`/`C-002` auth).
+  ///
+  /// `dev` presents the pseudonymous `dev:<subject>` token the gateway's own
+  /// verifier accepts outside production; `firebase` presents an anonymous
+  /// Firebase ID token, upgraded to the reader's account at sign-in (D-011).
+  /// A release build defaults to Firebase; a debug build to the local verifier,
+  /// so the live path is authenticated on a laptop before a Firebase project is
+  /// wired to the client.
+  static const String authMode = String.fromEnvironment('SCENOVA_AUTH_MODE');
+
+  /// Whether the lookup path authenticates through Firebase.
+  static bool get useFirebaseAuth =>
+      authMode == 'firebase' || (authMode.isEmpty && kReleaseMode);
 
   /// The wait after which the reader is told a clip is still being made and
   /// offered a notification when it is ready.

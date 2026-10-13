@@ -92,7 +92,15 @@ class HttpLookupApi implements LookupApi {
   Uri _uri(String path) => Uri.parse('$baseUrl$path');
 
   Future<Map<String, String>> _headers() async {
-    final token = await idTokenProvider();
+    String? token;
+    try {
+      token = await idTokenProvider();
+    } on Object {
+      // The identity could not be established. The request goes out without a
+      // token and the gateway refuses it as unauthenticated (`C-001`/`C-002`,
+      // 401), rather than the failure reading as the device being offline.
+      token = null;
+    }
     return <String, String>{
       'content-type': 'application/json',
       'accept': 'application/json',

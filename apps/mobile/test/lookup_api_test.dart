@@ -269,6 +269,36 @@ void main() {
         ),
       );
     });
+
+    test(
+      'refuses the lookup when the identity cannot be established',
+      () async {
+        late http.Request captured;
+        final api = HttpLookupApi(
+          baseUrl: 'https://gateway.scenova.app',
+          idTokenProvider: () async => throw StateError('no identity'),
+          localeProvider: () => 'en',
+          client: MockClient((request) async {
+            captured = request;
+            return http.Response('{}', 401);
+          }),
+        );
+
+        await expectLater(
+          api.createLookup(request),
+          // An identity failure reads as unauthenticated, never as offline, and
+          // no request goes out with a forged or stale token.
+          throwsA(
+            isA<LookupApiException>().having(
+              (e) => e.isUnauthenticated,
+              'isUnauthenticated',
+              isTrue,
+            ),
+          ),
+        );
+        expect(captured.headers.containsKey('authorization'), isFalse);
+      },
+    );
   });
 
   group('MockLookupApi', () {

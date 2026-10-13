@@ -19,6 +19,7 @@ import 'package:scenova/services/capture_intake.dart';
 import 'package:scenova/services/connectivity.dart';
 import 'package:scenova/services/entitlement_provider.dart';
 import 'package:scenova/services/history_store.dart';
+import 'package:scenova/services/identity.dart';
 import 'package:scenova/services/lookup_api.dart';
 import 'package:scenova/services/settings_controller.dart';
 import 'package:scenova/theme/app_theme.dart';
@@ -315,6 +316,7 @@ ScenovaServices _services({
 }) {
   return ScenovaServices(
     lookupApi: api ?? MockLookupApi(),
+    identity: AnonymousIdentity(subject: 'preview'),
     historyStore: InMemoryHistoryStore(seed: history),
     connectivity: ManualConnectivity(online: online),
     settings: settings ?? SettingsController(),

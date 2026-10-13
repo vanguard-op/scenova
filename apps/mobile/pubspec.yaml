@@ -41,6 +41,11 @@ dependencies:
   # Renders the custom icon set and the brand mark from the SVG assets.
   flutter_svg: ^2.3.0
 
+  # Authenticates the lookup path (C-001/C-002 auth): an anonymous ID token
+  # before accounts ship, upgraded to the reader's account at sign-in.
+  firebase_core: ^4.15.0
+  firebase_auth: ^6.7.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -8,6 +8,7 @@ import 'capture_channel.dart';
 import 'connectivity.dart';
 import 'entitlement_provider.dart';
 import 'history_store.dart';
+import 'identity.dart';
 import 'lookup_api.dart';
 import 'settings_controller.dart';
 
@@ -18,6 +19,7 @@ import 'settings_controller.dart';
 class ScenovaServices {
   ScenovaServices({
     required this.lookupApi,
+    required this.identity,
     required this.historyStore,
     required this.connectivity,
     required this.settings,
@@ -27,6 +29,10 @@ class ScenovaServices {
   });
 
   final LookupApi lookupApi;
+
+  /// The reader's identity, presented on every lookup (`C-001`/`C-002` auth).
+  final IdentityProvider identity;
+
   final HistoryStore historyStore;
   final ConnectivityMonitor connectivity;
   final SettingsController settings;
@@ -43,14 +49,22 @@ class ScenovaServices {
     Entitlement entitlement = Entitlement.unmeteredGuest,
     List<HistoryEntry> history = const <HistoryEntry>[],
   }) {
+    // The identity the lookup path presents: an anonymous Firebase ID token in
+    // production, and the gateway's pseudonymous dev token on a laptop
+    // (`C-001`/`C-002` auth; D-011).
+    final identity = AppConfig.useFirebaseAuth
+        ? FirebaseIdentity()
+        : AnonymousIdentity();
+
     return ScenovaServices(
       lookupApi: AppConfig.useMockLookupApi
           ? MockLookupApi(latency: AppConfig.mockLatency)
           : HttpLookupApi(
               baseUrl: AppConfig.apiBaseUrl,
-              idTokenProvider: () async => null,
+              idTokenProvider: identity.idToken,
               localeProvider: () => locale,
             ),
+      identity: identity,
       historyStore: InMemoryHistoryStore(seed: history),
       connectivity: ManualConnectivity(),
       settings: SettingsController(
