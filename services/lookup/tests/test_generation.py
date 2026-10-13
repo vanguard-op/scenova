@@ -73,6 +73,37 @@ async def test_a_queued_job_posts_the_contract_fields() -> None:
 
 
 @pytest.mark.asyncio
+async def test_a_word_job_serialises_a_null_phrase() -> None:
+    # A word job carries no phrase (C-003): the pipeline generates the gloss
+    # phrase via C-004, so the field must go out as an explicit null.
+    seen: dict[str, object] = {}
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen["body"] = json.loads(request.content)
+        return httpx2.Response(202, json={"jobId": "gen_abc", "status": "queued"})
+
+    client = _client(handler)
+    await client.enqueue(
+        GenerationJob(
+            job_id="gen_abc",
+            lookup_id="lk_1",
+            kind=Kind.WORD,
+            lemma="key",
+            phrase=None,
+            sense_label="door_opener",
+            part_of_speech=PartOfSpeech.NOUN,
+            target_duration_seconds=4.0,
+            model_pin="gemini-omni-1.1-flash",
+        )
+    )
+
+    body = seen["body"]
+    assert isinstance(body, dict)
+    assert body["phrase"] is None
+    await client.aclose()
+
+
+@pytest.mark.asyncio
 async def test_an_already_enqueued_job_is_reported() -> None:
     client = _client(lambda _request: httpx2.Response(409, json={"code": "conflict"}))
 

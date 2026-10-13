@@ -1,13 +1,17 @@
-"""Generation orchestration: enqueue a job, produce a clip, store it (FEAT-005).
+"""Generation orchestration: enqueue a job, produce a clip, store it (FEAT-004, FEAT-005).
 
-A job carries the gloss phrase and the library key for a word sense. The service
-calls the model-serving clip endpoint (C-005), writes a word clip to the shared
-library, and notifies the reader when the clip is ready. The reader is never
-blocked: `submit` enqueues and returns, and the job runs in the background.
+A word job arrives without a gloss phrase, so the service first asks the model
+layer for one (C-004) and generates the clip from it; a phrase job carries its
+selection and skips that step. It then calls the model-serving clip endpoint
+(C-005), writes a word clip to the shared library, and notifies the reader when
+the clip is ready. The reader is never blocked: `submit` enqueues and returns,
+and the job runs in the background.
 
 A decline, a timeout, an unavailable provider, a clip over the four-second cap,
 an exhausted generation budget, or the `enable_generation` kill switch being off
-leaves no clip stored, so the caller shows the fallback.
+leaves no clip stored, so the caller shows the fallback. The phrase step never
+fails the job: the model layer's own fallback arrives as a normal result, and an
+unreachable model layer is substituted with the fixed template.
 
 Every job records the two pinned models the generation path depends on: the text
 model that produced the gloss phrase and the video model the clip is generated
@@ -68,6 +72,12 @@ from .models import (
     Kind,
 )
 from .notifier import LoggingNotifier, Notifier
+from .phrase_client import (
+    HttpPhraseClient,
+    PhraseGenerator,
+    PhraseUnavailableError,
+)
+from .phrase_fallback import fallback_phrase
 from .pins import ModelPins
 from .queue import InMemoryJobQueue, JobQueue
 
@@ -106,6 +116,7 @@ class GenerationService:
         self,
         *,
         queue: JobQueue,
+        phrase_generator: PhraseGenerator,
         clip_generator: ClipGenerator,
         library: LibraryWriter,
         notifier: Notifier,
@@ -115,6 +126,7 @@ class GenerationService:
         clock: Clock | None = None,
     ) -> None:
         self._queue = queue
+        self._phrase_generator = phrase_generator
         self._clip_generator = clip_generator
         self._library = library
         self._notifier = notifier
@@ -134,12 +146,15 @@ class GenerationService:
 
         The caller derives a stable jobId for a missing word, so two concurrent
         lookups for the same word collide on it and share one generation (C-003
-        409 on a repeated jobId).
+        409 on a repeated jobId). A phrase job must carry its selection; a word
+        job leaves the phrase null and the pipeline generates it (C-004).
         """
 
-        phrase = request.phrase.strip()
+        phrase = None if request.phrase is None else request.phrase.strip()
         if phrase == "":
             raise MissingPhraseError("The job carried no phrase to generate from.")
+        if request.kind is Kind.PHRASE and phrase is None:
+            raise MissingPhraseError("A phrase job needs a phrase to generate from.")
         duration = request.targetDurationSeconds
         if duration <= 0 or duration > self._settings.clip_max_duration_seconds:
             raise TargetDurationError(
@@ -203,9 +218,14 @@ class GenerationService:
             )
         )
 
+        # A word job has no phrase yet, so the gloss phrase is generated first;
+        # the phrase step never fails the job (C-004).
+        phrase = await self._resolve_phrase(running)
+        running = replace(running, phrase=phrase)
+
         try:
             clip = await self._clip_generator.generate(
-                phrase=running.phrase,
+                phrase=phrase,
                 target_duration_seconds=running.target_duration_seconds,
                 model_pin=running.clip_model,
             )
@@ -229,13 +249,14 @@ class GenerationService:
             )
 
         if running.kind is Kind.WORD:
-            await self._store_word_clip(running, clip)
+            await self._store_word_clip(running, clip, phrase)
         await self._notifier.clip_ready(lookup_id=running.lookup_id, job_id=running.id, clip=clip)
         return await self._succeed(running, clip, started_at)
 
     async def aclose(self) -> None:
-        """Release the model client's connections."""
+        """Release the model clients' connections."""
 
+        await self._phrase_generator.aclose()
         await self._clip_generator.aclose()
 
     async def get_status(self, job_id: str) -> JobStatusResponse:
@@ -251,6 +272,43 @@ class GenerationService:
             raise JobNotFoundError("No generation job exists for this id.")
         return JobStatusResponse(jobId=job.id, lookupId=job.lookup_id, status=job.status)
 
+    async def _resolve_phrase(self, job: GenerationJob) -> str:
+        """The phrase the clip is generated from: the job's own, or a C-004 gloss.
+
+        A word job arrives without a phrase, so the pipeline asks the model layer
+        for one. The model layer's own fallback is a normal result, so only
+        unavailability leaves it as an error — and C-004 leaves the substitution
+        to the caller, so the pipeline substitutes the fixed template rather than
+        dropping the reader to a lookup with no phrase.
+        """
+
+        if job.phrase is not None:
+            return job.phrase
+
+        try:
+            result = await self._phrase_generator.generate(
+                lemma=job.lemma,
+                part_of_speech=job.part_of_speech.value,
+                sense_hint=job.sense_label,
+                model_pin=self._pins.phrase.version,
+            )
+        except PhraseUnavailableError:
+            logger.info("phrase model unavailable; substituting the fallback (job %s)", job.id)
+            return self._fallback_phrase(job)
+
+        phrase = result.phrase.strip()
+        if phrase == "":
+            logger.info("phrase model returned no usable phrase (job %s)", job.id)
+            return self._fallback_phrase(job)
+        return phrase
+
+    def _fallback_phrase(self, job: GenerationJob) -> str:
+        return fallback_phrase(
+            lemma=job.lemma,
+            sense_hint=job.sense_label,
+            part_of_speech=job.part_of_speech.value,
+        )
+
     async def _admit(self) -> bool:
         """Reserve one clip call against the generation budget, if one is set."""
 
@@ -261,7 +319,7 @@ class GenerationService:
             self._cost_units += COST_UNITS_PER_CLIP
             return True
 
-    async def _store_word_clip(self, job: GenerationJob, clip: ClipResult) -> None:
+    async def _store_word_clip(self, job: GenerationJob, clip: ClipResult, phrase: str) -> None:
         now = _now()
         asset = ClipAsset(
             id=clip.clip_id,
@@ -275,10 +333,10 @@ class GenerationService:
         )
         entry = LibraryEntry(
             id=f"le_{uuid4().hex}",
-            lemma=job.lemma or job.phrase,
+            lemma=job.lemma or phrase,
             part_of_speech=job.part_of_speech,
             sense_label=job.sense_label,
-            gloss_phrase=job.phrase,
+            gloss_phrase=phrase,
             clip_asset_id=asset.id,
             status="active",
             source="generated",
@@ -356,6 +414,11 @@ def build_default_service(settings: Settings) -> GenerationService:
 
     return GenerationService(
         queue=InMemoryJobQueue(),
+        phrase_generator=HttpPhraseClient(
+            base_url=settings.model_base_url,
+            internal_audience=settings.internal_audience,
+            timeout_seconds=settings.phrase_timeout_seconds,
+        ),
         clip_generator=HttpClipClient(
             base_url=settings.model_base_url,
             internal_audience=settings.internal_audience,

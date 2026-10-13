@@ -290,7 +290,9 @@ async def test_a_missing_word_sense_is_handed_to_the_generation_pipeline() -> No
     assert job.lemma == "come"
     assert job.sense_label == "arrive"
     assert job.part_of_speech == PartOfSpeech.VERB
-    assert job.phrase == "to move toward or reach a place"
+    # A word job leaves the phrase null: the pipeline generates the gloss phrase
+    # via C-004 (C-003).
+    assert job.phrase is None
     assert job.target_duration_seconds == 4.0
     assert job.model_pin == "gemini-omni-1.1-flash"
 

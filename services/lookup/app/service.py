@@ -377,13 +377,15 @@ def _word_jobs(
     model_pin: str,
     target_duration: float,
 ) -> list[GenerationJob]:
+    # A word job leaves the phrase null: the pipeline generates the gloss phrase
+    # from the word, its part of speech, and the sense hint (C-003, C-004).
     return [
         GenerationJob(
             job_id=word_job_id(lemma, record.sense_label, record.part_of_speech),
             lookup_id=lookup_id,
             kind=Kind.WORD,
             lemma=lemma,
-            phrase=record.gloss_phrase,
+            phrase=None,
             sense_label=record.sense_label,
             part_of_speech=record.part_of_speech,
             target_duration_seconds=target_duration,

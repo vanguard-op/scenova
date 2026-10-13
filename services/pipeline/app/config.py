@@ -30,6 +30,10 @@ DEFAULT_PINNED_AT = "2026-10-12T00:00:00+00:00"
 # Clip generation is a long-running job (NFR-003, NFR-004), so the internal
 # client waits far longer than the lookup path does.
 DEFAULT_MODEL_TIMEOUT_SECONDS = 120.0
+# The gloss phrase is a short text call. The model layer bounds it with its own
+# request timeout and answers with its fallback, so the pipeline's outer wait is
+# a little longer than that rather than the clip's long wait.
+DEFAULT_PHRASE_TIMEOUT_SECONDS = 40.0
 # Clips are capped at four seconds so they resolve within a reader's glance.
 CLIP_MAX_DURATION_SECONDS = 4.0
 # The `enable_generation` release flag (release.md "Rollout Phases & Feature
@@ -49,6 +53,7 @@ class Settings:
     require_internal_auth: bool = True
     model_base_url: str = f"http://127.0.0.1:{DEFAULT_MODEL_PORT}"
     model_timeout_seconds: float = DEFAULT_MODEL_TIMEOUT_SECONDS
+    phrase_timeout_seconds: float = DEFAULT_PHRASE_TIMEOUT_SECONDS
     clip_max_duration_seconds: float = CLIP_MAX_DURATION_SECONDS
     # The two pinned model versions the generation path records on every job.
     phrase_model_pin: str = PHRASE_MODEL_PIN
@@ -77,6 +82,9 @@ class Settings:
             model_base_url=model_base_url,
             model_timeout_seconds=_env_float(
                 source, "PIPELINE_MODEL_TIMEOUT_SECONDS", DEFAULT_MODEL_TIMEOUT_SECONDS
+            ),
+            phrase_timeout_seconds=_env_float(
+                source, "PIPELINE_PHRASE_TIMEOUT_SECONDS", DEFAULT_PHRASE_TIMEOUT_SECONDS
             ),
             phrase_model_pin=_env_str(source, "PHRASE_MODEL_PIN", PHRASE_MODEL_PIN),
             clip_model_pin=_env_str(source, "CLIP_MODEL_PIN", CLIP_MODEL_PIN),

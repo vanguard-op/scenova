@@ -57,7 +57,10 @@ class GenerationJob:
     lookup_id: str
     kind: Kind
     lemma: str | None
-    phrase: str
+    # The gloss phrase the clip is generated from. A word job arrives without one
+    # and the service fills it from C-004 before the clip step; a phrase job
+    # carries its selection here.
+    phrase: str | None
     sense_label: str
     part_of_speech: PartOfSpeech
     target_duration_seconds: float

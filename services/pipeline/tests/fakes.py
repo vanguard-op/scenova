@@ -1,7 +1,8 @@
 """Shared test doubles for the pipeline tests.
 
-A fake clip generator, a recording notifier, a spawner that drops the background
-run, and a rig that wires the service the same way the app does.
+A fake phrase generator, a fake clip generator, a recording notifier, a spawner
+that drops the background run, and a rig that wires the service the same way the
+app does.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from pipeline.app.events import GenerationEvent
 from pipeline.app.jobs import GenerationJob
 from pipeline.app.library import InMemoryLibraryWriter
 from pipeline.app.models import CreateJobRequest, Kind, PartOfSpeech
+from pipeline.app.phrase_client import PhraseResult
 from pipeline.app.queue import InMemoryJobQueue, JobQueue
 from pipeline.app.service import Clock, GenerationService
 
@@ -30,6 +32,45 @@ class _Call:
     phrase: str
     target_duration_seconds: float
     model_pin: str
+
+
+@dataclass
+class _PhraseCall:
+    """The arguments the fake phrase generator was called with."""
+
+    lemma: str | None
+    part_of_speech: str
+    sense_hint: str
+    model_pin: str
+
+
+class FakePhraseGenerator:
+    """A phrase generator that returns a fixed phrase or raises a fixed error."""
+
+    def __init__(
+        self,
+        result: PhraseResult | None = None,
+        error: Exception | None = None,
+    ) -> None:
+        self.result = result if result is not None else phrase()
+        self.error = error
+        self.calls: list[_PhraseCall] = []
+
+    async def generate(
+        self,
+        *,
+        lemma: str | None,
+        part_of_speech: str,
+        sense_hint: str,
+        model_pin: str,
+    ) -> PhraseResult:
+        self.calls.append(_PhraseCall(lemma, part_of_speech, sense_hint, model_pin))
+        if self.error is not None:
+            raise self.error
+        return self.result
+
+    async def aclose(self) -> None:
+        return None
 
 
 class FakeClipGenerator:
@@ -112,11 +153,24 @@ class Rig:
     """The service under test with the doubles it was built from."""
 
     service: GenerationService
+    phrases: FakePhraseGenerator
     generator: FakeClipGenerator
     library: InMemoryLibraryWriter
     notifier: RecordingNotifier
     queue: JobQueue
     events: RecordingEmitter
+
+
+def phrase(text: str = "a key in the door") -> PhraseResult:
+    """A generated phrase, as C-004 returns on a good call."""
+
+    return PhraseResult(phrase=text, source="generated", best_guess=False)
+
+
+def fallback_phrase_result(text: str = "a key") -> PhraseResult:
+    """The model layer's own fallback, as C-004 returns it on a refusal."""
+
+    return PhraseResult(phrase=text, source="fallback", best_guess=True)
 
 
 def clip(duration_seconds: float = 3.0) -> ClipResult:
@@ -134,7 +188,7 @@ def clip(duration_seconds: float = 3.0) -> ClipResult:
 def request(
     job_id: str = "job-1",
     *,
-    phrase: str = "a key in the door",
+    phrase: str | None = "a key in the door",
     kind: Kind = Kind.WORD,
     lemma: str | None = "key",
     sense_label: str = "door_opener",
@@ -160,18 +214,21 @@ def request(
 def rig(
     *,
     generator: FakeClipGenerator | None = None,
+    phrase_generator: FakePhraseGenerator | None = None,
     queue: JobQueue | None = None,
     budget: float = 0.0,
     enable_generation: bool = True,
     clock: Clock | None = None,
 ) -> Rig:
     resolved_generator = generator if generator is not None else FakeClipGenerator()
+    resolved_phrases = phrase_generator if phrase_generator is not None else FakePhraseGenerator()
     resolved_queue = queue if queue is not None else InMemoryJobQueue()
     library = InMemoryLibraryWriter()
     notifier = RecordingNotifier()
     events = RecordingEmitter()
     service = GenerationService(
         queue=resolved_queue,
+        phrase_generator=resolved_phrases,
         clip_generator=resolved_generator,
         library=library,
         notifier=notifier,
@@ -182,6 +239,7 @@ def rig(
     )
     return Rig(
         service=service,
+        phrases=resolved_phrases,
         generator=resolved_generator,
         library=library,
         notifier=notifier,

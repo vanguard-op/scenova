@@ -4,7 +4,8 @@ On a library miss the lookup service hands generation to the pipeline: a missing
 word sense becomes a word job, and a short phrase becomes a phrase job. The
 pipeline enqueues the job and returns 202 at once, so the lookup path waits only
 for the hand-off — never for the clip — and the clip arrives asynchronously
-(NFR-002, NFR-003).
+(NFR-002, NFR-003). A word job carries no phrase, because the pipeline generates
+the gloss phrase itself (C-004); a phrase job carries its selection.
 
 Two lookups for the same missing word must share one generation, so a word job's
 id is derived from the library key (lemma, sense, part of speech) rather than
@@ -64,7 +65,9 @@ class GenerationJob:
     lookup_id: str
     kind: Kind
     lemma: str | None
-    phrase: str
+    # A phrase job carries its selection; a word job leaves it null and the
+    # pipeline generates the gloss phrase via C-004 (C-003).
+    phrase: str | None
     sense_label: str
     part_of_speech: PartOfSpeech
     target_duration_seconds: float

@@ -18,10 +18,14 @@ from pipeline.app.errors import (
     TargetDurationError,
 )
 from pipeline.app.models import JobStatus, Kind, PartOfSpeech
+from pipeline.app.phrase_client import PhraseUnavailableError
 from pipeline.tests.fakes import (
     FailingQueue,
     FakeClipGenerator,
+    FakePhraseGenerator,
     clip,
+    fallback_phrase_result,
+    phrase,
     request,
     rig,
 )
@@ -94,6 +98,81 @@ async def test_a_blank_phrase_is_rejected_before_any_generation() -> None:
 
     with pytest.raises(MissingPhraseError):
         await test_rig.service.submit(request(phrase="   "))
+
+    assert test_rig.generator.calls == []
+
+
+@pytest.mark.asyncio
+async def test_a_word_job_without_a_phrase_generates_one_via_c004() -> None:
+    # A word job arrives with a null phrase (C-003), so the pipeline asks the
+    # model layer for the gloss phrase and generates the clip from it.
+    test_rig = rig(phrase_generator=FakePhraseGenerator(phrase("a key in the door")))
+    await test_rig.service.submit(request(phrase=None, sense_label="door_opener"))
+
+    job = await test_rig.service.run("job-1")
+
+    assert job.status == JobStatus.SUCCEEDED
+    assert job.phrase == "a key in the door"
+    assert len(test_rig.phrases.calls) == 1
+    call = test_rig.phrases.calls[0]
+    assert call.lemma == "key"
+    assert call.part_of_speech == "noun"
+    assert call.sense_hint == "door_opener"
+    assert call.model_pin == "gemini-3.5-flash-lite"
+    assert test_rig.generator.calls[0].phrase == "a key in the door"
+    stored = test_rig.library.find("key", "door_opener", PartOfSpeech.NOUN)
+    assert stored is not None
+    assert stored.entry.gloss_phrase == "a key in the door"
+
+
+@pytest.mark.asyncio
+async def test_a_phrase_job_uses_its_selection_and_asks_for_no_phrase() -> None:
+    test_rig = rig()
+    await test_rig.service.submit(request(kind=Kind.PHRASE, lemma=None, phrase="kick the bucket"))
+
+    await test_rig.service.run("job-1")
+
+    assert test_rig.phrases.calls == []
+    assert test_rig.generator.calls[0].phrase == "kick the bucket"
+
+
+@pytest.mark.asyncio
+async def test_an_unreachable_phrase_model_is_substituted_with_the_fallback() -> None:
+    # C-004 leaves the substitution to the caller on 503, so the phrase step
+    # still hands the clip step a grammatical phrase rather than failing.
+    test_rig = rig(
+        phrase_generator=FakePhraseGenerator(error=PhraseUnavailableError("unavailable"))
+    )
+    await test_rig.service.submit(request(phrase=None, lemma="key"))
+
+    job = await test_rig.service.run("job-1")
+
+    assert job.status == JobStatus.SUCCEEDED
+    assert test_rig.generator.calls[0].phrase == "a key"
+    stored = test_rig.library.find("key", "door_opener", PartOfSpeech.NOUN)
+    assert stored is not None
+    assert stored.entry.gloss_phrase == "a key"
+
+
+@pytest.mark.asyncio
+async def test_the_model_layers_own_fallback_phrase_is_used() -> None:
+    # A refusal, a timeout, or an unusable phrase comes back as a normal 200 with
+    # source=fallback, so the pipeline carries that phrase through rather than
+    # substituting its own.
+    test_rig = rig(phrase_generator=FakePhraseGenerator(fallback_phrase_result("an ice")))
+    await test_rig.service.submit(request(phrase=None, lemma="ice", sense_label="frozen_water"))
+
+    await test_rig.service.run("job-1")
+
+    assert test_rig.generator.calls[0].phrase == "an ice"
+
+
+@pytest.mark.asyncio
+async def test_a_phrase_job_without_a_phrase_is_rejected() -> None:
+    test_rig = rig()
+
+    with pytest.raises(MissingPhraseError):
+        await test_rig.service.submit(request(kind=Kind.PHRASE, lemma=None, phrase=None))
 
     assert test_rig.generator.calls == []
 

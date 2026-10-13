@@ -51,7 +51,9 @@ class CreateJobRequest(BaseModel):
     lookupId: str
     kind: Kind
     lemma: str | None = None
-    phrase: str
+    # The selection for a phrase job; a word job leaves it null and the pipeline
+    # generates the phrase via C-004 before the clip step.
+    phrase: str | None = None
     senseLabel: str
     partOfSpeech: PartOfSpeech
     targetDurationSeconds: float

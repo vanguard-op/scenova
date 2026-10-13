@@ -72,6 +72,29 @@ def test_a_blank_phrase_is_a_bad_request() -> None:
     assert response.json()["code"] == "missing_phrase"
 
 
+def test_a_word_job_without_a_phrase_is_accepted() -> None:
+    # A word job leaves the phrase null and the pipeline generates it (C-003).
+    with _client(rig().service) as client:
+        response = client.post(
+            "/internal/generation-jobs", json=_payload(phrase=None), headers=_INTERNAL
+        )
+
+    assert response.status_code == 202
+    assert response.json() == {"jobId": "job-1", "status": "queued"}
+
+
+def test_a_phrase_job_without_a_phrase_is_a_bad_request() -> None:
+    with _client(rig().service) as client:
+        response = client.post(
+            "/internal/generation-jobs",
+            json=_payload(kind="phrase", lemma=None, phrase=None),
+            headers=_INTERNAL,
+        )
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "missing_phrase"
+
+
 def test_a_target_over_four_seconds_is_a_bad_request() -> None:
     with _client(rig().service) as client:
         response = client.post(
