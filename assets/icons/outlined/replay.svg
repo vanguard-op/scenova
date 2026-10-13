@@ -6,11 +6,11 @@
     <title>Replay</title>
     <g id="icon-replay-arc-icon-replay" data-name="Circular arc">
       <title>Circular arc</title>
-      <path d="M 15.75 5.5 A 7.5 7.5 0 1 1 8.25 5.5" fill="none" stroke="#504C5C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M 18.495 8.25 A 7.5 7.5 0 1 1 12 4.5" fill="none" stroke="#504C5C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
     </g>
     <g id="icon-replay-head-icon-replay" data-name="Arrowhead">
       <title>Arrowhead</title>
-      <path d="M 3.9 5.2 L 8.3 5.5 L 6.4 9.6" fill="none" stroke="#504C5C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M 9.395 2.315 L 12 4.5 L 9.395 6.685" fill="none" stroke="#504C5C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
     </g>
   </g>
 </svg>
