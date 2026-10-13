@@ -53,3 +53,10 @@ Auth: Firebase ID token in `Authorization` (anonymous before sign-in); rate-limi
 Request: events: [{ eventId: string, name: string (an EVT-### name), occurredAt: string (UTC ISO-8601), anonymousId: string, sessionId: string, platform: android|ios, appVersion: string, locale: string, properties: object }] (batch, at most 50)
 Response 202: accepted: integer
 Errors: 400 (unknown event name; a property carrying personal data), 401 (missing or invalid token), 429 (rate limited)
+
+### C-008: POST /v1/push-registrations
+Status: Frozen
+Auth: Firebase ID token in `Authorization` (anonymous before sign-in); rate-limited at the gateway
+Request: token: string (the platform push token), platform: android|ios
+Response 202: registered: boolean
+Errors: 400 (missing or unreadable token, unknown platform), 401 (missing or invalid token), 429 (rate limited). The notification service pushes a clip-ready notice to this token when a generation the reader is waiting on completes.

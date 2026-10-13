@@ -1,7 +1,7 @@
 # DELIVERY — Scenova
 
 ## Source of Truth
-`docs/Scenova/` (BPRD), a nested git repo. Content revision `f801f30e6e9b`; docs commit `4a1a00225ff1`. Read-only for the squad; `product-shaper` is the only writer. The roadmap owns the build order.
+`docs/Scenova/` (BPRD), a nested git repo. Content revision `9f4cc2e0d0d5`; docs commit `ef3719d3b5a9`. Read-only for the squad; `product-shaper` is the only writer. The roadmap owns the build order.
 
 ## Team & File Ownership
 | Owner | Owns |
@@ -81,52 +81,16 @@ docs/           BPRD (product-shaper)
 ### Completed Phases
 | Phase | Closed | Notes |
 |---|---|---|
-| — | — | No phase closed yet. |
+| — | — | No verified phase closed yet; the conditional close of the first phase is a decisions-log entry. |
 
-### Active Phase: Phase 1: Foundations
+### Active Phase: Phase 2: The Reading Loop
 | Task | Feature | Owner | Status | Contract |
 |---|---|---|---|---|
-| T-001 | — | infra-engineer | Done | — |
-| T-002 | FEAT-001 | frontend-engineer | Done | C-001, C-002 |
-| T-003 | FEAT-003 | backend-engineer | Done | C-001, C-002 |
-| T-004 | FEAT-004 | ai-engineer | Done | C-004 |
-| T-005 | FEAT-005 | ai-engineer | Done | C-005 |
-| T-006 | FEAT-005 | backend-engineer | Done | C-003, C-005 |
-| T-007 | — | infra-engineer | Done | — |
-| T-008 | FEAT-003, FEAT-005 | backend-engineer | Done | C-002, C-003, C-005 |
-| T-009 | FEAT-005 | backend-engineer | Done | C-002, C-006 |
-| T-010 | FEAT-004 | ai-engineer | Done | C-004 |
-| T-011 | FEAT-002 | frontend-engineer | Done | C-001, C-002 |
-| T-012 | FEAT-002 | frontend-engineer | Done | C-001, C-002 |
-| T-013 | FEAT-001, FEAT-002, FEAT-012 | frontend-engineer | Done | C-001 |
-| T-014 | — | visual-artist | Done | — |
-| T-015 | — | visual-artist | Done | — |
-| T-016 | — | frontend-engineer | Done | — |
-| T-018 | — | infra-engineer | Done | — |
-| T-019 | FEAT-005 | backend-engineer | Done | C-001, C-003, C-006 |
-| T-020 | FEAT-001, FEAT-002 | frontend-engineer | Done | C-001, C-002 |
-| T-021 | FEAT-005 | ai-engineer | Done | C-005 |
-| T-022 | FEAT-005 | qa-engineer | Done | C-005 |
-| T-023 | FEAT-004, FEAT-005, FEAT-007 | ai-engineer | Done | C-004, C-005 |
-| T-024 | — | backend-engineer | Done | C-007 |
-| T-025 | — | frontend-engineer | Done | C-007 |
-| T-026 | — | backend-engineer | Done | C-007 |
-| T-027 | — | infra-engineer | Done | — |
-| T-028 | — | qa-engineer | Done | C-004, C-005 |
-| T-029 | FEAT-004 | ai-engineer | Done | C-004 |
-| T-030 | FEAT-005 | backend-engineer | Done | C-003, C-006 |
-| T-031 | — | qa-engineer | Done | C-004, C-005 |
-| T-032 | FEAT-004 | backend-engineer | Done | C-003, C-004 |
-| T-033 | FEAT-004 | backend-engineer | Done | C-001, C-002, C-003 |
-| T-034 | — | infra-engineer | Done | — |
-| T-035 | FEAT-003 | backend-engineer | Done | C-003 |
-| T-036 | FEAT-004 | qa-engineer | Done | C-004 |
-| T-037 | FEAT-004 | ai-engineer | Done | C-004 |
-| T-038 | FEAT-004 | qa-engineer | Done | C-004 |
-| T-039 | FEAT-004 | ai-engineer | Done | C-004 |
-| T-040 | FEAT-004 | qa-engineer | Done | C-004 |
-| T-041 | — | ai-engineer | Done | C-004 |
-| T-042 | — | qa-engineer | Done | C-004, C-005 |
+| T-043 | FEAT-006 | backend-engineer | Ready | C-001, C-002, C-003, C-006 |
+| T-044 | FEAT-007 | ai-engineer | Ready | C-005 |
+| T-045 | FEAT-008 | backend-engineer | Ready | C-008 |
+| T-046 | FEAT-008 | frontend-engineer | Ready | C-001, C-002, C-008 |
+| T-047 | FEAT-007 | frontend-engineer | Ready | C-001, C-002 |
 
 ## Decisions Log
 | # | Decision | Rationale | By |
@@ -150,6 +114,7 @@ docs/           BPRD (product-shaper)
 | D-017 | Analytics is added to Phase 1, with a frozen client intake contract (C-007) | The taxonomy was specified but owned by no phase; the launch funnels depend on it | user |
 | D-018 | The gloss phrase and the clip use separate pinned models: the text model `gemini-3.5-flash-lite` for the phrase, the video model `gemini-omni-1.1-flash` for the clip | One model for both is expensive and inaccurate at text; each output is pinned, costed, and measured on its own terms | user |
 | D-019 | The gloss-phrase bound is seven words or fewer; the judged bar is a single trained rater with adjudication; the cost ceiling is verified from the cost signal; the quality gate asserts only the bars the phase's capabilities deliver | The earlier bound and two-rater panel were not achievable and cost a measured miss; NFR-051 is judged in this phase because the clip is generated here, while NFR-053 belongs to the next phase | user |
+| D-020 | Phase 1 closed conditionally: regression and NFR-050 green, but NFR-051 (word-clip quality) unmeasured and NFR-052 (reader-helpful) unavailable | NFR-051 needs a judged video run; NFR-052 is live rolling-30-day feedback. The generation path's release stays flagged until NFR-051 is measured | user |
 
 ## Definition of Done
 - **Task:** the acceptance criteria in the cited feature doc are met; the frozen contract is conformed; unit tests pass; format, lint, analyze, and build are clean; work is committed to the dev branch and confined to `Own`.
