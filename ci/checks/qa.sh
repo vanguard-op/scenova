@@ -9,8 +9,9 @@
 # the failure is reproducible from the same command locally (`make qa`).
 #
 # Model-backed checks carry the `model` marker and are opt-in: a judged run needs
-# the golden sets and the pinned-model credential, so it runs at the phase gate
-# via `make qa-model`, not on every push (nfr.md "Measurement & Verification").
+# the golden sets and the pinned-model credential, so the input checks run at the
+# phase gate via `make qa-model` and the golden-set evaluation via
+# `make model-bar`, not on every push (nfr.md "Measurement & Verification").
 set -euo pipefail
 . "$(dirname "$0")/../lib.sh"
 

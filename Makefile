@@ -29,14 +29,14 @@ RUFF      := $(VENV)/bin/ruff
 MYPY      := $(VENV)/bin/mypy
 PYTEST    := $(VENV)/bin/pytest
 
-.PHONY: help setup fmt lint typecheck test qa qa-model build bundle boot security \
+.PHONY: help setup fmt lint typecheck test qa qa-model model-bar build bundle boot security \
         infra-init infra-fmt infra-validate infra-plan infra-apply \
         deploy promote rollback ci clean
 
 help: ## Show the documented commands
 	@printf '\nScenova platform commands (env=%s, venv=%s)\n\n' "$(ENVIRONMENT)" "$(VENV)"
 	@awk 'BEGIN{FS=":.*## "} /^[a-zA-Z0-9_-]+:.*## /{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
-	@printf '\nTargets: make setup · make ci · make qa · make deploy ENV=staging\n\n'
+	@printf '\nTargets: make setup · make ci · make qa · make model-bar · make deploy ENV=staging\n\n'
 
 # --- Setup -------------------------------------------------------------------
 
@@ -72,8 +72,11 @@ test: ## Run unit tests (pytest, flutter test)
 qa: ## Run the QA integration and acceptance suites (the development promotion gate)
 	@bash ci/checks/qa.sh
 
-qa-model: ## Run the model quality-bar evaluation (NFR-050–NFR-053; needs golden sets + the pinned-model credential)
+qa-model: ## Run the QA model-marked gate checks (golden sets present; pinned-model credential)
 	@if [ -d qa ]; then $(PYTEST) qa/ -m model; else echo "skip: no quality-bar harness (qa/)"; fi
+
+model-bar: ## Run the model quality bar (BAR=NFR-050|NFR-051|NFR-053|all; ARGS="--ratings …")
+	@bash ci/checks/model_bar.sh "$(BAR)" $(ARGS)
 
 build: ## Build every present workspace (compile, container images, APK)
 	@bash ci/checks/build.sh

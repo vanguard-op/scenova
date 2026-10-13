@@ -62,6 +62,7 @@ SERVICES=(
   "library|app.main:app|LIBRARY_PORT"
   "entitlement|app.main:app|ENTITLEMENT_PORT"
   "feedback|app.main:app|FEEDBACK_PORT"
+  "analytics|app.main:app|ANALYTICS_PORT"
 )
 MODEL_MODULE="app.main:app"
 MODEL_PORT_VAR="MODEL_PORT"

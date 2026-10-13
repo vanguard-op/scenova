@@ -34,6 +34,7 @@ services = {
   library     = { public = false }
   entitlement = { public = false }
   feedback    = { public = false }
+  analytics   = { public = false }
   model       = { public = false }
 }
 
