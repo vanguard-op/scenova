@@ -19,7 +19,7 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from .config import Settings
+from .config import CLIP_MODEL_PIN, Settings
 from .errors import (
     ClientLookupIdConflictError,
     EmptySelectionError,
@@ -28,7 +28,6 @@ from .errors import (
 )
 from .generation import (
     CLIP_TARGET_SECONDS,
-    DEFAULT_MODEL_PIN,
     GenerationAlreadyEnqueuedError,
     GenerationClient,
     GenerationJob,
@@ -97,14 +96,14 @@ class LookupService:
         store: LookupStore,
         library: LibraryPort,
         generation: GenerationClient,
-        model_pin: str = DEFAULT_MODEL_PIN,
+        clip_model_pin: str = CLIP_MODEL_PIN,
         generation_target_duration_seconds: float = CLIP_TARGET_SECONDS,
     ) -> None:
         self._inventory = inventory
         self._store = store
         self._library = library
         self._generation = generation
-        self._model_pin = model_pin
+        self._clip_model_pin = clip_model_pin
         self._target_duration = generation_target_duration_seconds
         # Serialises the idempotency check and the write, so a duplicate
         # clientLookupId is replayed rather than recorded twice.
@@ -191,7 +190,7 @@ class LookupService:
                 lookup_id,
                 lemma,
                 missing,
-                model_pin=self._model_pin,
+                model_pin=self._clip_model_pin,
                 target_duration=self._target_duration,
             )
             if not await self._enqueue(jobs):
@@ -228,7 +227,7 @@ class LookupService:
             sense_label=PHRASE_SENSE_LABEL,
             part_of_speech=PartOfSpeech.OTHER,
             target_duration_seconds=self._target_duration,
-            model_pin=self._model_pin,
+            model_pin=self._clip_model_pin,
         )
         if await self._enqueue([job]):
             return _stored(
@@ -404,7 +403,7 @@ def build_default_service(settings: Settings | None = None) -> LookupService:
             internal_audience=resolved.internal_audience,
             timeout_seconds=resolved.pipeline_timeout_seconds,
         ),
-        model_pin=resolved.model_pin,
+        clip_model_pin=resolved.clip_model_pin,
         generation_target_duration_seconds=resolved.generation_target_duration_seconds,
     )
 

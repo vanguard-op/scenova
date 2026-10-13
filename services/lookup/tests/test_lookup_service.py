@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from lookup.app.config import CLIP_MODEL_PIN
 from lookup.app.errors import (
     ClientLookupIdConflictError,
     EmptySelectionError,
@@ -58,12 +59,14 @@ def _service(
     inventory: SenseInventory | None = None,
     library: LibraryPort | None = None,
     generation: RecordingGenerationClient | None = None,
+    clip_model_pin: str = CLIP_MODEL_PIN,
 ) -> LookupService:
     return LookupService(
         inventory=inventory if inventory is not None else build_default_inventory(),
         store=InMemoryLookupStore(),
         library=library if library is not None else InMemoryLibrary(),
         generation=generation if generation is not None else RecordingGenerationClient(),
+        clip_model_pin=clip_model_pin,
     )
 
 
@@ -297,6 +300,18 @@ async def test_a_missing_word_sense_is_handed_to_the_generation_pipeline() -> No
     assert job.phrase is None
     assert job.target_duration_seconds == 4.0
     assert job.model_pin == "gemini-omni-1.1-flash"
+
+
+@pytest.mark.asyncio
+async def test_a_configured_clip_pin_is_carried_onto_the_generation_job() -> None:
+    generation = RecordingGenerationClient()
+
+    response = await _service(
+        generation=generation, clip_model_pin="gemini-omni-2.0-flash"
+    ).create_lookup(_request("coming"), "corr")
+
+    assert response.status == LookupStatus.GENERATING
+    assert generation.jobs[0].model_pin == "gemini-omni-2.0-flash"
 
 
 @pytest.mark.asyncio

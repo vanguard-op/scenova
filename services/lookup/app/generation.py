@@ -32,9 +32,6 @@ from .models import Kind, PartOfSpeech
 
 logger = logging.getLogger(__name__)
 
-# The pinned model version every generation is measured against (architecture
-# "Model Version & Fallback"); the lookup service passes it through to C-003.
-DEFAULT_MODEL_PIN = "gemini-omni-1.1-flash"
 # Clips are capped at four seconds, so a generation targets the cap.
 CLIP_TARGET_SECONDS = 4.0
 

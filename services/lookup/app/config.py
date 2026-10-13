@@ -18,8 +18,12 @@ DEFAULT_PIPELINE_PORT = "8082"
 # The lookup path must stay fast (NFR-002), so the enqueue call is bounded well
 # below the reader-facing wait; a timeout is the reader's fallback, not a hang.
 DEFAULT_PIPELINE_TIMEOUT_SECONDS = 5.0
-# The pinned model version (architecture "Model Version & Fallback").
-DEFAULT_MODEL_PIN = "gemini-omni-1.1-flash"
+# The pinned video model the clip is generated against (architecture "Model
+# Version & Fallback", D-018). The lookup service only carries the clip pin on a
+# generation job (C-003); the gloss phrase pin belongs to the pipeline, which
+# generates the phrase. The pin is a product-wide constant, so it is not a
+# per-environment knob.
+CLIP_MODEL_PIN = "gemini-omni-1.1-flash"
 # Clips are capped at four seconds, so a generation targets the cap.
 DEFAULT_GENERATION_TARGET_SECONDS = 4.0
 
@@ -33,7 +37,7 @@ class Settings:
     require_internal_auth: bool = True
     pipeline_base_url: str = f"http://127.0.0.1:{DEFAULT_PIPELINE_PORT}"
     pipeline_timeout_seconds: float = DEFAULT_PIPELINE_TIMEOUT_SECONDS
-    model_pin: str = DEFAULT_MODEL_PIN
+    clip_model_pin: str = CLIP_MODEL_PIN
     generation_target_duration_seconds: float = DEFAULT_GENERATION_TARGET_SECONDS
 
     @classmethod
@@ -54,7 +58,7 @@ class Settings:
             pipeline_timeout_seconds=_env_float(
                 source, "LOOKUP_PIPELINE_TIMEOUT_SECONDS", DEFAULT_PIPELINE_TIMEOUT_SECONDS
             ),
-            model_pin=_env_str(source, "GEMINI_MODEL", DEFAULT_MODEL_PIN),
+            clip_model_pin=_env_str(source, "CLIP_MODEL_PIN", CLIP_MODEL_PIN),
             generation_target_duration_seconds=_env_float(
                 source,
                 "LOOKUP_GENERATION_TARGET_SECONDS",
