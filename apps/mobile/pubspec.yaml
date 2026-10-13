@@ -46,6 +46,10 @@ dependencies:
   firebase_core: ^4.15.0
   firebase_auth: ^6.7.0
 
+  # Streams the clip in the shared Clip Player, so the reader sees the clip
+  # itself rather than a poster and the controls follow real playback.
+  video_player: ^2.14.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

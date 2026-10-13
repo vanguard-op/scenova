@@ -69,6 +69,10 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
   bool _hasPlayed = false;
   bool _noticeQueued = false;
 
+  /// Whether the still-making notice is on screen, so it can be taken down the
+  /// moment the clip arrives rather than lingering over the clip.
+  bool _generatingNoticeVisible = false;
+
   ClipViewController get _controller => widget.controller;
 
   @override
@@ -95,6 +99,12 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
     if (!mounted) return;
     if (_controller.playing) _hasPlayed = true;
     setState(() {});
+    // The clip has arrived (or the lookup settled some other way), so the
+    // still-making notice has nothing left to wait on; it leaves with the wait.
+    if (_generatingNoticeVisible && _controller.phase != ClipPhase.generating) {
+      _generatingNoticeVisible = false;
+      _messengerKey.currentState?.hideCurrentSnackBar();
+    }
     if (_controller.shouldShowGeneratingNotice && !_noticeQueued) {
       _noticeQueued = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -108,12 +118,14 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
   }
 
   void _showMessage(String message) {
+    _generatingNoticeVisible = false;
     _messengerKey.currentState
       ?..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _showGeneratingNotice() {
+    _generatingNoticeVisible = true;
     _messengerKey.currentState
       ?..hideCurrentSnackBar()
       ..showSnackBar(

@@ -193,6 +193,44 @@ void main() {
     await teardown(tester);
   });
 
+  testWidgets('the still-making notice clears once the clip is ready', (
+    tester,
+  ) async {
+    final services = buildServices(api: MockLookupApi(pollsUntilReady: 5));
+    final controller = controllerFor(
+      services,
+      'xylograph',
+      pollInterval: const Duration(milliseconds: 100),
+      noticeThreshold: const Duration(milliseconds: 250),
+    );
+    addTearDown(controller.dispose);
+
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+    await tester.pump();
+
+    // Past the wait threshold the reader is told the clip is still being made.
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump();
+    await tester.pump();
+    expect(
+      find.text('Your clip is still being made. It will be here shortly.'),
+      findsOneWidget,
+    );
+
+    // The clip arrives; the notice has nothing left to wait on and leaves, so
+    // it does not sit over the clip that just started playing.
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(controller.phase, ClipPhase.playing);
+    expect(
+      find.text('Your clip is still being made. It will be here shortly.'),
+      findsNothing,
+    );
+    await teardown(tester);
+  });
+
   testWidgets('a notice the service does not need says the lookup finished', (
     tester,
   ) async {
