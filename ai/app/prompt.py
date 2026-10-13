@@ -1,9 +1,10 @@
-"""Loader for the versioned gloss-phrase prompt artifact.
+"""Loader for the versioned prompt artifacts.
 
-The prompt is a behaviour artifact, not a string in a handler: it lives in
-`ai/prompts/gloss_phrase.v3.txt`, carries its own version, and is loaded and
-parsed here. A change to the prompt is a new versioned file, so the phrase
-behaviour can be diffed and rolled back like code.
+A prompt is a behaviour artifact, not a string in a handler: the gloss-phrase
+prompt lives in `ai/prompts/gloss_phrase.v3.txt` and the clip direction in
+`ai/prompts/word_clip.v2.txt`, each carries its own version, and each is loaded
+and parsed here. A change to a prompt is a new versioned file, so the behaviour
+can be diffed and rolled back like code.
 """
 
 from __future__ import annotations
@@ -16,7 +17,11 @@ PROMPT_DIR = Path(__file__).resolve().parent.parent / "prompts"
 # on (NFR-050). A change to it is a new versioned file; the previous version is
 # kept so the pin can be diffed and rolled back.
 DEFAULT_PROMPT_PATH = PROMPT_DIR / "gloss_phrase.v3.txt"
-DEFAULT_CLIP_PROMPT_PATH = PROMPT_DIR / "word_clip.v1.txt"
+# The clip direction is the artifact the clip bars are measured on (NFR-051,
+# NFR-053). One clip path serves both word clips and phrase clips, so v2 directs
+# the clip by the phrase's meaning and covers idioms rather than reading every
+# phrase literally; v1 is kept so the change can be diffed and rolled back.
+DEFAULT_CLIP_PROMPT_PATH = PROMPT_DIR / "word_clip.v2.txt"
 
 _SYSTEM_MARKER = "[system]"
 _USER_MARKER = "[user]"

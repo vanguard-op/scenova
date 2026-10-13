@@ -55,6 +55,20 @@ async def test_generated_clip_matches_the_output_contract() -> None:
 
 
 @pytest.mark.asyncio
+async def test_a_phrase_selection_is_generated_from_the_phrase_itself() -> None:
+    model = FakeClipModel([CLIP_BYTES])
+
+    response = await post(model, payload=clip_payload(phrase="break the ice"))
+
+    assert response.status_code == 201
+    # A phrase job sends the reader's selection straight to the clip step (no
+    # gloss step), and the shipped direction depicts its meaning, not the
+    # literal words (FEAT-007; NFR-053).
+    assert "break the ice" in model.calls[0]["user"]
+    assert "meaning" in model.calls[0]["system"]
+
+
+@pytest.mark.asyncio
 async def test_short_target_rounds_up_to_the_next_second() -> None:
     response = await post(
         FakeClipModel([CLIP_BYTES]),
