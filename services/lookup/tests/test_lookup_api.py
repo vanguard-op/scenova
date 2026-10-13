@@ -6,12 +6,28 @@ from fastapi.testclient import TestClient
 
 from lookup.app.api import create_app
 from lookup.app.config import Settings
+from lookup.app.inventory import build_default_inventory
+from lookup.app.library import InMemoryLibrary
+from lookup.app.service import LookupService
+from lookup.app.store import InMemoryLookupStore
+from lookup.tests.fakes import RecordingGenerationClient
 
 _INTERNAL = {"x-internal-audience": "scenova-internal"}
 
 
 def _client(require_internal_auth: bool = True) -> TestClient:
-    return TestClient(create_app(settings=Settings(require_internal_auth=require_internal_auth)))
+    service = LookupService(
+        inventory=build_default_inventory(),
+        store=InMemoryLookupStore(),
+        library=InMemoryLibrary(),
+        generation=RecordingGenerationClient(),
+    )
+    return TestClient(
+        create_app(
+            settings=Settings(require_internal_auth=require_internal_auth),
+            service=service,
+        )
+    )
 
 
 def _payload(selection: str, client_id: str = "client-1") -> dict[str, object]:

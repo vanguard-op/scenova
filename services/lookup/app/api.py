@@ -7,6 +7,8 @@ limiting stay at the gateway.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Annotated
 from uuid import uuid4
 
@@ -26,9 +28,16 @@ def create_app(
     """Build the lookup service application."""
 
     resolved_settings = settings or Settings.from_env()
-    resolved_service = service or build_default_service()
+    resolved_service = service or build_default_service(resolved_settings)
 
-    app = FastAPI(title="Scenova Lookup Service", version="1.0.0")
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        try:
+            yield
+        finally:
+            await resolved_service.aclose()
+
+    app = FastAPI(title="Scenova Lookup Service", version="1.0.0", lifespan=lifespan)
 
     @app.exception_handler(LookupError)
     async def _handle_lookup_error(_request: Request, exc: LookupError) -> JSONResponse:

@@ -20,10 +20,13 @@ from lookup.app.library import InMemoryLibrary, LibraryClip, LibraryEntry, Libra
 from lookup.app.models import CreateLookupRequest, Kind, LookupStatus, PartOfSpeech
 from lookup.app.service import (
     BEST_GUESS_NOTICE,
+    GENERATION_UNAVAILABLE_NOTICE,
     INVENTORY_UNAVAILABLE_NOTICE,
+    PHRASE_SENSE_LABEL,
     LookupService,
 )
 from lookup.app.store import InMemoryLookupStore
+from lookup.tests.fakes import RecordingGenerationClient, unavailable
 
 
 def _request(
@@ -46,11 +49,13 @@ def _request(
 def _service(
     inventory: SenseInventory | None = None,
     library: LibraryPort | None = None,
+    generation: RecordingGenerationClient | None = None,
 ) -> LookupService:
     return LookupService(
         inventory=inventory if inventory is not None else build_default_inventory(),
         store=InMemoryLookupStore(),
         library=library if library is not None else InMemoryLibrary(),
+        generation=generation if generation is not None else RecordingGenerationClient(),
     )
 
 
@@ -258,3 +263,160 @@ async def test_a_lookup_is_visible_only_to_its_caller() -> None:
 async def test_an_unknown_lookup_id_is_not_found() -> None:
     with pytest.raises(LookupNotFoundError):
         await _service().get_lookup("lk_missing", "reader-1", "corr")
+
+
+@pytest.mark.asyncio
+async def test_a_missing_word_sense_is_handed_to_the_generation_pipeline() -> None:
+    generation = RecordingGenerationClient()
+
+    response = await _service(generation=generation).create_lookup(_request("coming"), "corr")
+
+    assert response.status == LookupStatus.GENERATING
+    assert len(generation.jobs) == 1
+    job = generation.jobs[0]
+    assert job.kind == Kind.WORD
+    assert job.lookup_id == response.lookupId
+    assert job.lemma == "come"
+    assert job.sense_label == "arrive"
+    assert job.part_of_speech == PartOfSpeech.VERB
+    assert job.phrase == "to move toward or reach a place"
+    assert job.target_duration_seconds == 4.0
+    assert job.model_pin == "gemini-omni-1.1-flash"
+
+
+@pytest.mark.asyncio
+async def test_two_lookups_for_the_same_missing_word_share_one_job() -> None:
+    generation = RecordingGenerationClient()
+    service = _service(generation=generation)
+
+    await service.create_lookup(_request("coming", client_id="c-1"), "corr")
+    await service.create_lookup(_request("came", client_id="c-2"), "corr")
+
+    assert len(generation.jobs) == 2
+    assert generation.jobs[0].job_id == generation.jobs[1].job_id
+
+
+@pytest.mark.asyncio
+async def test_a_served_word_starts_no_generation() -> None:
+    library = InMemoryLibrary()
+    library.add(
+        "come",
+        "arrive",
+        PartOfSpeech.VERB,
+        _entry("e-come", "to move toward or reach a place"),
+    )
+    generation = RecordingGenerationClient()
+
+    response = await _service(library=library, generation=generation).create_lookup(
+        _request("coming"), "corr"
+    )
+
+    assert response.status == LookupStatus.SERVED
+    assert generation.jobs == []
+
+
+@pytest.mark.asyncio
+async def test_without_consent_a_miss_starts_no_generation() -> None:
+    generation = RecordingGenerationClient()
+
+    response = await _service(generation=generation).create_lookup(
+        _request("zephyr", consent=False), "corr"
+    )
+
+    assert response.status == LookupStatus.DENIED
+    assert generation.jobs == []
+
+
+@pytest.mark.asyncio
+async def test_a_pipeline_that_cannot_accept_the_job_shows_the_fallback() -> None:
+    response = await _service(generation=unavailable()).create_lookup(_request("coming"), "corr")
+
+    assert response.status == LookupStatus.FALLBACK
+    assert response.notice == GENERATION_UNAVAILABLE_NOTICE
+    # The word and phrase still show; only the clip is unavailable.
+    assert response.normalisedLemma == "come"
+    assert response.senses[0].glossPhrase == "to move toward or reach a place"
+
+
+@pytest.mark.asyncio
+async def test_a_generation_another_lookup_already_started_is_not_an_error() -> None:
+    response = await _service(generation=RecordingGenerationClient(shared=True)).create_lookup(
+        _request("coming"), "corr"
+    )
+
+    assert response.status == LookupStatus.GENERATING
+    assert response.notice is None
+
+
+@pytest.mark.asyncio
+async def test_a_phrase_selection_is_handed_to_the_phrase_path() -> None:
+    generation = RecordingGenerationClient()
+
+    response = await _service(generation=generation).create_lookup(
+        _request("kick the bucket"), "corr"
+    )
+
+    assert response.kind == Kind.PHRASE
+    assert len(generation.jobs) == 1
+    job = generation.jobs[0]
+    assert job.kind == Kind.PHRASE
+    assert job.lemma is None
+    assert job.phrase == "kick the bucket"
+    assert job.sense_label == PHRASE_SENSE_LABEL
+    assert job.part_of_speech == PartOfSpeech.OTHER
+
+
+@pytest.mark.asyncio
+async def test_a_phrase_handed_to_generation_has_its_punctuation_stripped() -> None:
+    generation = RecordingGenerationClient()
+
+    response = await _service(generation=generation).create_lookup(
+        _request("kick the bucket."), "corr"
+    )
+
+    assert response.rawSelection == "kick the bucket."
+    assert generation.jobs[0].phrase == "kick the bucket"
+
+
+@pytest.mark.asyncio
+async def test_a_poll_serves_a_clip_the_library_gained_after_generation() -> None:
+    library = InMemoryLibrary()
+    service = _service(library=library)
+
+    created = await service.create_lookup(_request("coming"), "corr")
+    assert created.status == LookupStatus.GENERATING
+
+    # The pipeline writes the finished word clip to the shared library.
+    library.add(
+        "come",
+        "arrive",
+        PartOfSpeech.VERB,
+        _entry("e-come", "to move toward or reach a place"),
+    )
+    polled = await service.get_lookup(created.lookupId, "reader-1", "corr-2")
+
+    assert polled.status == LookupStatus.SERVED
+    assert polled.senses[0].clip is not None
+    assert polled.senses[0].entryId == "e-come"
+
+
+@pytest.mark.asyncio
+async def test_a_poll_keeps_generating_while_the_clip_is_missing() -> None:
+    service = _service()
+    created = await service.create_lookup(_request("coming"), "corr")
+
+    polled = await service.get_lookup(created.lookupId, "reader-1", "corr-2")
+
+    assert polled.status == LookupStatus.GENERATING
+    assert polled.senses[0].clip is None
+
+
+@pytest.mark.asyncio
+async def test_a_phrase_poll_stays_generating() -> None:
+    service = _service()
+    created = await service.create_lookup(_request("kick the bucket"), "corr")
+
+    polled = await service.get_lookup(created.lookupId, "reader-1", "corr-2")
+
+    assert polled.kind == Kind.PHRASE
+    assert polled.status == LookupStatus.GENERATING
