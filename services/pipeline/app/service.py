@@ -71,7 +71,7 @@ from .models import (
     JobStatusResponse,
     Kind,
 )
-from .notifier import LoggingNotifier, Notifier
+from .notifier import HttpNotifier, Notifier
 from .phrase_client import (
     HttpPhraseClient,
     PhraseGenerator,
@@ -269,11 +269,12 @@ class GenerationService:
         return await self._succeed(running, clip, started_at)
 
     async def aclose(self) -> None:
-        """Release the model and library clients' connections."""
+        """Release the model, library, and notification clients' connections."""
 
         await self._phrase_generator.aclose()
         await self._clip_generator.aclose()
         await self._library.aclose()
+        await self._notifier.aclose()
 
     async def get_status(self, job_id: str) -> JobStatusResponse:
         """Report a job's state so a stalled generation can be resolved (C-006).
@@ -482,7 +483,11 @@ def build_default_service(settings: Settings) -> GenerationService:
             internal_audience=settings.internal_audience,
             timeout_seconds=settings.library_timeout_seconds,
         ),
-        notifier=LoggingNotifier(),
+        notifier=HttpNotifier(
+            base_url=settings.notification_base_url,
+            internal_audience=settings.internal_audience,
+            timeout_seconds=settings.notification_timeout_seconds,
+        ),
         settings=settings,
         spawner=AsyncioTaskSpawner(),
         events=LoggingGenerationEventEmitter(),

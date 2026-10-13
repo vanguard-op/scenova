@@ -1,9 +1,9 @@
-"""Client HTTP API for the gateway (C-001, C-002, C-007).
+"""Client HTTP API for the gateway (C-001, C-002, C-007, C-008).
 
-The gateway authenticates the caller, rate-limits lookups and events, validates
-the request body, and passes the downstream service's response through unchanged,
-so the frozen contract's status codes and error codes reach the client as they
-are produced.
+The gateway authenticates the caller, rate-limits lookups, events, and push
+registrations, validates the request body, and passes the downstream service's
+response through unchanged, so the frozen contract's status codes and error codes
+reach the client as they are produced.
 """
 
 from __future__ import annotations
@@ -22,7 +22,8 @@ from .auth import TokenVerifier, build_token_verifier
 from .config import Settings
 from .errors import EmptySelectionError, GatewayError, RateLimitedError
 from .lookup_client import HttpLookupClient, LookupClient, UpstreamResponse
-from .models import CreateLookupRequest, IngestEventsRequest
+from .models import CreateLookupRequest, IngestEventsRequest, RegisterPushRequest
+from .notification_client import HttpPushRegistrationClient, PushRegistrationClient
 from .ratelimit import InMemoryFixedWindowRateLimiter, RateLimiter
 
 
@@ -32,7 +33,9 @@ def create_app(
     limiter: RateLimiter | None = None,
     lookup_client: LookupClient | None = None,
     analytics_client: AnalyticsClient | None = None,
+    notification_client: PushRegistrationClient | None = None,
     event_limiter: RateLimiter | None = None,
+    registration_limiter: RateLimiter | None = None,
 ) -> FastAPI:
     """Build the API gateway application."""
 
@@ -46,6 +49,10 @@ def create_app(
         limit=resolved_settings.events_rate_limit_per_minute,
         window_seconds=resolved_settings.rate_limit_window_seconds,
     )
+    resolved_registration_limiter = registration_limiter or InMemoryFixedWindowRateLimiter(
+        limit=resolved_settings.registrations_rate_limit_per_minute,
+        window_seconds=resolved_settings.rate_limit_window_seconds,
+    )
     resolved_client = lookup_client or HttpLookupClient(
         base_url=resolved_settings.lookup_base_url,
         internal_audience=resolved_settings.internal_audience,
@@ -53,6 +60,10 @@ def create_app(
     )
     resolved_analytics = analytics_client or HttpAnalyticsClient(
         base_url=resolved_settings.analytics_base_url,
+        timeout_seconds=resolved_settings.upstream_timeout_seconds,
+    )
+    resolved_notification = notification_client or HttpPushRegistrationClient(
+        base_url=resolved_settings.notification_base_url,
         timeout_seconds=resolved_settings.upstream_timeout_seconds,
     )
 
@@ -63,6 +74,7 @@ def create_app(
         finally:
             await resolved_client.aclose()
             await resolved_analytics.aclose()
+            await resolved_notification.aclose()
 
     app = FastAPI(title="Scenova API Gateway", version="1.0.0", lifespan=lifespan)
 
@@ -114,6 +126,18 @@ def create_app(
             raise RateLimitedError("Too many events. Please try again in a moment.")
         correlation_id = _correlation_id(resolved_settings, request)
         upstream = await resolved_analytics.ingest(
+            payload.model_dump(), authorization, correlation_id
+        )
+        return _passthrough(upstream, correlation_id, resolved_settings)
+
+    @app.post("/v1/push-registrations", status_code=202)
+    async def register_push(payload: RegisterPushRequest, request: Request) -> Response:
+        authorization = request.headers.get("authorization")
+        subject = await resolved_verifier.verify(authorization)
+        if not await resolved_registration_limiter.allow(subject.id):
+            raise RateLimitedError("Too many registrations. Please try again in a moment.")
+        correlation_id = _correlation_id(resolved_settings, request)
+        upstream = await resolved_notification.register(
             payload.model_dump(), authorization, correlation_id
         )
         return _passthrough(upstream, correlation_id, resolved_settings)

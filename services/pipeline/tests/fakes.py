@@ -106,6 +106,9 @@ class RecordingNotifier:
     async def clip_ready(self, *, lookup_id: str, job_id: str, clip: ClipResult) -> None:
         self.ready.append((lookup_id, job_id, clip))
 
+    async def aclose(self) -> None:
+        return None
+
 
 class NullSpawner:
     """A spawner that closes the background run without executing it."""

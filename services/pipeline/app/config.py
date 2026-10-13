@@ -19,6 +19,7 @@ DEFAULT_INTERNAL_AUDIENCE = "scenova-internal"
 DEFAULT_CORRELATION_ID_HEADER = "x-correlation-id"
 DEFAULT_MODEL_PORT = "8090"
 DEFAULT_LIBRARY_PORT = "8083"
+DEFAULT_NOTIFICATION_PORT = "8087"
 # The two model versions the generation path pins and no others (architecture
 # "Model Version & Fallback", D-018): the text model that produces the gloss
 # phrase and the video model that produces the clip. Both are pinned so each
@@ -41,6 +42,10 @@ DEFAULT_PHRASE_TIMEOUT_SECONDS = 40.0
 DEFAULT_LIBRARY_TIMEOUT_SECONDS = 5.0
 DEFAULT_LIBRARY_STORE_ATTEMPTS = 3
 DEFAULT_LIBRARY_STORE_RETRY_DELAY_SECONDS = 0.25
+# The clip-ready notice to the notification service runs after the clip is
+# produced, off the reader's path. When it cannot be sent the clip is still
+# delivered, so a short wait is enough to report it without holding the job open.
+DEFAULT_NOTIFICATION_TIMEOUT_SECONDS = 5.0
 # Clips are capped at four seconds so they resolve within a reader's glance.
 CLIP_MAX_DURATION_SECONDS = 4.0
 # The `enable_generation` release flag (release.md "Rollout Phases & Feature
@@ -65,6 +70,8 @@ class Settings:
     library_timeout_seconds: float = DEFAULT_LIBRARY_TIMEOUT_SECONDS
     library_store_attempts: int = DEFAULT_LIBRARY_STORE_ATTEMPTS
     library_store_retry_delay_seconds: float = DEFAULT_LIBRARY_STORE_RETRY_DELAY_SECONDS
+    notification_base_url: str = f"http://127.0.0.1:{DEFAULT_NOTIFICATION_PORT}"
+    notification_timeout_seconds: float = DEFAULT_NOTIFICATION_TIMEOUT_SECONDS
     clip_max_duration_seconds: float = CLIP_MAX_DURATION_SECONDS
     # The two pinned model versions the generation path records on every job.
     phrase_model_pin: str = PHRASE_MODEL_PIN
@@ -88,6 +95,11 @@ class Settings:
             source,
             "LIBRARY_BASE_URL",
             f"http://127.0.0.1:{_env_str(source, 'LIBRARY_PORT', DEFAULT_LIBRARY_PORT)}",
+        )
+        notification_base_url = _env_str(
+            source,
+            "NOTIFICATION_BASE_URL",
+            f"http://127.0.0.1:{_env_str(source, 'NOTIFICATION_PORT', DEFAULT_NOTIFICATION_PORT)}",
         )
         return cls(
             internal_audience=_env_str(source, "INTERNAL_AUDIENCE", DEFAULT_INTERNAL_AUDIENCE),
@@ -113,6 +125,12 @@ class Settings:
                 source,
                 "PIPELINE_LIBRARY_STORE_RETRY_DELAY_SECONDS",
                 DEFAULT_LIBRARY_STORE_RETRY_DELAY_SECONDS,
+            ),
+            notification_base_url=notification_base_url,
+            notification_timeout_seconds=_env_float(
+                source,
+                "PIPELINE_NOTIFICATION_TIMEOUT_SECONDS",
+                DEFAULT_NOTIFICATION_TIMEOUT_SECONDS,
             ),
             phrase_model_pin=_env_str(source, "PHRASE_MODEL_PIN", PHRASE_MODEL_PIN),
             clip_model_pin=_env_str(source, "CLIP_MODEL_PIN", CLIP_MODEL_PIN),
