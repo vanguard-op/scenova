@@ -27,15 +27,16 @@ PIP       := $(VENV)/bin/pip
 BLACK     := $(VENV)/bin/black
 RUFF      := $(VENV)/bin/ruff
 MYPY      := $(VENV)/bin/mypy
+PYTEST    := $(VENV)/bin/pytest
 
-.PHONY: help setup fmt lint typecheck test build bundle boot security \
+.PHONY: help setup fmt lint typecheck test qa qa-model build bundle boot security \
         infra-init infra-fmt infra-validate infra-plan infra-apply \
         deploy promote rollback ci clean
 
 help: ## Show the documented commands
 	@printf '\nScenova platform commands (env=%s, venv=%s)\n\n' "$(ENVIRONMENT)" "$(VENV)"
 	@awk 'BEGIN{FS=":.*## "} /^[a-zA-Z0-9_-]+:.*## /{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
-	@printf '\nTargets: make setup · make ci · make deploy ENV=staging\n\n'
+	@printf '\nTargets: make setup · make ci · make qa · make deploy ENV=staging\n\n'
 
 # --- Setup -------------------------------------------------------------------
 
@@ -67,6 +68,12 @@ typecheck: ## Type-check the Python workspace (mypy)
 
 test: ## Run unit tests (pytest, flutter test)
 	@bash ci/checks/test.sh
+
+qa: ## Run the QA integration and acceptance suites (the development promotion gate)
+	@bash ci/checks/qa.sh
+
+qa-model: ## Run the model quality-bar evaluation (NFR-050–NFR-053; needs golden sets + the pinned-model credential)
+	@if [ -d qa ]; then $(PYTEST) qa/ -m model; else echo "skip: no quality-bar harness (qa/)"; fi
 
 build: ## Build every present workspace (compile, container images, APK)
 	@bash ci/checks/build.sh
@@ -112,7 +119,7 @@ rollback: ## Roll a service back to its previous revision (ENV=… SVC=…)
 
 # --- Composite ---------------------------------------------------------------
 
-ci: ## Full local CI run (lint, types, tests, security, infra, build, boot)
+ci: ## Full local CI run (lint, types, tests, security, infra, build, boot, qa)
 	@bash ci/ci.sh
 
 clean: ## Remove build and tool caches
