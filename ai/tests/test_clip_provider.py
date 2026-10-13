@@ -16,7 +16,7 @@ from app.provider import (
     _combine_prompt,
     _extract_video,
 )
-from helpers import CLIP_BYTES, DEFAULT_PIN, make_test_settings
+from helpers import CLIP_BYTES, CLIP_PIN, make_test_settings
 
 
 class _ScriptedClipModel(GeminiClipModel):
@@ -48,7 +48,7 @@ async def _generate(model: GeminiClipModel) -> bytes:
     return await model.generate(
         system="s",
         user="u",
-        model_pin=DEFAULT_PIN,
+        model_pin=CLIP_PIN,
         duration_seconds=4,
         resolution="360p",
         generate_audio=False,

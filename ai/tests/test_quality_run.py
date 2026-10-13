@@ -14,7 +14,8 @@ from pathlib import Path
 import pytest
 from app.config import MAX_PHRASE_CHARS, MAX_PHRASE_WORDS
 from app.data import load_common_words
-from quality.bar import MODEL_PIN, bar_by_id, item_key
+from helpers import PHRASE_PIN
+from quality.bar import bar_by_id, item_key
 from quality.judge import Decide, phrase_judge
 from quality.produce import Producer, ReplayProducer
 from quality.run import (
@@ -89,6 +90,7 @@ def _run(
         decide=decide or _decide(),
         producer=producer or _producer(),
         judged_by="rubric only (pre-screen; raters required for the bar)",
+        model_pin=PHRASE_PIN,
         items=_ITEMS,
         record=record,
     )
@@ -99,7 +101,7 @@ def test_a_run_reports_the_measured_share_against_the_bar() -> None:
 
     assert report.nfr_id == "NFR-050"
     assert report.threshold == 0.90
-    assert report.model_pin == MODEL_PIN
+    assert report.model_pin == PHRASE_PIN
     assert report.sample_size == 2
     assert report.passed == 1
     assert report.rate == 0.5

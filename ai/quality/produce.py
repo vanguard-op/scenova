@@ -190,7 +190,7 @@ def live_phrase_producer(settings: Settings) -> PhraseProducer:
         common_words=load_common_words(),
         settings=settings,
     )
-    return PhraseProducer(service, model_pin=settings.model_pin)
+    return PhraseProducer(service, model_pin=settings.phrase_model_pin)
 
 
 def live_clip_producer(settings: Settings, *, target_duration_seconds: float = 4.0) -> ClipProducer:
@@ -205,6 +205,6 @@ def live_clip_producer(settings: Settings, *, target_duration_seconds: float = 4
     )
     return ClipProducer(
         service,
-        model_pin=settings.model_pin,
+        model_pin=settings.clip_model_pin,
         target_duration_seconds=target_duration_seconds,
     )

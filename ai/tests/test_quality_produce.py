@@ -10,7 +10,8 @@ import pytest
 from app.provider import ProviderRefusal, ProviderTimeout, ProviderUnavailable
 from helpers import (
     CLIP_BYTES,
-    DEFAULT_PIN,
+    CLIP_PIN,
+    PHRASE_PIN,
     FakeClipModel,
     FakeClipStore,
     FakePhraseModel,
@@ -30,7 +31,7 @@ _GLOSS_ITEM = {"lemma": "key", "partOfSpeech": "noun", "senseHint": "a small met
 @pytest.mark.asyncio
 async def test_the_phrase_producer_maps_the_item_through_the_service() -> None:
     model = FakePhraseModel(["a key in the door"])
-    producer = PhraseProducer(make_service(model), model_pin=DEFAULT_PIN)
+    producer = PhraseProducer(make_service(model), model_pin=PHRASE_PIN)
 
     outcome = await producer(_GLOSS_ITEM)
 
@@ -44,13 +45,13 @@ async def test_the_phrase_producer_maps_the_item_through_the_service() -> None:
     _system, user, pin = model.calls[0]
     assert "key" in user
     assert "a small metal object" in user
-    assert pin == DEFAULT_PIN
+    assert pin == PHRASE_PIN
 
 
 @pytest.mark.asyncio
 async def test_the_phrase_producer_captures_provider_unavailability() -> None:
     model = FakePhraseModel([ProviderUnavailable("down")])
-    producer = PhraseProducer(make_service(model), model_pin=DEFAULT_PIN)
+    producer = PhraseProducer(make_service(model), model_pin=PHRASE_PIN)
 
     outcome = await producer(_GLOSS_ITEM)
 
@@ -62,7 +63,7 @@ async def test_the_phrase_producer_captures_provider_unavailability() -> None:
 @pytest.mark.asyncio
 async def test_the_phrase_producer_reports_a_fallback_as_generated_false() -> None:
     model = FakePhraseModel([ProviderRefusal("declined")])
-    producer = PhraseProducer(make_service(model), model_pin=DEFAULT_PIN)
+    producer = PhraseProducer(make_service(model), model_pin=PHRASE_PIN)
 
     outcome = await producer(_GLOSS_ITEM)
 
@@ -75,7 +76,7 @@ async def test_the_phrase_producer_reports_a_fallback_as_generated_false() -> No
 async def test_the_clip_producer_reports_a_produced_clip() -> None:
     model = FakeClipModel([CLIP_BYTES])
     service = make_clip_service(model, store=FakeClipStore())
-    producer = ClipProducer(service, model_pin=DEFAULT_PIN)
+    producer = ClipProducer(service, model_pin=CLIP_PIN)
 
     outcome = await producer({"word": "key", "phrase": "a key in the door"})
 
@@ -100,7 +101,7 @@ async def test_the_clip_producer_captures_provider_failures(
 ) -> None:
     model = FakeClipModel([failure])
     service = make_clip_service(model, store=FakeClipStore())
-    producer = ClipProducer(service, model_pin=DEFAULT_PIN)
+    producer = ClipProducer(service, model_pin=CLIP_PIN)
 
     outcome = await producer({"phrase": "a key in the door"})
 

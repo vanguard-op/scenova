@@ -1,12 +1,13 @@
 """Runtime configuration for the model-serving layer.
 
-Values are read from the environment declared in `.env.example` (the model pin,
-the API key, the request timeout, the retry count, the circuit breaker, and the
-internal audience). Nothing secret is read from a repository file (NFR-024).
+Values are read from the environment declared in `.env.example` (the API key,
+the request timeout, the retry count, the circuit breaker, and the internal
+audience). Nothing secret is read from a repository file (NFR-024).
 
-The decoding and guardrail knobs below are constants rather than environment
-variables: they are part of the pinned behaviour the quality bar was measured
-on, so they change with the prompt artifact, not per environment.
+The two model pins, the decoding knobs, and the guardrail knobs below are
+constants rather than environment variables: they are part of the pinned
+behaviour the quality bar was measured on, so they change with the prompt
+artifact, not per environment.
 """
 
 from __future__ import annotations
@@ -16,9 +17,14 @@ from dataclasses import dataclass
 from functools import lru_cache
 from typing import Literal
 
-# The version the quality bar was measured on (architecture "Model Version &
-# Fallback"); no other version is used unless a fresh evaluation pins one.
-DEFAULT_MODEL_PIN = "gemini-omni-1.1-flash"
+# The two versions the quality bar was measured on (architecture "Model Version
+# & Fallback"): the gloss phrase is a text capability pinned to its text model
+# and measured on NFR-050, and the clip is a video capability pinned to its video
+# model and measured on NFR-051/NFR-053. Each pin is used only for the step it
+# belongs to; a replacement is a new pin after a fresh evaluation, never a shared
+# value. No other version is used.
+PHRASE_MODEL_PIN = "gemini-3.5-flash-lite"
+CLIP_MODEL_PIN = "gemini-omni-1.1-flash"
 DEFAULT_INTERNAL_AUDIENCE = "scenova-internal"
 
 # Pinned decoding: low temperature keeps the phrase concrete and common.
@@ -83,7 +89,8 @@ def _env_float(name: str, default: float) -> float:
 class Settings:
     """Immutable configuration resolved once at process start."""
 
-    model_pin: str
+    phrase_model_pin: str
+    clip_model_pin: str
     gemini_api_key: str | None
     request_timeout_seconds: float
     max_attempts: int
@@ -112,7 +119,8 @@ def load_settings() -> Settings:
     """Build settings from the environment, falling back to documented defaults."""
 
     return Settings(
-        model_pin=_env_str("GEMINI_MODEL", DEFAULT_MODEL_PIN),
+        phrase_model_pin=PHRASE_MODEL_PIN,
+        clip_model_pin=CLIP_MODEL_PIN,
         gemini_api_key=_env_opt("GEMINI_API_KEY"),
         request_timeout_seconds=_env_float("GEMINI_TIMEOUT_SECONDS", 30.0),
         max_attempts=_env_int("GEMINI_MAX_ATTEMPTS", 3),

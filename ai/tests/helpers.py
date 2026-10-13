@@ -25,7 +25,8 @@ DEFAULT_LEMMA = "key"
 DEFAULT_POS = "noun"
 DEFAULT_HINT = "a small metal object that opens a lock"
 DEFAULT_PHRASE = "a key in the door"
-DEFAULT_PIN = "gemini-omni-1.1-flash"
+PHRASE_PIN = "gemini-3.5-flash-lite"
+CLIP_PIN = "gemini-omni-1.1-flash"
 CDN_BASE = "https://cdn.test"
 CLIP_RESOLUTION = "360p"
 CLIP_BYTES = b"\x00\x00\x00\x18ftypmp42scenova-test-clip"
@@ -106,7 +107,7 @@ def phrase_payload(**overrides: Any) -> dict[str, Any]:
         "lemma": DEFAULT_LEMMA,
         "partOfSpeech": DEFAULT_POS,
         "senseHint": DEFAULT_HINT,
-        "modelPin": DEFAULT_PIN,
+        "modelPin": PHRASE_PIN,
     }
     payload.update(overrides)
     return payload
@@ -185,7 +186,7 @@ def clip_payload(**overrides: Any) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "phrase": DEFAULT_PHRASE,
         "targetDurationSeconds": 4,
-        "modelPin": DEFAULT_PIN,
+        "modelPin": CLIP_PIN,
     }
     payload.update(overrides)
     return payload

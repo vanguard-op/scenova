@@ -76,7 +76,7 @@ class PhraseService:
             part_of_speech=request.part_of_speech,
             sense_hint=request.sense_hint,
         )
-        model_pin = request.model_pin or self._settings.model_pin
+        model_pin = request.model_pin or self._settings.phrase_model_pin
         attempts = max(1, self._settings.regeneration_attempts)
 
         for _ in range(attempts):

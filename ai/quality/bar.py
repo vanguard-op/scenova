@@ -22,7 +22,6 @@ if str(_REPO_ROOT) not in sys.path:
 
 from qa.quality_bar import (  # noqa: E402
     BARS,
-    MODEL_PIN,
     Bar,
     EvaluationResult,
     GoldenSetMissing,
@@ -32,7 +31,6 @@ from qa.quality_bar import (  # noqa: E402
 
 __all__ = [
     "BARS",
-    "MODEL_PIN",
     "Bar",
     "EvaluationResult",
     "GoldenSetInvalid",

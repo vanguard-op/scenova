@@ -20,7 +20,6 @@ from pathlib import Path
 from typing import TypeVar
 
 from .bar import (
-    MODEL_PIN,
     Bar,
     EvaluationResult,
     ItemKey,
@@ -130,6 +129,7 @@ def run_bar(
     decide: Decide,
     producer: Producer,
     judged_by: str,
+    model_pin: str,
     items: Sequence[Mapping[str, object]] | None = None,
     record: Path | None = None,
     sheet: Path | None = None,
@@ -150,14 +150,16 @@ def run_bar(
         return verdict.passed
 
     result = evaluate(bar, resolved, produce, judge)
-    return _report(bar, result, reasons, judged_by)
+    return _report(bar, result, reasons, judged_by=judged_by, model_pin=model_pin)
 
 
 def _report(
     bar: Bar,
     result: EvaluationResult,
     reasons: Mapping[str, Judgement],
+    *,
     judged_by: str,
+    model_pin: str,
 ) -> BarReport:
     fields = required_fields(bar)
     key = item_key(bar)
@@ -180,7 +182,7 @@ def _report(
         metric=bar.metric,
         threshold=bar.threshold,
         cost_ceiling=bar.cost_ceiling,
-        model_pin=MODEL_PIN,
+        model_pin=model_pin,
         sample_size=result.sample_size,
         passed=result.passed,
         rate=result.rate,

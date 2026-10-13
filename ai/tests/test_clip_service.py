@@ -8,8 +8,8 @@ from app.clip.store import ClipStorageError
 from app.provider import ProviderRefusal, ProviderTimeout, ProviderUnavailable
 from helpers import (
     CLIP_BYTES,
+    CLIP_PIN,
     DEFAULT_PHRASE,
-    DEFAULT_PIN,
     FakeClipModel,
     FakeClipStore,
     make_clip_service,
@@ -17,7 +17,7 @@ from helpers import (
 
 
 def request(*, phrase: str = DEFAULT_PHRASE, duration: float = 4.0) -> ClipRequest:
-    return ClipRequest(phrase=phrase, target_duration_seconds=duration, model_pin=DEFAULT_PIN)
+    return ClipRequest(phrase=phrase, target_duration_seconds=duration, model_pin=CLIP_PIN)
 
 
 @pytest.mark.asyncio
@@ -43,7 +43,7 @@ async def test_prompt_and_pins_are_passed_to_the_provider() -> None:
 
     call = model.calls[0]
     assert "a spoon on a table" in call["user"]
-    assert call["model_pin"] == DEFAULT_PIN
+    assert call["model_pin"] == CLIP_PIN
     assert call["resolution"] == "360p"
     assert call["generate_audio"] is False
 

@@ -87,6 +87,18 @@ def _resolve_producer(bar: Bar, replay: str | None) -> Producer:
     return live_clip_producer(settings)
 
 
+def _capability_pin(bar: Bar) -> str:
+    """The pinned model the bar was measured against (architecture "Model Version & Fallback").
+
+    The gloss phrase is a text capability on its own pin; the clip bars are video
+    capabilities on theirs. The report names the pin the run was measured against,
+    whether it produced live or replayed a recorded run.
+    """
+
+    settings = get_settings()
+    return settings.phrase_model_pin if bar.nfr_id == "NFR-050" else settings.clip_model_pin
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
 
@@ -104,6 +116,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     record = Path(args.record) if args.record else None
     sheet = Path(args.sheet) if args.sheet else None
     producer = _resolve_producer(bar, args.replay)
+    model_pin = _capability_pin(bar)
 
     if bar.nfr_id == "NFR-050":
         decide, judged_by = _phrase_decide(bar, ratings)
@@ -132,6 +145,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             decide=decide,
             producer=producer,
             judged_by=judged_by,
+            model_pin=model_pin,
             record=record,
             sheet=sheet,
         )

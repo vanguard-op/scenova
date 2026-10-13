@@ -14,7 +14,7 @@ from app.provider import (
     ProviderTimeout,
     ProviderUnavailable,
 )
-from helpers import DEFAULT_PIN, make_test_settings
+from helpers import PHRASE_PIN, make_test_settings
 
 
 class _ScriptedModel(GeminiPhraseModel):
@@ -45,7 +45,7 @@ async def test_retries_a_transient_failure_then_succeeds() -> None:
         [ProviderUnavailable("boom"), "a key in the door"],
     )
 
-    text = await model.generate(system="s", user="u", model_pin=DEFAULT_PIN)
+    text = await model.generate(system="s", user="u", model_pin=PHRASE_PIN)
 
     assert text == "a key in the door"
     assert model.calls == 2
@@ -59,11 +59,11 @@ async def test_exhausted_retries_raise_unavailable_and_open_the_circuit() -> Non
     )
 
     with pytest.raises(ProviderUnavailable):
-        await model.generate(system="s", user="u", model_pin=DEFAULT_PIN)
+        await model.generate(system="s", user="u", model_pin=PHRASE_PIN)
     assert model.calls == 2
 
     with pytest.raises(ProviderUnavailable):
-        await model.generate(system="s", user="u", model_pin=DEFAULT_PIN)
+        await model.generate(system="s", user="u", model_pin=PHRASE_PIN)
     assert model.calls == 2  # the open circuit stopped the second call
 
 
@@ -75,7 +75,7 @@ async def test_timeout_is_not_retried() -> None:
     )
 
     with pytest.raises(ProviderTimeout):
-        await model.generate(system="s", user="u", model_pin=DEFAULT_PIN)
+        await model.generate(system="s", user="u", model_pin=PHRASE_PIN)
 
     assert model.calls == 1
 
@@ -90,7 +90,7 @@ async def test_empty_response_is_a_refusal(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr(model, "_get_client", lambda: _stub_client(_generate_content))
 
     with pytest.raises(ProviderRefusal):
-        await model.generate(system="s", user="u", model_pin=DEFAULT_PIN)
+        await model.generate(system="s", user="u", model_pin=PHRASE_PIN)
 
 
 @pytest.mark.asyncio
@@ -103,7 +103,7 @@ async def test_elapsed_timeout_maps_to_provider_timeout(monkeypatch: pytest.Monk
     monkeypatch.setattr(model, "_get_client", lambda: _stub_client(_generate_content))
 
     with pytest.raises(ProviderTimeout):
-        await model.generate(system="s", user="u", model_pin=DEFAULT_PIN)
+        await model.generate(system="s", user="u", model_pin=PHRASE_PIN)
 
 
 @pytest.mark.asyncio
@@ -116,7 +116,7 @@ async def test_network_error_maps_to_unavailable(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(model, "_get_client", lambda: _stub_client(_generate_content))
 
     with pytest.raises(ProviderUnavailable):
-        await model.generate(system="s", user="u", model_pin=DEFAULT_PIN)
+        await model.generate(system="s", user="u", model_pin=PHRASE_PIN)
 
 
 @pytest.mark.asyncio
@@ -124,4 +124,4 @@ async def test_missing_credentials_are_unavailable() -> None:
     model = GeminiPhraseModel(make_test_settings(gemini_api_key=None, max_attempts=1))
 
     with pytest.raises(ProviderUnavailable):
-        await model.generate(system="s", user="u", model_pin=DEFAULT_PIN)
+        await model.generate(system="s", user="u", model_pin=PHRASE_PIN)

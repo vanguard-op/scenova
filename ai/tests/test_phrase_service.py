@@ -8,8 +8,8 @@ from app.provider import ProviderRefusal, ProviderTimeout, ProviderUnavailable
 from helpers import (
     DEFAULT_HINT,
     DEFAULT_LEMMA,
-    DEFAULT_PIN,
     DEFAULT_POS,
+    PHRASE_PIN,
     FakePhraseModel,
     make_service,
 )
@@ -20,7 +20,7 @@ def request(*, lemma: str | None = DEFAULT_LEMMA, sense_hint: str = DEFAULT_HINT
         lemma=lemma,
         part_of_speech=DEFAULT_POS,
         sense_hint=sense_hint,
-        model_pin=DEFAULT_PIN,
+        model_pin=PHRASE_PIN,
     )
 
 
@@ -33,7 +33,7 @@ async def test_returns_a_generated_phrase() -> None:
     assert result.phrase == "a key in the door"
     assert result.source == "generated"
     assert result.best_guess is False
-    assert model.calls[0][2] == DEFAULT_PIN
+    assert model.calls[0][2] == PHRASE_PIN
 
 
 @pytest.mark.asyncio

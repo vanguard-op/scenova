@@ -16,7 +16,6 @@ from __future__ import annotations
 
 from .bar import (
     BARS,
-    MODEL_PIN,
     Bar,
     GoldenSetInvalid,
     GoldenSetMissing,
@@ -47,7 +46,6 @@ from .run import (
 
 __all__ = [
     "BARS",
-    "MODEL_PIN",
     "Bar",
     "BarReport",
     "ClipOutcome",

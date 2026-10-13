@@ -73,7 +73,7 @@ class ClipService:
     async def generate(self, request: ClipRequest) -> ClipResult:
         duration = self._duration_seconds(request.target_duration_seconds)
         system, user = self._prompt.render(phrase=request.phrase)
-        model_pin = request.model_pin or self._settings.model_pin
+        model_pin = request.model_pin or self._settings.clip_model_pin
 
         data = await self._model.generate(
             system=system,
