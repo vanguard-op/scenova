@@ -314,7 +314,10 @@ def test_the_clip_endpoint_reports_the_provider_unavailable(model: httpx2.Client
 
 
 def test_the_clip_endpoint_refuses_a_target_over_four_seconds(model: httpx2.Client) -> None:
-    # C-005 pins the output at most four seconds; a longer target is rejected.
+    # C-005 pins the output at most four seconds; a longer target is a
+    # request-contract violation (400), kept distinct from the provider's decline
+    # (422) so the pipeline can tell a bad target from a phrase the provider
+    # refused.
     response = model.post(
         "/internal/model/clip",
         headers=INTERNAL,
@@ -325,4 +328,5 @@ def test_the_clip_endpoint_refuses_a_target_over_four_seconds(model: httpx2.Clie
         },
     )
 
-    assert response.status_code == 422, response.text
+    assert response.status_code == 400, response.text
+    assert response.json()["code"] == "target_duration_exceeded"
