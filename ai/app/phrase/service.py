@@ -61,7 +61,11 @@ class PhraseService:
 
     def _fallback(self, request: PhraseRequest) -> PhraseResult:
         return PhraseResult(
-            phrase=fallback_phrase(lemma=request.lemma, sense_hint=request.sense_hint),
+            phrase=fallback_phrase(
+                lemma=request.lemma,
+                sense_hint=request.sense_hint,
+                part_of_speech=request.part_of_speech,
+            ),
             source="fallback",
             best_guess=True,
         )

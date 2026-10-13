@@ -105,4 +105,4 @@ async def test_falls_back_when_lemma_is_absent() -> None:
 
     result = await make_service(model).generate(request(lemma=None, sense_hint="ice on a lake"))
 
-    assert result.phrase == "a ice"
+    assert result.phrase == "an ice"
