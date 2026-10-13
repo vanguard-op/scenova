@@ -64,7 +64,7 @@ Errors: 400 (missing or unreadable token, unknown platform, unknown lookup), 401
 ### C-009: POST /internal/library/entries
 Status: Frozen (revision 1)
 Auth: internal service identity; never reachable from the client
-Request: entry: { id: string, lemma: string, partOfSpeech: string, senseLabel: string, glossPhrase: string (at most 60), glossPhraseIsFallback: boolean, clipAssetId: string, status: active|held|retired, source: seeded|generated, createdAt: string, updatedAt: string }, asset: { id: string, durationSeconds: number (over 0, at most 4), resolution: "360p", storageKey: string, url: string, hasAudio: boolean, synthIdWatermark: boolean, createdAt: string }
+Request: entry: { id: string, lemma: string, partOfSpeech: string, senseLabel: string, glossPhrase: string (at most 60), glossPhraseIsFallback: boolean, clipAssetId: string, status: active|held|retired, source: seeded|generated, createdAt: string, updatedAt: string }, asset: { id: string, durationSeconds: number (three to four), resolution: "360p", storageKey: string, url: string, hasAudio: boolean, synthIdWatermark: boolean, createdAt: string }
 Response 202: entryId: string, status: active|held|retired
 Errors: 400 (missing key fields or clip), 401 (not an internal caller), 503 (library unavailable). Upserts by the lemma and sense key.
 
