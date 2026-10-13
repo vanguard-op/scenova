@@ -13,6 +13,7 @@ artifact, not per environment.
 from __future__ import annotations
 
 import os
+import tempfile
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Literal
@@ -57,6 +58,19 @@ CLIP_MIME_TYPE = "video/mp4"
 # it renders the clip unmuted.
 CLIP_HAS_AUDIO = True
 CLIP_STORAGE_PREFIX = "clips/"
+
+# Where a finished clip is stored. The architecture puts clips in object storage
+# behind a CDN (Cloud Storage + Cloud CDN); a local run has neither, so the clip
+# is written to the model service's own filesystem and served back from it
+# (FEAT-005, FEAT-006). The backend is resolved per environment, with
+# `CLIP_STORE_BACKEND` overriding it, and `gcs` stays the cloud default so a
+# misconfigured local value can never quietly redirect production storage.
+ClipStoreBackend = Literal["gcs", "local"]
+DEFAULT_ENVIRONMENT = "dev"
+DEFAULT_MODEL_PORT = "8090"
+CLIP_STORE_BACKEND_DEV: ClipStoreBackend = "local"
+CLIP_STORE_BACKEND_CLOUD: ClipStoreBackend = "gcs"
+CLIP_LOCAL_DIR_NAME = "scenova-clips"
 
 # Video generation is a long-running provider operation. The Interactions API
 # returns the finished clip in one call, but a clip that is still being worked
@@ -116,6 +130,9 @@ class Settings:
     max_output_tokens: int
     clip_bucket: str
     clip_cdn_base_url: str
+    clip_local_dir: str
+    clip_local_base_url: str
+    clip_store_backend: ClipStoreBackend
     clip_storage_prefix: str
     clip_target_resolution: ClipResolution
     clip_min_duration_seconds: int
@@ -128,6 +145,11 @@ class Settings:
 def load_settings() -> Settings:
     """Build settings from the environment, falling back to documented defaults."""
 
+    environment = _env_str("ENVIRONMENT", DEFAULT_ENVIRONMENT)
+    model_port = _env_str("MODEL_PORT", DEFAULT_MODEL_PORT)
+    default_clip_store_backend = (
+        CLIP_STORE_BACKEND_DEV if environment == DEFAULT_ENVIRONMENT else CLIP_STORE_BACKEND_CLOUD
+    )
     return Settings(
         phrase_model_pin=PHRASE_MODEL_PIN,
         clip_model_pin=CLIP_MODEL_PIN,
@@ -146,6 +168,17 @@ def load_settings() -> Settings:
         max_output_tokens=MAX_OUTPUT_TOKENS,
         clip_bucket=_env_str("CLIP_BUCKET", ""),
         clip_cdn_base_url=_env_str("CLIP_CDN_BASE_URL", ""),
+        # A local run serves the clip from the model service itself, so the base
+        # is the service's own address. The default is the host's loopback; an
+        # Android emulator reaches the host through `10.0.2.2` and sets
+        # `CLIP_LOCAL_BASE_URL=http://10.0.2.2:<MODEL_PORT>`.
+        clip_local_dir=_env_str(
+            "CLIP_LOCAL_DIR", os.path.join(tempfile.gettempdir(), CLIP_LOCAL_DIR_NAME)
+        ),
+        clip_local_base_url=_env_str("CLIP_LOCAL_BASE_URL", f"http://localhost:{model_port}"),
+        clip_store_backend=_env_clip_store_backend(
+            "CLIP_STORE_BACKEND", default_clip_store_backend
+        ),
         clip_storage_prefix=CLIP_STORAGE_PREFIX,
         clip_target_resolution=CLIP_TARGET_RESOLUTION,
         clip_min_duration_seconds=CLIP_MIN_DURATION_SECONDS,
@@ -154,6 +187,15 @@ def load_settings() -> Settings:
         clip_poll_interval_seconds=DEFAULT_CLIP_POLL_INTERVAL_SECONDS,
         clip_has_audio=CLIP_HAS_AUDIO,
     )
+
+
+def _env_clip_store_backend(name: str, default: ClipStoreBackend) -> ClipStoreBackend:
+    """Read the clip-store backend, ignoring any value that is not a known one."""
+
+    raw = _env_opt(name)
+    if raw in ("gcs", "local"):
+        return raw  # type: ignore[return-value]
+    return default
 
 
 @lru_cache(maxsize=1)

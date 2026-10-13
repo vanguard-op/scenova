@@ -64,3 +64,10 @@ class StorageUnavailableError(ModelError):
 
     status_code = 503
     code = "storage_unavailable"
+
+
+class ClipNotFoundError(ModelError):
+    """A requested clip is not on local disk, so there is nothing to serve."""
+
+    status_code = 404
+    code = "clip_not_found"

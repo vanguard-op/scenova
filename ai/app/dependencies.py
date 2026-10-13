@@ -9,7 +9,7 @@ from __future__ import annotations
 from functools import lru_cache
 
 from .clip.service import ClipService
-from .clip.store import GcsClipStore
+from .clip.store import build_clip_store
 from .config import get_settings
 from .data import load_common_words
 from .phrase.service import PhraseService
@@ -39,7 +39,7 @@ def _build_clip_service() -> ClipService:
     model: ClipModel = GeminiClipModel(settings)
     return ClipService(
         model=model,
-        store=GcsClipStore(settings),
+        store=build_clip_store(settings),
         prompt=load_prompt(DEFAULT_CLIP_PROMPT_PATH),
         settings=settings,
     )
