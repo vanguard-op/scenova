@@ -1,44 +1,48 @@
 NFR-050 gloss-phrase measured run — provenance
 
 Bar       docs/Scenova/nfr.md, NFR-050 (FEAT-004). Metric: share of phrases that pass
-          the rubric (fewer than seven words, common words, one clear meaning).
-          Threshold >= 0.90. Cost ceiling <= $0.01 per request.
+          the rubric (seven words or fewer, common words, one clear meaning).
+          Threshold >= 0.90. Cost ceiling <= $0.01 per request, verified from the live
+          cost signal (analytics.md generation_completed, EVT-008), not this run.
           Golden set: qa/golden/gloss_phrase.jsonl (200 word-sense items).
 Model     gemini-3.5-flash-lite — the pinned text model for the gloss phrase
           (nfr.md "Model Quality & Cost"; architecture.md "Model Version & Fallback").
-Run date  2026-10-13 (re-measure after the gloss-phrase behaviour was raised).
+Run date  2026-10-13 (re-measure after the judged bar was aligned to the settled
+          "seven words or fewer" bound and the gloss phrase re-pinned to prompt v3).
 
 Artifacts
 - qa/replay/NFR-050.jsonl   The recorded run: one produced outcome per golden item, keyed
                             by item identity. Produced live through the shipped phrase path
-                            (ai/app/phrase, C-004) against the pinned model and the current
-                            prompt artifact, then replayed offline so the score is
-                            reproducible without a credential.
+                            (ai/app/phrase, C-004) against the pinned model with the settled
+                            seven-word cap (ai/app/config.py MAX_PHRASE_WORDS) and the pinned
+                            prompt artifact gloss-phrase-v3, then replayed offline so the
+                            score is reproducible without a credential.
 - qa/ratings/NFR-050.json   The rater judgement, keyed by item identity (booleans).
 - qa/reports/NFR-050.json   The judged report: metric, sample size, rate, and failures.
 
 Result
-- Mechanical pre-screen: 199/200 = 0.995.
-- Judged (rubric and raters): 198/200 = 0.990.
+- Mechanical pre-screen: 200/200 = 1.000.
+- Judged (rubric and raters): 199/200 = 0.995.
 - Both meet the 0.90 bar. The generation path is not blocked on NFR-050.
 
-Failures (2)
-- weakness|noun|the lack of strength in body or will — "a weakness" (fallback phrase).
-  The pinned model's candidate was rejected by the shipped guardrail
-  (ai/app/phrase/guardrails.py) after regeneration, so the fixed template was
-  substituted; the bar counts a fallback as a miss.
-- empty|adjective|having nothing inside — "An empty glass of milk." (rater rejected).
-  The phrase contradicts itself: a glass of milk is not empty, so it does not show
-  one clear meaning of the target sense.
+Failure (1)
+- dark|adjective|having little or no light — "Turn on the dark lamp." (rater rejected).
+  The phrase contradicts itself: a lamp you turn on is not the dark one, so it does not
+  show one clear meaning of the target sense.
 
-Rater provenance (caveat)
-nfr.md specifies two trained raters with a third as adjudicator. No separate trained
-raters were available in this environment; the judgement in qa/ratings/NFR-050.json is a
-single QA rater pass applying the "one clear meaning" rubric, standing in for that process
-input. It does not decide the verdict: the mechanical pre-screen alone (199/200 = 0.995)
-already clears the 0.90 bar, and the rater check can only lower it.
+Rater provenance
+nfr.md now fixes the bar as a single-rater measurement: each item is judged by one
+trained rater against the rubric, and quality and model engineering re-judge every item
+the rater marks short of the rubric and a fixed sample of the rest, the adjudicated
+verdict being the one the run counts. No separate adjudicator was available in this
+environment; the judgement in qa/ratings/NFR-050.json is a single QA rater pass applying
+the "one clear meaning" rubric, standing in for that process input. It does not decide
+the verdict: the mechanical pre-screen alone (200/200 = 1.000) already clears the 0.90
+bar, and the rater check can only lower it.
 
 Comparison to the previous measured run
-The previous measured run scored 0.865 (below the bar), with 22 mechanical misses, all on
-the fallback path. After the gloss-phrase behaviour was raised — a word-capped prompt
-artifact and a wider common-word guardrail — the mechanical misses fell from 22 to 1.
+The previous measured run scored 0.990 (198/200) under the earlier "fewer than seven
+words" bound and prompt v2, with a fallback miss on "weakness". Re-measured through the
+same phrase path under the settled bound (cap seven) and prompt v3, 154 of the 200
+phrases were produced differently; the "weakness" item is now generated ("Illness brings
+physical weakness to the body.") and the mechanical misses fell from 1 to 0.

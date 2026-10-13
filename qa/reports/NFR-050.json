@@ -1,42 +1,26 @@
 {
   "nfrId": "NFR-050",
   "capability": "Gloss phrase generation",
-  "metric": "Share of phrases that pass the rubric (fewer than seven words, common words, one clear meaning)",
+  "metric": "Share of phrases that pass the rubric (seven words or fewer, common words, one clear meaning)",
   "threshold": 0.9,
   "costCeiling": "$0.01 per request",
   "modelPin": "gemini-3.5-flash-lite",
   "sampleSize": 200,
-  "passed": 198,
-  "rate": 0.99,
+  "passed": 199,
+  "rate": 0.995,
   "meetsBar": true,
   "judgedBy": "rubric and raters",
   "failures": [
     {
-      "key": "weakness|noun|the lack of strength in body or will",
+      "key": "dark|adjective|having little or no light",
       "item": {
-        "lemma": "weakness",
-        "partOfSpeech": "noun",
-        "senseHint": "the lack of strength in body or will"
-      },
-      "reason": "fallback phrase",
-      "output": {
-        "phrase": "a weakness",
-        "source": "fallback",
-        "bestGuess": true,
-        "failed": false,
-        "reason": null
-      }
-    },
-    {
-      "key": "empty|adjective|having nothing inside",
-      "item": {
-        "lemma": "empty",
+        "lemma": "dark",
         "partOfSpeech": "adjective",
-        "senseHint": "having nothing inside"
+        "senseHint": "having little or no light"
       },
       "reason": "rater rejected",
       "output": {
-        "phrase": "An empty glass of milk.",
+        "phrase": "Turn on the dark lamp.",
         "source": "generated",
         "bestGuess": false,
         "failed": false,
@@ -44,5 +28,5 @@
       }
     }
   ],
-  "generatedAt": "2026-10-13T15:24:23.636981+00:00"
+  "generatedAt": "2026-10-13T16:02:10.133927+00:00"
 }

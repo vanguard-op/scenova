@@ -15,9 +15,11 @@ Golden-set files live in `qa/golden/` as one JSON object per line:
 - `word_clip.jsonl`      (NFR-051): `{"word", "phrase"}`
 - `phrase_clip.jsonl`    (NFR-053): `{"phrase"}`
 
-The judge for the clip bars is a rater (two trained raters with an adjudicator,
-per nfr.md); the harness accepts a judge callable so a run is reproducible, and
-reports the metric, the sample size, and the failing cases.
+The judge for the bars is a rater (one trained rater with adjudication, per
+nfr.md: the rater's misses and a fixed sample of the rest are re-judged, and the
+adjudicated verdict is the one the run counts); the harness accepts a judge
+callable so a run is reproducible, and reports the metric, the sample size, and
+the failing cases.
 """
 
 from __future__ import annotations
@@ -59,7 +61,7 @@ BARS: tuple[Bar, ...] = (
         capability="Gloss phrase generation",
         golden_file="gloss_phrase.jsonl",
         minimum_items=200,
-        metric="Share of phrases that pass the rubric (fewer than seven words, common words, "
+        metric="Share of phrases that pass the rubric (seven words or fewer, common words, "
         "one clear meaning)",
         threshold=0.90,
         cost_ceiling="$0.01 per request",

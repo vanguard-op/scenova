@@ -59,8 +59,8 @@ def test_the_golden_set_evaluation_meets_the_bar(bar: Bar, tmp_path: Path) -> No
     if not ratings.exists():
         pytest.fail(
             f"{bar.nfr_id}: the golden set cannot be judged — there are no rater "
-            f"judgements at {ratings}. Two trained raters with a third as adjudicator "
-            "are a judged-run input (nfr.md, Model Quality & Cost)."
+            f"judgements at {ratings}. One trained rater with adjudication "
+            "is a judged-run input (nfr.md, Model Quality & Cost)."
         )
 
     report_path = tmp_path / f"{bar.nfr_id}.json"
