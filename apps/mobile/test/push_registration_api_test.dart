@@ -18,31 +18,36 @@ void main() {
       );
     }
 
-    test('posts the frozen token and platform with the bearer token', () async {
-      late http.Request captured;
-      final api = apiReturning((request) {
-        captured = request;
-        return http.Response(
-          jsonEncode(<String, dynamic>{'registered': true}),
-          202,
+    test(
+      'posts the frozen token, platform, and lookup with the bearer token',
+      () async {
+        late http.Request captured;
+        final api = apiReturning((request) {
+          captured = request;
+          return http.Response(
+            jsonEncode(<String, dynamic>{'registered': true}),
+            202,
+          );
+        });
+
+        final registered = await api.register(
+          token: 'fcm-token-1',
+          platform: LookupPlatform.android,
+          lookupId: 'lk_1',
         );
-      });
 
-      final registered = await api.register(
-        token: 'fcm-token-1',
-        platform: LookupPlatform.android,
-      );
-
-      expect(registered, isTrue);
-      expect(captured.method, 'POST');
-      expect(captured.url.path, '/v1/push-registrations');
-      expect(captured.headers['authorization'], 'Bearer token');
-      final body = jsonDecode(captured.body) as Map<String, dynamic>;
-      expect(body, <String, dynamic>{
-        'token': 'fcm-token-1',
-        'platform': 'android',
-      });
-    });
+        expect(registered, isTrue);
+        expect(captured.method, 'POST');
+        expect(captured.url.path, '/v1/push-registrations');
+        expect(captured.headers['authorization'], 'Bearer token');
+        final body = jsonDecode(captured.body) as Map<String, dynamic>;
+        expect(body, <String, dynamic>{
+          'token': 'fcm-token-1',
+          'platform': 'android',
+          'lookupId': 'lk_1',
+        });
+      },
+    );
 
     test('reports a service that does not register the token', () async {
       final api = apiReturning(
@@ -52,7 +57,11 @@ void main() {
         ),
       );
       expect(
-        await api.register(token: 't', platform: LookupPlatform.ios),
+        await api.register(
+          token: 't',
+          platform: LookupPlatform.ios,
+          lookupId: 'lk_1',
+        ),
         isFalse,
       );
     });
@@ -60,7 +69,11 @@ void main() {
     test('maps a 400 to a rejected token', () async {
       final api = apiReturning((_) => http.Response('{}', 400));
       await expectLater(
-        api.register(token: 't', platform: LookupPlatform.ios),
+        api.register(
+          token: 't',
+          platform: LookupPlatform.ios,
+          lookupId: 'lk_1',
+        ),
         throwsA(
           isA<PushRegistrationException>().having(
             (e) => e.isRejected,
@@ -74,7 +87,11 @@ void main() {
     test('maps a 401 to an unauthenticated failure', () async {
       final api = apiReturning((_) => http.Response('{}', 401));
       await expectLater(
-        api.register(token: 't', platform: LookupPlatform.ios),
+        api.register(
+          token: 't',
+          platform: LookupPlatform.ios,
+          lookupId: 'lk_1',
+        ),
         throwsA(
           isA<PushRegistrationException>().having(
             (e) => e.isUnauthenticated,
@@ -88,7 +105,11 @@ void main() {
     test('maps a 429 to a retryable failure', () async {
       final api = apiReturning((_) => http.Response('{}', 429));
       await expectLater(
-        api.register(token: 't', platform: LookupPlatform.ios),
+        api.register(
+          token: 't',
+          platform: LookupPlatform.ios,
+          lookupId: 'lk_1',
+        ),
         throwsA(
           isA<PushRegistrationException>().having(
             (e) => e.isRetryable,
@@ -110,7 +131,11 @@ void main() {
         ),
       );
       await expectLater(
-        api.register(token: 't', platform: LookupPlatform.ios),
+        api.register(
+          token: 't',
+          platform: LookupPlatform.ios,
+          lookupId: 'lk_1',
+        ),
         throwsA(
           isA<PushRegistrationException>()
               .having((e) => e.code, 'code', 'unreadable_token')
@@ -130,7 +155,11 @@ void main() {
         client: MockClient((_) async => throw http.ClientException('no route')),
       );
       await expectLater(
-        api.register(token: 't', platform: LookupPlatform.ios),
+        api.register(
+          token: 't',
+          platform: LookupPlatform.ios,
+          lookupId: 'lk_1',
+        ),
         throwsA(
           isA<PushRegistrationException>().having(
             (e) => e.isOffline,

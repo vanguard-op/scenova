@@ -15,20 +15,27 @@ class _FixedTokens implements PushTokenProvider {
 }
 
 void main() {
-  test('registers the device token with its platform', () async {
-    final api = MockPushRegistrationApi();
-    final registrar = PushRegistrar(
-      api: api,
-      tokens: _FixedTokens('device-token'),
-      connectivity: ManualConnectivity(),
-    );
-    addTearDown(registrar.dispose);
+  test(
+    'registers the device token against the lookup it is waiting on',
+    () async {
+      final api = MockPushRegistrationApi();
+      final registrar = PushRegistrar(
+        api: api,
+        tokens: _FixedTokens('device-token'),
+        connectivity: ManualConnectivity(),
+      );
+      addTearDown(registrar.dispose);
 
-    expect(await registrar.requestClipReadyNotice(), isTrue);
-    expect(api.tokens, <String>['device-token']);
-    expect(api.platforms, <LookupPlatform>[LookupPlatform.current()]);
-    expect(registrar.pendingRegistration, isFalse);
-  });
+      expect(
+        await registrar.requestClipReadyNotice(lookupId: 'lk_1'),
+        PushNoticeResult.registered,
+      );
+      expect(api.tokens, <String>['device-token']);
+      expect(api.platforms, <LookupPlatform>[LookupPlatform.current()]);
+      expect(api.lookupIds, <String>['lk_1']);
+      expect(registrar.pendingRegistration, isFalse);
+    },
+  );
 
   test('registers nothing when the device has no token', () async {
     final api = MockPushRegistrationApi();
@@ -39,12 +46,32 @@ void main() {
     );
     addTearDown(registrar.dispose);
 
-    expect(await registrar.requestClipReadyNotice(), isFalse);
+    expect(
+      await registrar.requestClipReadyNotice(lookupId: 'lk_1'),
+      PushNoticeResult.notRegistered,
+    );
     expect(api.tokens, isEmpty);
     expect(registrar.pendingRegistration, isFalse);
   });
 
-  test('holds an offline registration and sends it when back online', () async {
+  test('reports a lookup the service has already finished', () async {
+    final api = MockPushRegistrationApi()..declinesRegistration = true;
+    final registrar = PushRegistrar(
+      api: api,
+      tokens: _FixedTokens('device-token'),
+      connectivity: ManualConnectivity(),
+    );
+    addTearDown(registrar.dispose);
+
+    expect(
+      await registrar.requestClipReadyNotice(lookupId: 'lk_1'),
+      PushNoticeResult.noNoticeNeeded,
+    );
+    // Nothing is held: a lookup that has finished has no later event to watch.
+    expect(registrar.pendingRegistration, isFalse);
+  });
+
+  test('holds an offline registration and sends it, lookup and all, when back online', () async {
     final api = MockPushRegistrationApi();
     final connectivity = ManualConnectivity(online: false);
     final registrar = PushRegistrar(
@@ -54,7 +81,10 @@ void main() {
     );
     addTearDown(registrar.dispose);
 
-    expect(await registrar.requestClipReadyNotice(), isFalse);
+    expect(
+      await registrar.requestClipReadyNotice(lookupId: 'lk_1'),
+      PushNoticeResult.notRegistered,
+    );
     expect(api.tokens, isEmpty);
     expect(registrar.pendingRegistration, isTrue);
 
@@ -64,6 +94,7 @@ void main() {
     connectivity.setOnline(true);
     await pumpEventQueue();
     expect(api.tokens, <String>['device-token']);
+    expect(api.lookupIds, <String>['lk_1']);
     expect(registrar.pendingRegistration, isFalse);
   });
 
@@ -77,7 +108,10 @@ void main() {
     );
     addTearDown(registrar.dispose);
 
-    expect(await registrar.requestClipReadyNotice(), isFalse);
+    expect(
+      await registrar.requestClipReadyNotice(lookupId: 'lk_1'),
+      PushNoticeResult.notRegistered,
+    );
     expect(registrar.pendingRegistration, isTrue);
 
     await pumpEventQueue();
@@ -86,6 +120,7 @@ void main() {
     connectivity.setOnline(true);
     await pumpEventQueue();
     expect(api.tokens, <String>['device-token']);
+    expect(api.lookupIds, <String>['lk_1']);
     expect(registrar.pendingRegistration, isFalse);
   });
 
@@ -99,7 +134,10 @@ void main() {
     );
     addTearDown(registrar.dispose);
 
-    expect(await registrar.requestClipReadyNotice(), isFalse);
+    expect(
+      await registrar.requestClipReadyNotice(lookupId: 'lk_1'),
+      PushNoticeResult.notRegistered,
+    );
     expect(registrar.pendingRegistration, isFalse);
 
     await pumpEventQueue();

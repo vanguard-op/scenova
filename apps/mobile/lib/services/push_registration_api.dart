@@ -39,11 +39,15 @@ class PushRegistrationException implements Exception {
 /// The push-token registrations intake, as frozen in `C-008`.
 abstract interface class PushRegistrationApi {
   /// `POST /v1/push-registrations`. Registers the device's platform push token
-  /// so the notification service can reach the reader when a generation they
-  /// are waiting on completes. Returns whether the service accepted it.
+  /// against [lookupId] — the lookup the reader is waiting on — so the
+  /// notification service can reach the reader when that generation completes.
+  ///
+  /// Returns whether a notice will come: `false` when the lookup has already
+  /// finished, since there is no later event to tell the reader about.
   Future<bool> register({
     required String token,
     required LookupPlatform platform,
+    required String lookupId,
   });
 }
 
@@ -66,6 +70,7 @@ class HttpPushRegistrationApi implements PushRegistrationApi {
   Future<bool> register({
     required String token,
     required LookupPlatform platform,
+    required String lookupId,
   }) async {
     final response = await _send(
       () async => _client.post(
@@ -74,6 +79,7 @@ class HttpPushRegistrationApi implements PushRegistrationApi {
         body: jsonEncode(<String, dynamic>{
           'token': token,
           'platform': platform.wire,
+          'lookupId': lookupId,
         }),
       ),
     );
@@ -165,21 +171,31 @@ class MockPushRegistrationApi implements PushRegistrationApi {
   /// The platform each registration reported, in order.
   final List<LookupPlatform> platforms = <LookupPlatform>[];
 
+  /// The lookup each registration was tied to, in order.
+  final List<String> lookupIds = <String>[];
+
   /// When set, `register` throws this status instead of accepting the token.
   int? failStatus;
+
+  /// When true, the service accepts the call but reports that no notice is
+  /// coming — the lookup has already finished (`C-008`, `registered: false`).
+  bool declinesRegistration = false;
 
   @override
   Future<bool> register({
     required String token,
     required LookupPlatform platform,
+    required String lookupId,
   }) async {
     if (latency > Duration.zero) await Future<void>.delayed(latency);
     final status = failStatus;
     if (status != null) {
       throw PushRegistrationException(status, 'Scripted failure $status.');
     }
+    if (declinesRegistration) return false;
     tokens.add(token);
     platforms.add(platform);
+    lookupIds.add(lookupId);
     return true;
   }
 }

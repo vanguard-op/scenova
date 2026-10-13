@@ -179,8 +179,10 @@ void main() {
     await tester.tap(find.text('Notify me'));
     await tester.pump();
     expect(controller.willNotify, isTrue);
-    // Taking the notice registers the device for the clip-ready push (C-008).
+    // Taking the notice registers the device against the lookup the reader is
+    // waiting on, so the push can find its way back (C-008).
     expect(pushApi.tokens, hasLength(1));
+    expect(pushApi.lookupIds, <String>[controller.result!.lookupId]);
 
     // Left generating past the timeout, the lookup is reported with a retry
     // rather than polling forever.
@@ -188,6 +190,48 @@ void main() {
     await tester.pump();
     expect(controller.phase, ClipPhase.error);
     expect(find.text('That lookup did not finish'), findsOneWidget);
+    await teardown(tester);
+  });
+
+  testWidgets('a notice the service does not need says the lookup finished', (
+    tester,
+  ) async {
+    // The service reports the lookup is no longer generating, so there is no
+    // later event to notify about; the reader is told rather than left waiting.
+    final pushApi = MockPushRegistrationApi()..declinesRegistration = true;
+    final services = buildServices(
+      api: MockLookupApi(pollsUntilReady: 100),
+      pushApi: pushApi,
+    );
+    final controller = controllerFor(
+      services,
+      'xylograph',
+      pollInterval: const Duration(milliseconds: 100),
+      noticeThreshold: const Duration(milliseconds: 250),
+      pollTimeout: const Duration(milliseconds: 900),
+    );
+    addTearDown(controller.dispose);
+
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await tester.tap(find.text('Notify me'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(
+      find.text('This lookup already finished. It will update here.'),
+      findsOneWidget,
+    );
+
+    // Let the wait time out so the poll stops rather than outliving the test.
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
     await teardown(tester);
   });
 

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../models/analytics_event.dart';
 import '../models/lookup.dart';
 import '../services/app_services.dart';
+import '../services/push_registrar.dart';
 import '../services/settings_controller.dart';
 import '../theme/colors.dart';
 import '../theme/tokens.dart';
@@ -129,16 +130,21 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
     _controller.markGeneratingNoticeShown();
   }
 
-  /// Registers the device for the clip-ready notice and tells the reader
-  /// whether it was set up.
+  /// Registers the device for the clip-ready notice and tells the reader what
+  /// came of it.
   Future<void> _notifyWhenReady() async {
-    final registered = await _controller.notifyWhenReady();
+    final outcome = await _controller.notifyWhenReady();
     if (!mounted) return;
-    _showMessage(
-      registered
-          ? "We'll let you know when your clip is ready."
-          : 'We could not set up the notice. Try again when you are online.',
-    );
+    _showMessage(switch (outcome) {
+      PushNoticeResult.registered =>
+        "We'll let you know when your clip is ready.",
+      // The service had nothing left to watch: the lookup has resolved, so the
+      // view is about to settle instead of waiting on a notice.
+      PushNoticeResult.noNoticeNeeded =>
+        'This lookup already finished. It will update here.',
+      PushNoticeResult.notRegistered =>
+        'We could not set up the notice. Try again when you are online.',
+    });
   }
 
   @override

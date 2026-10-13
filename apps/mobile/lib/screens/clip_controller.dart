@@ -9,6 +9,7 @@ import '../models/lookup.dart';
 import '../services/app_services.dart';
 import '../services/capture_intake.dart';
 import '../services/lookup_api.dart';
+import '../services/push_registrar.dart';
 
 /// The state of the in-context clip view
 /// (`docs/Scenova/screens/03-clip-view.md` → States).
@@ -244,14 +245,19 @@ class ClipViewController extends ChangeNotifier {
 
   /// The reader asked to be told when the clip is ready.
   ///
-  /// This registers the device with the notice service (`C-008`) and returns
-  /// whether the registration reached it. The reader's choice stands either way;
-  /// a registration held for the connection is retried when it returns.
-  Future<bool> notifyWhenReady() async {
+  /// This registers the device with the notice service against the lookup the
+  /// reader is waiting on (`C-008`) and returns what came of it. The reader's
+  /// choice stands either way; a registration held for the connection is retried
+  /// when it returns.
+  Future<PushNoticeResult> notifyWhenReady() async {
     _willNotify = true;
     _noticeDismissed = true;
     notifyListeners();
-    return services.pushRegistrar.requestClipReadyNotice();
+    final lookupId = _result?.lookupId;
+    // Only a lookup the service knows about can be watched; a result built
+    // from the device's own store has none.
+    if (lookupId == null) return PushNoticeResult.notRegistered;
+    return services.pushRegistrar.requestClipReadyNotice(lookupId: lookupId);
   }
 
   Future<void> _requestLookup() async {
