@@ -26,6 +26,18 @@ class UnauthorizedError(ModelError):
     code = "unauthorized"
 
 
+class TargetDurationExceededError(ModelError):
+    """The requested clip duration is over the four-second cap (C-005).
+
+    A malformed target is a request-contract violation, not a provider outcome:
+    it is a 400, kept distinct from the 422 the provider's decline returns so the
+    pipeline can tell the two apart.
+    """
+
+    status_code = 400
+    code = "target_duration_exceeded"
+
+
 class ProviderUnavailableError(ModelError):
     """The model provider could not be reached after retries."""
 

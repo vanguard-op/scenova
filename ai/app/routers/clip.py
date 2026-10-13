@@ -10,13 +10,14 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from ..auth import require_internal_caller
 from ..clip.service import ClipRequest, ClipService
 from ..clip.store import ClipStorageError
-from ..config import ClipResolution
+from ..config import ClipResolution, Settings, get_settings
 from ..dependencies import get_clip_service
 from ..errors import (
     ProviderDeclinedError,
     ProviderTimeoutError,
     ProviderUnavailableError,
     StorageUnavailableError,
+    TargetDurationExceededError,
 )
 from ..provider import ProviderRefusal, ProviderTimeout, ProviderUnavailable
 
@@ -29,7 +30,7 @@ class ClipRequestBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     phrase: str = Field(min_length=1)
-    targetDurationSeconds: float = Field(le=4)
+    targetDurationSeconds: float
     modelPin: str = Field(min_length=1)
 
     @field_validator("phrase")
@@ -56,8 +57,18 @@ class ClipResponseBody(BaseModel):
 async def generate_clip(
     body: ClipRequestBody,
     service: Annotated[ClipService, Depends(get_clip_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
     _caller: Annotated[None, Depends(require_internal_caller)],
 ) -> ClipResponseBody:
+    # The duration cap is a request-contract violation (400), kept separate from
+    # the provider's decline (422) so the pipeline can tell a bad target from a
+    # phrase the provider refused.
+    if body.targetDurationSeconds > settings.clip_max_duration_seconds:
+        raise TargetDurationExceededError(
+            f"A clip target of {body.targetDurationSeconds:g}s is over the "
+            f"{settings.clip_max_duration_seconds}-second cap."
+        )
+
     try:
         result = await service.generate(
             ClipRequest(

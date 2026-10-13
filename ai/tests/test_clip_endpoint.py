@@ -122,13 +122,35 @@ async def test_wrong_audience_is_401() -> None:
 
 
 @pytest.mark.asyncio
-async def test_target_over_four_seconds_is_rejected() -> None:
+async def test_target_over_four_seconds_is_a_400_not_a_decline() -> None:
+    model = FakeClipModel([CLIP_BYTES])
+    store = FakeClipStore()
+
     response = await post(
-        FakeClipModel([CLIP_BYTES]),
+        model,
         payload=clip_payload(targetDurationSeconds=5),
+        store=store,
     )
 
-    assert response.status_code == 422
+    # A bad target is a request-contract violation, distinct from the provider's
+    # decline (422): the pipeline can tell the two apart by status and code.
+    assert response.status_code == 400
+    assert response.json()["code"] == "target_duration_exceeded"
+    assert response.json()["message"]
+    # Nothing is generated or stored for a rejected target.
+    assert model.calls == []
+    assert store.puts == []
+
+
+@pytest.mark.asyncio
+async def test_target_at_the_four_second_cap_is_accepted() -> None:
+    response = await post(
+        FakeClipModel([CLIP_BYTES]),
+        payload=clip_payload(targetDurationSeconds=4),
+    )
+
+    assert response.status_code == 201
+    assert response.json()["durationSeconds"] == 4.0
 
 
 @pytest.mark.asyncio
