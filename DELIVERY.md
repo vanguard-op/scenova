@@ -1,7 +1,7 @@
 # DELIVERY — Scenova
 
 ## Source of Truth
-`docs/Scenova/` (BPRD), a nested git repo. Content revision `339f8c3717cb`; docs commit `09100d66619c`. Read-only for the squad; `product-shaper` is the only writer. The roadmap owns the build order.
+`docs/Scenova/` (BPRD), a nested git repo. Content revision `9e1714e347c0`; docs commit `914a1483e624`. Read-only for the squad; `product-shaper` is the only writer. The roadmap owns the build order.
 
 ## Team & File Ownership
 | Owner | Owns |
@@ -94,7 +94,9 @@ docs/           BPRD (product-shaper)
 | T-008 | FEAT-003, FEAT-005 | backend-engineer | Done | C-002, C-003, C-005 |
 | T-009 | FEAT-005 | backend-engineer | Done | C-002, C-006 |
 | T-010 | FEAT-004 | ai-engineer | In Progress | C-004 |
-| T-011 | FEAT-002 | frontend-engineer | In Progress | C-001, C-002 |
+| T-011 | FEAT-002 | frontend-engineer | Done | C-001, C-002 |
+| T-012 | FEAT-002 | frontend-engineer | Done | C-001, C-002 |
+| T-013 | FEAT-001, FEAT-002, FEAT-012 | frontend-engineer | Done | C-001 |
 
 ## Decisions Log
 | # | Decision | Rationale | By |
@@ -112,6 +114,7 @@ docs/           BPRD (product-shaper)
 | D-011 | Pre-account authentication: anonymous Firebase ID token, upgraded to the reader's account at sign-in | The gateway must enforce authentication before accounts ship, without the client holding a server secret | lead |
 | D-012 | Contract revision 1 to C-001 and C-002: the reader-facing best-guess signal is `notice` (not a `senseLabel` sentinel); errors carry a `{code, message}` body; 503 is added as retryable | Both services already emit this shape; the sentinel was an undocumented coupling. Only the client needs re-aligning | lead |
 | D-013 | Brand-doc gaps: motion timings stay build-layer-owned; the semantic families' 100/300/700/900 shades are completed; the gloss fallback is made grammatical | The branding reference deliberately excludes motion tokens, so the derived values stand; the shade and fallback gaps were real and are now settled | user |
+| D-014 | The icon set's disabled state is carried by a solid colour, never opacity or alpha | Opacity renders inconsistently across platforms; the muted reading is carried by brightness instead (solid `grey-400` against the `grey-600` default) | user |
 
 ## Definition of Done
 - **Task:** the acceptance criteria in the cited feature doc are met; the frozen contract is conformed; unit tests pass; format, lint, analyze, and build are clean; work is committed to the dev branch and confined to `Own`.
