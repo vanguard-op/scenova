@@ -8,6 +8,7 @@ set -euo pipefail
 log "Scenova CI · environment=${ENVIRONMENT} · commit=${GIT_SHA:-local}"
 
 bash ci/checks/lint.sh
+bash ci/checks/env_schema.sh
 bash ci/checks/types.sh
 bash ci/checks/test.sh
 bash ci/checks/security.sh

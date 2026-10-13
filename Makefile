@@ -29,7 +29,7 @@ RUFF      := $(VENV)/bin/ruff
 MYPY      := $(VENV)/bin/mypy
 PYTEST    := $(VENV)/bin/pytest
 
-.PHONY: help setup fmt lint typecheck test qa qa-model model-bar build bundle boot security \
+.PHONY: help setup fmt lint env typecheck test qa qa-model model-bar build bundle boot security \
         infra-init infra-fmt infra-validate infra-plan infra-apply \
         deploy promote rollback ci clean
 
@@ -62,6 +62,9 @@ fmt: ## Format Python (black) and Dart (dart format) in place
 
 lint: ## Lint Python (ruff) and Dart (flutter analyze), check formatting
 	@bash ci/checks/lint.sh
+
+env: ## Validate the environment schema (.env.example vs the release flags and clip store)
+	@bash ci/checks/env_schema.sh
 
 typecheck: ## Type-check the Python workspace (mypy)
 	@bash ci/checks/types.sh
@@ -122,7 +125,7 @@ rollback: ## Roll a service back to its previous revision (ENV=… SVC=…)
 
 # --- Composite ---------------------------------------------------------------
 
-ci: ## Full local CI run (lint, types, tests, security, infra, build, boot, qa)
+ci: ## Full local CI run (lint, env schema, types, tests, security, infra, build, boot, qa)
 	@bash ci/ci.sh
 
 clean: ## Remove build and tool caches
