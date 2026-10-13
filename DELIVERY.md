@@ -1,7 +1,7 @@
 # DELIVERY — Scenova
 
 ## Source of Truth
-`docs/Scenova/` (BPRD), a nested git repo. Content revision `5d40527f41b4`; docs commit `d4e4d1d41d4d`. Read-only for the squad; `product-shaper` is the only writer. The roadmap owns the build order.
+`docs/Scenova/` (BPRD), a nested git repo. Content revision `bca978c8551a`; docs commit `bee761a551c5`. Read-only for the squad; `product-shaper` is the only writer. The roadmap owns the build order.
 
 ## Team & File Ownership
 | Owner | Owns |
@@ -113,6 +113,10 @@ docs/           BPRD (product-shaper)
 | T-026 | — | backend-engineer | Done | C-007 |
 | T-027 | — | infra-engineer | Done | — |
 | T-028 | — | qa-engineer | Done | C-004, C-005 |
+| T-029 | FEAT-004 | ai-engineer | Done | C-004 |
+| T-030 | FEAT-005 | backend-engineer | Done | C-003, C-006 |
+| T-031 | — | qa-engineer | In Progress | C-004, C-005 |
+| T-032 | FEAT-004 | backend-engineer | In Progress | C-003, C-004 |
 
 ## Decisions Log
 | # | Decision | Rationale | By |
@@ -134,6 +138,7 @@ docs/           BPRD (product-shaper)
 | D-015 | Phase 1's goal is restated to the capture-to-clip foundation; serving a stored clip to the reader defers to the reading loop | The phase's features produce a clip; the component that serves it is the shared library, which the roadmap places in the next phase | user |
 | D-016 | The model quality bar's golden sets are built by the model engineer and the judged run is QA's gate | Keeps dataset construction with the model path and the release decision with QA | user |
 | D-017 | Analytics is added to Phase 1, with a frozen client intake contract (C-007) | The taxonomy was specified but owned by no phase; the launch funnels depend on it | user |
+| D-018 | The gloss phrase and the clip use separate pinned models: the text model `gemini-3.5-flash-lite` for the phrase, the video model `gemini-omni-1.1-flash` for the clip | One model for both is expensive and inaccurate at text; each output is pinned, costed, and measured on its own terms | user |
 
 ## Definition of Done
 - **Task:** the acceptance criteria in the cited feature doc are met; the frozen contract is conformed; unit tests pass; format, lint, analyze, and build are clean; work is committed to the dev branch and confined to `Own`.

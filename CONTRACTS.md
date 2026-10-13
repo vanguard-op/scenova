@@ -22,14 +22,14 @@ Body: error responses are `{"code": string, "message": string}`. `notice` carrie
 ### C-003: POST /internal/generation-jobs
 Status: Frozen
 Auth: internal service identity (service account); never reachable from the client
-Request: jobId: string, lookupId: string, kind: word|phrase, lemma: string|null, phrase: string, senseLabel: string, partOfSpeech: string, targetDurationSeconds: number (at most 4), modelPin: string ("gemini-omni-1.1-flash"), attempt: integer
+Request: jobId: string, lookupId: string, kind: word|phrase, lemma: string|null, phrase: string|null (the selection for a phrase job; null for a word job, where the pipeline generates the phrase via C-004), senseLabel: string, partOfSpeech: string, targetDurationSeconds: number (at most 4), modelPin: string ("gemini-omni-1.1-flash"), attempt: integer
 Response 202: jobId: string, status: queued|running
-Errors: 400 (missing phrase, or target duration over four seconds), 401 (not an internal caller), 409 (jobId already enqueued), 503 (queue unavailable)
+Errors: 400 (a phrase job without a phrase, or target duration over four seconds), 401 (not an internal caller), 409 (jobId already enqueued), 503 (queue unavailable)
 
 ### C-004: POST /internal/model/phrase
 Status: Frozen
 Auth: internal service identity (called by the generation pipeline only)
-Request: lemma: string|null, partOfSpeech: string, senseHint: string, modelPin: string
+Request: lemma: string|null, partOfSpeech: string, senseHint: string, modelPin: string ("gemini-3.5-flash-lite")
 Response 200: phrase: string (fewer than seven words, common words), source: generated|fallback, bestGuess: boolean
 Errors: 401 (not an internal caller), 503 (provider unavailable after retries; the caller substitutes the fallback). Refusal, timeout, or unusable output is returned as 200 with source=fallback, never as an error to the reader.
 
