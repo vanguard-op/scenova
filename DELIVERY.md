@@ -1,7 +1,7 @@
 # DELIVERY — Scenova
 
 ## Source of Truth
-`docs/Scenova/` (BPRD), a nested git repo. Content revision `bca978c8551a`; docs commit `bee761a551c5`. Read-only for the squad; `product-shaper` is the only writer. The roadmap owns the build order.
+`docs/Scenova/` (BPRD), a nested git repo. Content revision `f801f30e6e9b`; docs commit `4a1a00225ff1`. Read-only for the squad; `product-shaper` is the only writer. The roadmap owns the build order.
 
 ## Team & File Ownership
 | Owner | Owns |
@@ -115,8 +115,9 @@ docs/           BPRD (product-shaper)
 | T-028 | — | qa-engineer | Done | C-004, C-005 |
 | T-029 | FEAT-004 | ai-engineer | Done | C-004 |
 | T-030 | FEAT-005 | backend-engineer | Done | C-003, C-006 |
-| T-031 | — | qa-engineer | In Progress | C-004, C-005 |
-| T-032 | FEAT-004 | backend-engineer | In Progress | C-003, C-004 |
+| T-031 | — | qa-engineer | Done | C-004, C-005 |
+| T-032 | FEAT-004 | backend-engineer | Done | C-003, C-004 |
+| T-033 | FEAT-004 | backend-engineer | In Progress | C-001, C-002, C-003 |
 
 ## Decisions Log
 | # | Decision | Rationale | By |
