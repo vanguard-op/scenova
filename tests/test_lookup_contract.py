@@ -27,8 +27,6 @@ RESPONSE_KEYS = {
     "correlationId",
 }
 
-BEST_GUESS_FRAGMENT = "best guess"
-
 
 def _auth(subject: str = "reader-1") -> dict[str, str]:
     # The pre-account dev verifier accepts `dev:<subject>` (D-011).
@@ -101,20 +99,20 @@ def test_a_word_with_several_common_senses_returns_more_than_one(gateway: httpx2
     assert len(set(labels)) == len(labels)
 
 
-def test_an_unknown_word_is_the_key_and_flagged_as_a_best_guess(
+def test_an_unknown_word_keeps_the_word_as_the_key(
     gateway: httpx2.Client,
 ) -> None:
-    # FEAT-003: a word absent from the sense inventory keeps the word as the key
-    # and the reader is told the sense is a best guess (the advisory travels in
-    # `notice`; `senseLabel` is not a signal — C-001 revision 1).
+    # FEAT-003: a word absent from the sense inventory keeps the word as the key.
+    # No advisory about the meaning travels in `notice` — it is for clip
+    # availability only — and `senseLabel` is not a signal (C-001 revision 1).
     response = _create(gateway, "xylograph")
 
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["normalisedLemma"] == "xylograph"
-    assert body["notice"] and BEST_GUESS_FRAGMENT in body["notice"]
-    # The reader-facing signal is `notice`, never the sense label (C-001 revision
-    # 1); the label stays a non-empty human string.
+    assert body["notice"] is None
+    # The sense label stays a non-empty human string, never a signal (C-001
+    # revision 1).
     assert all(sense["senseLabel"] for sense in body["senses"])
 
 
@@ -155,7 +153,7 @@ def test_a_hyphenated_compound_keeps_the_word_as_written(gateway: httpx2.Client)
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["normalisedLemma"] == "well-known"
-    assert body["notice"] and BEST_GUESS_FRAGMENT in body["notice"]
+    assert body["notice"] is None
 
 
 def test_an_empty_selection_is_refused(gateway: httpx2.Client) -> None:

@@ -69,7 +69,6 @@ def _entry(
     sense_label: str,
     part_of_speech: str,
     gloss: str = "a sense in context",
-    fallback: bool = False,
 ) -> dict[str, Any]:
     return {
         "id": entry_id,
@@ -77,7 +76,6 @@ def _entry(
         "partOfSpeech": part_of_speech,
         "senseLabel": sense_label,
         "glossPhrase": gloss,
-        "glossPhraseIsFallback": fallback,
         "clipAssetId": f"clip_{entry_id}",
         "status": "active",
         "source": "generated",
@@ -356,7 +354,6 @@ def test_the_entry_write_conforms_to_contract_c009(library: httpx2.Client) -> No
             "partOfSpeech": "noun",
             "senseLabel": "reference",
             "glossPhrase": "a book of words and meanings",
-            "glossPhraseIsFallback": False,
             "clipAssetId": "clip_dictionary",
             "status": "active",
             "source": "generated",
@@ -394,7 +391,6 @@ def test_a_flat_entry_write_is_refused(library: httpx2.Client) -> None:
         "senseLabel": "shape",
         "partOfSpeech": "noun",
         "glossPhrase": "a superseded body",
-        "glossPhraseIsFallback": False,
         "source": "generated",
         "clip": {
             "storageKey": "clips/flat.mp4",
@@ -524,9 +520,9 @@ def test_the_library_serves_an_active_entry_with_its_clip(library: httpx2.Client
 
 def test_the_entry_read_conforms_to_contract_c010(library: httpx2.Client) -> None:
     # C-010 freezes the served entry as exactly what the lookup needs to serve a
-    # clip: the entry id, its review status, the gloss phrase and whether it is
-    # the fallback, and the clip. The lemma, sense label, and part of speech are
-    # the query, not part of the response.
+    # clip: the entry id, its review status, the gloss phrase, and the clip. The
+    # lemma, sense label, and part of speech are the query, not part of the
+    # response.
     _store(
         library,
         _entry(
@@ -546,14 +542,12 @@ def test_the_entry_read_conforms_to_contract_c010(library: httpx2.Client) -> Non
         "entryId",
         "status",
         "glossPhrase",
-        "glossPhraseIsFallback",
         "clip",
     }, f"C-010 entry fields differ: {sorted(entry)}"
     assert set(entry["clip"]) == {"url", "durationSeconds", "resolution", "hasAudio"}
     assert entry["entryId"] == "le_lucky"
     assert entry["status"] == "active"
     assert entry["glossPhrase"] == "having good luck"
-    assert entry["glossPhraseIsFallback"] is False
 
 
 def test_an_unknown_sense_key_reads_as_null(library: httpx2.Client) -> None:
