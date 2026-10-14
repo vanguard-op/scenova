@@ -84,6 +84,10 @@ class ClipViewController extends ChangeNotifier {
   bool _pastThreshold = false;
   bool _noticeDismissed = false;
   bool _fromHistory = false;
+
+  /// Whether the first load has run. Until it has, a newer selection is left to
+  /// the load that mounting triggers rather than starting a second lookup.
+  bool _loaded = false;
   FeedbackMark? _feedback;
 
   CaptureSelection get selection => _selection;
@@ -148,6 +152,7 @@ class ClipViewController extends ChangeNotifier {
   /// [announceStart] emits `lookup_started`; a retry of the same lookup passes
   /// false so the funnel counts the lookup once.
   Future<void> load({bool announceStart = true}) async {
+    _loaded = true;
     _cancelPoll();
     _playing = false;
     _feedback = null;
@@ -205,15 +210,29 @@ class ClipViewController extends ChangeNotifier {
 
   /// Reuses the open view for a new selection
   /// (`docs/Scenova/user-flow.md` → "Alternate Path E").
+  ///
+  /// A selection this view already carries is the reader invoking the entry
+  /// point twice in a row — the Android action delivered again while the card
+  /// is up (`FEAT-001`, Edge Cases). The existing lookup is reused rather than
+  /// started again, so one received word reports one lookup and starts one
+  /// generation. A different selection updates the view in place.
   Future<void> submit(CaptureSelection selection) async {
-    if (selection.isEmpty) {
-      _selection = selection;
-      await load();
-      return;
-    }
+    if (_isShowing(selection)) return;
     _selection = selection;
+    // A selection that arrives before the first frame is loaded by the mount,
+    // which reads [_selection]; loading here as well would start the same
+    // lookup twice.
+    if (!_loaded) return;
     await load();
   }
+
+  /// Whether this view is already showing [selection].
+  ///
+  /// The normalised text and the kind are compared, so a word delivered again
+  /// — with or without the punctuation the entry gate trims — reads as the same
+  /// selection.
+  bool _isShowing(CaptureSelection other) =>
+      other.text == _selection.text && other.kind == _selection.kind;
 
   Future<void> retry() => load(announceStart: false);
 

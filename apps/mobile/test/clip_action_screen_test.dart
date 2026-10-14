@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scenova/app.dart';
+import 'package:scenova/models/analytics_event.dart';
 import 'package:scenova/screens/clip_view_screen.dart';
 import 'package:scenova/screens/home_screen.dart';
 import 'package:scenova/screens/onboarding_screen.dart';
+import 'package:scenova/services/analytics_api.dart';
+import 'package:scenova/services/app_services.dart';
 import 'package:scenova/services/capture_channel.dart';
 import 'package:scenova/services/lookup_api.dart';
 import 'package:scenova/services/settings_controller.dart';
@@ -15,8 +18,9 @@ import 'support/harness.dart';
 
 /// The Android selection action's surface (`FEAT-001`, `FEAT-008`). These cover
 /// the paths that carry risk: the clip opening in place rather than the app, an
-/// empty selection, the dismiss that returns the reader to their page, and a
-/// second selection reusing the open view.
+/// empty selection, the dismiss that returns the reader to their page, and
+/// selections arriving twice — the same word reusing the open lookup, a new
+/// word replacing it, each reported once.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   const MethodChannel channel = MethodChannel(CaptureChannel.channelName);
@@ -41,15 +45,17 @@ void main() {
     return calls;
   }
 
-  Future<void> pumpAction(
+  Future<ScenovaServices> pumpAction(
     WidgetTester tester, {
     LookupApi? api,
     SettingsController? settings,
+    AnalyticsApi? analyticsApi,
   }) async {
     usePhoneWindow(tester);
     final services = buildServices(
       api: api ?? MockLookupApi(),
       settings: settings,
+      analyticsApi: analyticsApi,
     );
     await tester.pumpWidget(
       ScenovaApp(
@@ -58,7 +64,14 @@ void main() {
       ),
     );
     await tester.pump();
+    return services;
   }
+
+  /// The `lookup_started` events queued for the intake.
+  Iterable<AnalyticsEvent> lookupsStarted(ScenovaServices services) => services
+      .analytics
+      .pending
+      .where((event) => event.name == AnalyticsEventName.lookupStarted);
 
   testWidgets('a selection opens the clip in place, not the app', (
     tester,
@@ -143,7 +156,8 @@ void main() {
     tester,
   ) async {
     mockActionPlatform();
-    await pumpAction(tester);
+    final api = RecordingLookupApi(MockLookupApi());
+    final services = await pumpAction(tester, api: api);
 
     await deliverCapture(tester, 'come');
     await tester.pump();
@@ -156,6 +170,71 @@ void main() {
 
     expect(find.byType(ClipViewScreen), findsOneWidget);
     expect(find.text('Which meaning fits here?'), findsOneWidget);
+    // A second word is its own lookup: one lookup each, and the first is not
+    // started again.
+    expect(api.createCalls, 2);
+    expect(lookupsStarted(services), hasLength(2));
+    expect(
+      lookupsStarted(services).map((event) => event.properties['source']),
+      everyElement('android_action'),
+    );
+
+    await teardown(tester);
+  });
+
+  testWidgets('the action invoked again on the same word reuses the lookup', (
+    tester,
+  ) async {
+    mockActionPlatform();
+    final api = RecordingLookupApi(MockLookupApi());
+    final services = await pumpAction(tester, api: api);
+
+    await deliverCapture(tester, 'come');
+    await tester.pump();
+    await tester.pump();
+
+    // The reading app's action arrives again on the warm activity, for the word
+    // the card already carries.
+    await deliverCapture(tester, 'come');
+    await tester.pump();
+    await tester.pump();
+
+    expect(api.createCalls, 1);
+    expect(lookupsStarted(services), hasLength(1));
+    // The open lookup is reused as it stands: the card, its word, and its clip
+    // are the ones already on screen, so the clip is not played a second time.
+    expect(find.byType(ClipViewScreen), findsOneWidget);
+    expect(
+      find.text('a short clip that shows what the word means'),
+      findsOneWidget,
+    );
+    expect(services.analytics.pending.map((event) => event.name.wire), <String>[
+      'app_opened',
+      'lookup_started',
+      'lookup_served',
+      'clip_played',
+    ]);
+
+    await teardown(tester);
+  });
+
+  testWidgets('a word delivered twice before the card opens starts it once', (
+    tester,
+  ) async {
+    mockActionPlatform();
+    final api = RecordingLookupApi(MockLookupApi());
+    final services = await pumpAction(tester, api: api);
+
+    // Both deliveries land before the first frame, so the card that opens is
+    // the first one and it carries the selection once.
+    await deliverCapture(tester, 'come');
+    await deliverCapture(tester, 'come');
+    await tester.pump();
+    await tester.pump();
+
+    expect(api.createCalls, 1);
+    expect(lookupsStarted(services), hasLength(1));
+    expect(find.byType(ClipViewScreen), findsOneWidget);
 
     await teardown(tester);
   });
