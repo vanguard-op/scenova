@@ -97,11 +97,11 @@ Response 202: reportId: string, status: queued
 Errors: 400 (unknown reason; a note over 300 characters; a lookup with no clip served to the reader), 401 (missing or invalid token), 404 (unknown lookup, or not owned by the caller), 409 (clientReportId reused with a different report; the same reader has already reported this entry), 429 (rate limited), 503 (feedback store unavailable). A report queues the entry for review and holds it from new readers until it is reviewed; a report on an entry already under review joins the existing queue item; a report on a phrase lookup is recorded against the lookup and has no shared effect.
 
 ### C-014: GET /internal/review/queue
-Status: Frozen
+Status: Frozen (revision 1)
 Auth: operator identity carrying the curator role, multi-factor authenticated; never reachable from the reader client. A caller without the role is refused and the attempt is logged.
 Request: reason: wrong_meaning|offensive|low_quality|other|null, state: queued|reviewed|actioned|null, word: string|null, page: integer (query)
-Response 200: items: [{ entryId: string, lemma: string, senseLabel: string, reason: string, queuedAt: string, state: queued|reviewed|actioned }], openCount: integer, page: integer, pageCount: integer
-Errors: 401 (no operator session), 403 (an operator without the curator role), 503 (review service unavailable). Newest report first, one item per entry however many reports it holds.
+Response 200: items: [{ entryId: string, lemma: string, senseLabel: string, reason: wrong_meaning|offensive|low_quality|other|feedback_threshold, queuedAt: string, state: queued|reviewed|actioned }], openCount: integer, page: integer, pageCount: integer
+Errors: 401 (no operator session), 403 (an operator without the curator role), 503 (review service unavailable). Newest report first, one item per entry however many reports it holds. An item queued by the negative-feedback threshold rather than by a report carries `feedback_threshold` as its reason; the `reason` filter takes the report reasons only.
 
 ### C-015: GET /internal/review/entries/{entryId}
 Status: Frozen
