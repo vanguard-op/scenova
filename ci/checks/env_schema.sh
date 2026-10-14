@@ -55,6 +55,23 @@ done
 for key in "${CLIP_STORE_KEYS[@]}"; do
   grep -qE "^${key}=" "$SCHEMA" || die "$SCHEMA is missing the clip-store key $key"
 done
+
+# The project identifier is single-sourced (architecture.md "Identity provider";
+# D-005): GCP_PROJECT_ID is the one project, and FIREBASE_PROJECT_ID (the token
+# audience the services verify and the FCM target the notification service sends
+# to) and TASKS_PROJECT are derived from it by the Makefile and ci/lib.sh.
+# Declaring either here would reintroduce a second value that can silently
+# diverge — a mismatch makes the gateway reject every valid Firebase token with a
+# 401 and points FCM at the wrong project.
+grep -qE '^GCP_PROJECT_ID=' "$SCHEMA" \
+  || die "$SCHEMA must declare the project identifier GCP_PROJECT_ID"
+for derived in FIREBASE_PROJECT_ID TASKS_PROJECT; do
+  if grep -qE "^${derived}=" "$SCHEMA"; then
+    die "$SCHEMA must not declare $derived; it is derived from GCP_PROJECT_ID"
+  fi
+done
+info "project identifier ok: GCP_PROJECT_ID (FIREBASE_PROJECT_ID, TASKS_PROJECT derived)"
+
 info "schema ok: ${#FLAG_DEFAULTS[@]} flags, ${#CLIP_STORE_KEYS[@]} clip-store keys"
 
 shopt -s nullglob

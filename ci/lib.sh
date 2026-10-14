@@ -24,6 +24,16 @@ if [ -f .env ]; then
   set -a; . ./.env; set +a
 fi
 
+# One project identifier (see `.env.example`): the Firebase project — the token
+# audience the services verify and the FCM target the notification service sends
+# to — and the Cloud Tasks project are the same Google project, derived from
+# GCP_PROJECT_ID. Re-derived here after `.env` so a stale value left in a
+# developer's file cannot diverge from the project the stack is configured for.
+if [ -n "${GCP_PROJECT_ID:-}" ]; then
+  export FIREBASE_PROJECT_ID="$GCP_PROJECT_ID"
+  export TASKS_PROJECT="$GCP_PROJECT_ID"
+fi
+
 ENVIRONMENT="${ENVIRONMENT:-dev}"
 VENV="${VENV:-.venv}"
 case "$VENV" in

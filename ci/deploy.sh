@@ -27,7 +27,10 @@ TFVARS="infra/terraform/environments/${ENV}.tfvars"
 
 tfvar() { sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*\"\(.*\)\".*/\1/p" "$TFVARS" | head -1; }
 
-PROJECT_ID="${GCP_PROJECT_ID:-$(tfvar project_id)}"
+# The project is the per-environment one from the tfvars (the source of truth);
+# DEPLOY_PROJECT_ID overrides it explicitly. The local `.env` project
+# (GCP_PROJECT_ID) must never reach a deploy.
+PROJECT_ID="${DEPLOY_PROJECT_ID:-$(tfvar project_id)}"
 REGION="${GCP_REGION:-$(tfvar region)}"
 REPO="${GCP_ARTIFACT_REPO:-$(tfvar artifact_repo)}"
 GIT_SHA="${GIT_SHA:-$(git rev-parse --short HEAD 2>/dev/null || echo local)}"

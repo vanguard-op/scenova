@@ -28,5 +28,12 @@ if [ "${#paths[@]}" -eq 0 ]; then
   exit 0
 fi
 
+# The integration suite authenticates with the pre-account dev verifier (D-011):
+# every request presents a pseudonymous `dev:<subject>` token. Pin the mode here
+# so a developer's local `.env`, which may verify real Firebase ID tokens, cannot
+# leak into the run and 401 the suite — the same command must behave the same on
+# a laptop and in CI.
+export AUTH_MODE=dev
+
 log "QA · integration and acceptance suites (${paths[*]})"
 "$(tool pytest)" "${paths[@]}" -m "not model"

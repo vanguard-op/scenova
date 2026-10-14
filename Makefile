@@ -15,6 +15,15 @@ SHELL := /bin/bash
 -include .env
 export
 
+# One project identifier (see `.env.example`): the Firebase project — the token
+# audience the services verify and the FCM target the notification service sends
+# to — and the Cloud Tasks project are the same Google project, derived from
+# GCP_PROJECT_ID. Hard-assigned so a stale value left in a developer's `.env`
+# cannot silently diverge and 401 every valid token.
+FIREBASE_PROJECT_ID := $(GCP_PROJECT_ID)
+TASKS_PROJECT := $(GCP_PROJECT_ID)
+export FIREBASE_PROJECT_ID TASKS_PROJECT
+
 VENV        ?= .venv
 ENVIRONMENT ?= dev
 ENV         ?= $(ENVIRONMENT)
@@ -29,14 +38,14 @@ RUFF      := $(VENV)/bin/ruff
 MYPY      := $(VENV)/bin/mypy
 PYTEST    := $(VENV)/bin/pytest
 
-.PHONY: help setup fmt lint env typecheck test qa qa-model model-bar build bundle boot security \
+.PHONY: help setup auth fmt lint env typecheck test qa qa-model model-bar build bundle boot security \
         infra-init infra-fmt infra-validate infra-plan infra-apply \
         deploy promote rollback ci clean
 
 help: ## Show the documented commands
 	@printf '\nScenova platform commands (env=%s, venv=%s)\n\n' "$(ENVIRONMENT)" "$(VENV)"
 	@awk 'BEGIN{FS=":.*## "} /^[a-zA-Z0-9_-]+:.*## /{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
-	@printf '\nTargets: make setup · make ci · make qa · make model-bar · make deploy ENV=staging\n\n'
+	@printf '\nTargets: make setup · make auth · make ci · make qa · make model-bar · make deploy ENV=staging\n\n'
 
 # --- Setup -------------------------------------------------------------------
 
@@ -52,6 +61,9 @@ setup: ## Create .venv, install pinned dev tooling, seed .env, fetch Flutter dep
 	done; \
 	if [ ! -f .env ]; then cp .env.example .env; echo "==> created .env from .env.example"; fi; \
 	if [ -f apps/mobile/pubspec.yaml ]; then (cd apps/mobile && flutter pub get); else echo "==> skip: no Flutter app yet"; fi
+
+auth: ## Set up local Application Default Credentials for the project (ADC + quota project) and verify it
+	@bash ci/checks/auth.sh
 
 # --- Quality gates -----------------------------------------------------------
 
