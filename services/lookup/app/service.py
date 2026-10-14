@@ -72,11 +72,9 @@ from .models import (
 from .normalisation import MAX_PHRASE_WORDS, tokenise
 from .store import InMemoryLookupStore, LookupStore, StoredLookup
 
-BEST_GUESS_NOTICE = (
-    "This word isn't in our sense list yet, so we're showing the most likely meaning."
-)
+BEST_GUESS_NOTICE = "We're not sure about this word, so this is our best guess."
 INVENTORY_UNAVAILABLE_NOTICE = (
-    "Our sense list is temporarily unavailable, so we're showing the most likely meaning."
+    "We couldn't check this word just now, so this is our best guess."
 )
 GENERATION_UNAVAILABLE_NOTICE = (
     "We couldn't start a clip for this one. Please try again in a moment."
@@ -84,9 +82,7 @@ GENERATION_UNAVAILABLE_NOTICE = (
 GENERATION_FAILED_NOTICE = "We couldn't make a clip for this one. Please try again."
 # A served phrase that is the fallback template is a best guess, and the
 # reader-facing advisory travels in `notice` (C-001 revision 1, FEAT-004).
-PHRASE_FALLBACK_NOTICE = (
-    "We couldn't make a phrase for this one, so the meaning shown is a best guess."
-)
+PHRASE_FALLBACK_NOTICE = "This is our best guess at the meaning."
 EMPTY_NOTICE = "There was nothing to look up in that selection."
 
 # The sense label shown for a word outside the sense inventory. It is a plain

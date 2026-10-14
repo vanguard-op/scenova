@@ -401,6 +401,5 @@ class MockLookupApi implements LookupApi {
 
   /// Mirrors the service's own wording for a word it does not hold.
   static const String _bestGuessNotice =
-      "This word isn't in our sense list yet, so we're showing the most likely "
-      'meaning.';
+      "We're not sure about this word, so this is our best guess.";
 }

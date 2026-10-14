@@ -27,7 +27,7 @@ RESPONSE_KEYS = {
     "correlationId",
 }
 
-BEST_GUESS_FRAGMENT = "isn't in our sense list"
+BEST_GUESS_FRAGMENT = "best guess"
 
 
 def _auth(subject: str = "reader-1") -> dict[str, str]:

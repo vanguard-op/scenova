@@ -74,6 +74,7 @@ docs/           BPRD (product-shaper)
 - Reduce motion holds a clip on a still frame and plays on tap.
 - Offline: serve device history and saved clips; queue feedback and reports for reconnection.
 - Clips are capped at four seconds at 360p and carry the provider's watermark.
+- Reader-facing copy never names the product's internals — no "sense list", "library entry", "generation job", or similar machinery. It speaks in the product's own voice, plain and brief.
 - Provider circuit open: serve the library and device history, start no new generation.
 - One generation runs per missing word; concurrent lookups share it.
 
