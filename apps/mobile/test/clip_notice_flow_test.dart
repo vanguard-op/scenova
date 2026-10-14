@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:scenova/app.dart';
 import 'package:scenova/models/clip_notice.dart';
 import 'package:scenova/models/lookup.dart';
 import 'package:scenova/screens/clip_controller.dart';
+import 'package:scenova/screens/clip_view_screen.dart';
 import 'package:scenova/services/app_services.dart';
 import 'package:scenova/services/capture_intake.dart';
 import 'package:scenova/services/clip_notice_inbox.dart';
@@ -40,6 +44,15 @@ LookupResult _waitingWord() => const LookupResult(
   ],
   notice: null,
   correlationId: 'test',
+);
+
+/// The clip-ready notice a reader taps.
+ClipNotice _notice() => const ClipNotice(
+  lookupId: 'lk_ready',
+  clipUrl: 'https://cdn.scenova.test/lk_ready.mp4',
+  durationSeconds: 4,
+  resolution: '360p',
+  hasAudio: false,
 );
 
 ClipViewController _controllerFor(
@@ -364,6 +377,122 @@ void main() {
       expect(controller.phase, ClipPhase.wordAndPhrase);
       expect(controller.playing, isFalse);
       expect(await services.historyStore.all(), isEmpty);
+      await teardown(tester);
+    });
+  });
+
+  group("the notice's tap target", () {
+    testWidgets(
+      'tapping the notice opens the view for its lookup and plays the clip',
+      (tester) async {
+        // The reader is elsewhere in Scenova when the clip is ready; the notice
+        // reaches the device and the view opens for the lookup it names, playing
+        // the delivered clip and keeping it (`FEAT-008`).
+        final source = ScriptedClipNoticeSource();
+        final api = ScriptedGetLookupApi(result: _waitingWord());
+        final services = buildServices(
+          api: api,
+          clipNoticeSource: source,
+          settings: SettingsController(onboardingComplete: true),
+        );
+
+        await tester.pumpWidget(ScenovaApp(services: services));
+        await tester.pump();
+        await tester.pump();
+
+        source.deliverData(_wirePayload);
+        await tester.pump();
+        await tester.pump();
+        await tester.pump();
+
+        expect(find.byType(ClipViewScreen), findsOneWidget);
+        expect(find.text('xylograph'), findsWidgets);
+        expect(api.requestedIds, <String>['lk_ready']);
+        final saved = await services.historyStore.all();
+        expect(saved.single.word, 'xylograph');
+        expect(saved.single.clipUrl, 'https://cdn.scenova.test/lk_ready.mp4');
+        await teardown(tester);
+      },
+    );
+
+    testWidgets('the view opens for the lookup a notice names', (tester) async {
+      final api = ScriptedGetLookupApi(result: _waitingWord());
+      final services = buildServices(api: api);
+      final controller = ClipViewController(
+        services: services,
+        selection: CaptureSelection.empty,
+        notice: _notice(),
+      );
+      addTearDown(controller.dispose);
+
+      await pumpClipView(tester, services, controller);
+      await tester.pump();
+      await tester.pump();
+
+      expect(controller.phase, ClipPhase.playing);
+      expect(find.text('xylograph'), findsWidgets);
+      expect(
+        find.text('to print a picture from a carved block of wood'),
+        findsOneWidget,
+      );
+      final saved = await services.historyStore.all();
+      expect(saved.single.clipUrl, 'https://cdn.scenova.test/lk_ready.mp4');
+      await teardown(tester);
+    });
+
+    testWidgets(
+      'a notice whose lookup cannot be read shows the note and a retry',
+      (tester) async {
+        // The clip the notice carried has nowhere to sit when its lookup cannot
+        // be read, so the view opens with the clip-unavailable note and a retry
+        // (`FEAT-008`).
+        final api = ScriptedGetLookupApi(
+          error: const LookupApiException(
+            404,
+            'That lookup is no longer available.',
+          ),
+        );
+        final harness = await pumpHarness(tester, api: api);
+        await tester.pump();
+
+        unawaited(harness.router.openNoticedLookup(_notice()));
+        await tester.pump();
+        await tester.pump();
+
+        expect(find.byType(ClipViewScreen), findsOneWidget);
+        expect(
+          find.text('That clip is not available right now.'),
+          findsOneWidget,
+        );
+        expect(find.text('Try again'), findsOneWidget);
+        await teardown(tester);
+      },
+    );
+
+    testWidgets('an open view is not stacked over by a notice', (tester) async {
+      // A view is already open for another lookup; a notice does not stack a
+      // second view over it (`FEAT-008`).
+      final source = ScriptedClipNoticeSource();
+      final harness = await pumpHarness(
+        tester,
+        api: MockLookupApi(pollsUntilReady: 100000),
+        clipNoticeSource: source,
+      );
+      await tester.pump();
+
+      unawaited(harness.router.openSelection(CaptureSelection.parse('come')));
+      await tester.pump();
+      await tester.pump();
+      expect(find.byType(ClipViewScreen), findsOneWidget);
+
+      unawaited(harness.router.openNoticedLookup(_notice()));
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.byType(ClipViewScreen), findsOneWidget);
+      harness.router.dismissClip();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
       await teardown(tester);
     });
   });

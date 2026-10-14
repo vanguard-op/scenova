@@ -281,30 +281,51 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
         );
 
       case ClipPhase.offline:
+        final replayPaused = !_controller.offlineReplayEnabled;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            const OfflineBanner(
-              message:
-                  'You are offline. New clips need a connection; saved ones '
-                  'still play.',
+            OfflineBanner(
+              message: replayPaused
+                  ? 'You are offline. Saved clips need a connection to play.'
+                  : 'You are offline. New clips need a connection; saved ones '
+                        'still play.',
             ),
             SizedBox(height: tokens.spacing.lg),
-            EmptyState(
-              icon: AppIcons.offline,
-              headline: isPhrase
-                  ? 'This phrase is not saved on this device'
-                  : 'This word is not saved on this device',
-              body: isPhrase
-                  ? 'A phrase clip needs a connection to be made. Look it up '
-                        'again when you are back online.'
-                  : inPlace
-                  ? 'Look it up again when you are back online.'
-                  : 'Look it up again when you are back online, or browse the '
-                        'lookups you have saved.',
-              actionLabel: inPlace ? 'Close' : 'Open History',
-              onAction: inPlace ? widget.onDismiss : widget.onOpenHistory,
-            ),
+            if (_controller.replayingSavedEntry)
+              // Offline replay is switched off (`enable_offline_history`): the
+              // saved word and phrase stay on the device and are shown, while
+              // the clip waits for a connection.
+              _withHeaderAndActions(
+                context,
+                player: ClipPlayer(
+                  status: ClipPlayerStatus.unavailable,
+                  caption: _controller.word,
+                  unavailableMessage: 'Saved clips need a connection to play.',
+                  onRetry: _controller.retry,
+                ),
+              )
+            else
+              EmptyState(
+                icon: AppIcons.offline,
+                headline: replayPaused
+                    ? 'You are offline'
+                    : isPhrase
+                    ? 'This phrase is not saved on this device'
+                    : 'This word is not saved on this device',
+                body: replayPaused
+                    ? 'Saved clips need a connection to play. Your history is '
+                          'still here.'
+                    : isPhrase
+                    ? 'A phrase clip needs a connection to be made. Look it up '
+                          'again when you are back online.'
+                    : inPlace
+                    ? 'Look it up again when you are back online.'
+                    : 'Look it up again when you are back online, or browse the '
+                          'lookups you have saved.',
+                actionLabel: inPlace ? 'Close' : 'Open History',
+                onAction: inPlace ? widget.onDismiss : widget.onOpenHistory,
+              ),
           ],
         );
 
@@ -368,9 +389,9 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
           player: ClipPlayer(
             status: ClipPlayerStatus.unavailable,
             caption: _controller.word,
-            unavailableMessage: isPhrase
-                ? 'No clip for this phrase yet.'
-                : null,
+            unavailableMessage:
+                _controller.clipUnavailableMessage ??
+                (isPhrase ? 'No clip for this phrase yet.' : null),
             onRetry: _controller.retry,
           ),
         );

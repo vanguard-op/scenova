@@ -279,7 +279,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   tokens.spacing.lg,
                   0,
                 ),
-                child: const OfflineBanner(),
+                child: OfflineBanner(
+                  message: _scope.featureFlags.offlineHistoryEnabled
+                      ? null
+                      : 'You are offline. Saved clips need a connection to '
+                            'play.',
+                ),
               ),
             if (_storageFull)
               Padding(

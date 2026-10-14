@@ -52,6 +52,7 @@ class ClipViewController extends ChangeNotifier {
     required this.services,
     required CaptureSelection selection,
     this.source = LookupSource.typed,
+    ClipNotice? notice,
     HistoryEntry? savedEntry,
     Duration? pollInterval,
     Duration? noticeThreshold,
@@ -61,6 +62,7 @@ class ClipViewController extends ChangeNotifier {
            noticeThreshold ?? AppConfig.generatingNoticeThreshold,
        _pollTimeout = pollTimeout ?? AppConfig.lookupPollTimeout {
     _selection = selection;
+    _notice = notice;
     _savedEntry = savedEntry;
     // The clip-ready notice is listened for from the moment the view opens, so
     // a notice that arrives while the reader waits reaches this view (`C-008`).
@@ -94,6 +96,15 @@ class ClipViewController extends ChangeNotifier {
   Timer? _timeoutTimer;
   StreamSubscription<ClipNotice>? _noticeSub;
   bool _disposed = false;
+
+  /// The clip-ready notice this view was opened for, when it was opened by
+  /// tapping one. The clip it carried is the one to play, and the lookup it
+  /// names supplies the word and phrase (`FEAT-008`; `C-008`).
+  ClipNotice? _notice;
+
+  /// Whether the clip the view would play could not be placed — the lookup the
+  /// notice named could not be read, so the delivered clip has nowhere to sit.
+  bool _clipUnavailable = false;
 
   bool _playing = false;
   bool _willNotify = false;
@@ -148,6 +159,19 @@ class ClipViewController extends ChangeNotifier {
   /// Whether the in-context view is shown at all (`enable_clip_view`).
   bool get _clipViewEnabled => services.featureFlags.clipViewEnabled;
 
+  /// Whether a saved clip replays with no connection
+  /// (`enable_offline_history`). When it is off, offline replay is disabled
+  /// while the on-device history stays.
+  bool get offlineReplayEnabled => services.featureFlags.offlineHistoryEnabled;
+
+  /// Whether this view is showing a saved lookup from the device.
+  bool get replayingSavedEntry => _savedEntry != null;
+
+  /// A note for a clip surface that has nothing to play for a reason other
+  /// than the word having no clip: the lookup a notice named could not be read.
+  String? get clipUnavailableMessage =>
+      _clipUnavailable ? 'That clip is not available right now.' : null;
+
   Sense? get _firstSense =>
       (_result?.senses.isEmpty ?? true) ? null : _result!.senses.first;
 
@@ -192,10 +216,20 @@ class ClipViewController extends ChangeNotifier {
     _pastThreshold = false;
     _noticeDismissed = false;
     _fromHistory = false;
+    _clipUnavailable = false;
     _errorMessage = null;
     _chosenSense = null;
     _result = null;
     _setPhase(ClipPhase.loading);
+
+    // A clip-ready notice opens the view for the lookup it names: the clip the
+    // notice carried is played and kept, and the word and phrase come from the
+    // lookup (`FEAT-008`; `C-008`).
+    final notice = _notice;
+    if (notice != null) {
+      await _loadFromNotice(notice);
+      return;
+    }
 
     if (_selection.isEmpty) {
       _setPhase(ClipPhase.empty);
@@ -213,6 +247,13 @@ class ClipViewController extends ChangeNotifier {
     // it starts no lookup and no generation.
     final saved = _savedEntry;
     if (saved != null) {
+      // Offline replay can be switched off at runtime (`enable_offline_history`):
+      // the entry stays on the device, but its clip does not play with no
+      // connection.
+      if (!services.connectivity.isOnline && !offlineReplayEnabled) {
+        _serveSavedEntryOffline(saved);
+        return;
+      }
       _serveSavedEntry(saved);
       return;
     }
@@ -342,6 +383,36 @@ class ClipViewController extends ChangeNotifier {
       _setPhase(ClipPhase.fallback);
     }
     return outcome;
+  }
+
+  /// Opens the view for the lookup a clip-ready notice names (`FEAT-008`).
+  ///
+  /// The clip the notice carried is the one to play; the word and phrase come
+  /// from the lookup the notice names (`C-002`). The clip cannot be reached with
+  /// no connection, and a lookup that cannot be read leaves the delivered clip
+  /// with nowhere to sit — both settle the view rather than leaving it waiting.
+  Future<void> _loadFromNotice(ClipNotice notice) async {
+    if (!services.connectivity.isOnline) {
+      _setPhase(ClipPhase.offline);
+      return;
+    }
+    try {
+      final result = await services.lookupApi.getLookup(notice.lookupId);
+      if (_disposed) return;
+      _selection = CaptureSelection.parse(result.rawSelection);
+      _result = result;
+      _applyNotice(notice);
+    } on LookupApiException catch (error) {
+      if (_disposed) return;
+      if (error.isOffline) {
+        _setPhase(ClipPhase.offline);
+        return;
+      }
+      // The lookup could not be read, so the phrase the view would show it
+      // under is not available; the note and a retry stand in (`FEAT-008`).
+      _clipUnavailable = true;
+      _setPhase(ClipPhase.fallback);
+    }
   }
 
   Future<void> _requestLookup() async {
@@ -607,7 +678,7 @@ class ClipViewController extends ChangeNotifier {
   }
 
   Future<void> _serveFromHistoryOrOffline() async {
-    if (_clipViewEnabled) {
+    if (_clipViewEnabled && offlineReplayEnabled) {
       final saved = await _savedClipFor(_selection);
       if (_disposed) return;
       if (saved != null) {
@@ -636,7 +707,36 @@ class ClipViewController extends ChangeNotifier {
   /// the word and phrase with the clip unavailable, which is the fallback state.
   void _serveSavedEntry(HistoryEntry entry) {
     _fromHistory = true;
-    final url = entry.clipUrl;
+    final result = _resultFromEntry(entry, includeClip: true);
+    _result = result;
+    _chosenSense = result.senses.first;
+    _setPhase(
+      result.status == LookupStatus.fallback
+          ? ClipPhase.fallback
+          : ClipPhase.playing,
+    );
+    if (result.status == LookupStatus.served) _autoplayOrHold();
+  }
+
+  /// Shows a saved lookup whose clip cannot replay because offline replay is
+  /// switched off (`enable_offline_history`).
+  ///
+  /// The word and phrase stay on the device and are shown; only the clip is
+  /// withheld, so the reader keeps their history with no connection.
+  void _serveSavedEntryOffline(HistoryEntry entry) {
+    _fromHistory = true;
+    final result = _resultFromEntry(entry, includeClip: false);
+    _result = result;
+    _chosenSense = result.senses.first;
+    _setPhase(ClipPhase.offline);
+  }
+
+  /// The saved lookup as a result, with or without the clip the device holds.
+  LookupResult _resultFromEntry(
+    HistoryEntry entry, {
+    required bool includeClip,
+  }) {
+    final url = includeClip ? entry.clipUrl : null;
     final sense = Sense(
       senseLabel: '1',
       partOfSpeech: '',
@@ -651,7 +751,7 @@ class ClipViewController extends ChangeNotifier {
               hasAudio: entry.hasAudio,
             ),
     );
-    _result = LookupResult(
+    return LookupResult(
       lookupId: entry.id,
       kind: entry.kind,
       rawSelection: entry.word,
@@ -661,9 +761,6 @@ class ClipViewController extends ChangeNotifier {
       notice: null,
       correlationId: 'local',
     );
-    _chosenSense = sense;
-    _setPhase(url == null ? ClipPhase.fallback : ClipPhase.playing);
-    if (url != null) _autoplayOrHold();
   }
 
   /// The clip saved for [selection] on this device, or null.

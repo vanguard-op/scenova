@@ -555,6 +555,45 @@ void main() {
     await teardown(tester);
   });
 
+  testWidgets('with offline replay off a saved clip does not play offline', (
+    tester,
+  ) async {
+    // The kill switch (`enable_offline_history`) disables offline replay while
+    // the on-device history stays: the saved clip is not served with no
+    // connection, and the reader is told why.
+    final services = buildServices(
+      api: MockLookupApi(),
+      online: false,
+      history: InMemoryHistoryStore(
+        seed: <HistoryEntry>[
+          seededEntry(
+            word: 'come',
+            phrase: 'to move towards someone',
+            clipUrl: 'device://come',
+          ),
+        ],
+      ),
+      featureFlags: const FixedFeatureFlags(offlineHistoryEnabled: false),
+    );
+    final controller = controllerFor(services, 'come');
+    addTearDown(controller.dispose);
+
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+    await tester.pump();
+
+    expect(controller.phase, ClipPhase.offline);
+    expect(controller.playing, isFalse);
+    expect(
+      find.text(
+        'Saved clips need a connection to play. Your history is still '
+        'here.',
+      ),
+      findsOneWidget,
+    );
+    await teardown(tester);
+  });
+
   testWidgets('a failed lookup shows the error state with a retry', (
     tester,
   ) async {

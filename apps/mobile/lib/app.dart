@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'app_router.dart';
 import 'models/analytics_event.dart';
+import 'models/clip_notice.dart';
 import 'models/lookup.dart';
 import 'screens/clip_action_screen.dart';
 import 'screens/history_screen.dart';
@@ -56,12 +57,19 @@ class _ScenovaAppState extends State<ScenovaApp> with WidgetsBindingObserver {
   /// (`EVT-001`).
   bool _wasBackgrounded = false;
 
+  /// The notices this process has already routed, so a launch notice delivered
+  /// on both the inbox stream and the launch read opens one view.
+  final Set<String> _routedNotices = <String>{};
+
+  StreamSubscription<ClipNotice>? _noticeSub;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _syncPlatformAccessibility();
     _listenForCaptures();
+    _listenForClipNotices();
     // The app is foregrounded at launch (`EVT-001`).
     widget.services.analytics.appOpened(source: AppOpenSource.launch);
   }
@@ -69,6 +77,7 @@ class _ScenovaAppState extends State<ScenovaApp> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    unawaited(_noticeSub?.cancel());
     _router.dispose();
     super.dispose();
   }
@@ -121,6 +130,32 @@ class _ScenovaAppState extends State<ScenovaApp> with WidgetsBindingObserver {
       LookupPlatform.current() == LookupPlatform.android
       ? LookupSource.androidAction
       : LookupSource.iosExtension;
+
+  /// Routes a clip-ready notice the reader tapped to its Clip View (`FEAT-008`).
+  ///
+  /// The action entry owns the clip in place and has no app navigation to open a
+  /// notice's view onto, so only the app entry routes notices.
+  void _listenForClipNotices() {
+    if (widget.entryPoint == CaptureEntryPoint.selectionAction) return;
+    _noticeSub = widget.services.clipNotices.notices.listen(_onClipNotice);
+    unawaited(_adoptLaunchNotice());
+  }
+
+  void _onClipNotice(ClipNotice notice) {
+    if (_routedNotices.contains(notice.lookupId)) return;
+    _routedNotices.add(notice.lookupId);
+    unawaited(_router.openNoticedLookup(notice));
+  }
+
+  /// Routes the notice the app was launched from, once the first frame has put
+  /// the navigator up.
+  Future<void> _adoptLaunchNotice() async {
+    final notice = await widget.services.clipNotices.openedNotice();
+    if (notice == null) return;
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+    _onClipNotice(notice);
+  }
 
   void _syncPlatformAccessibility() {
     widget.services.settings.platformReduceMotion = WidgetsBinding

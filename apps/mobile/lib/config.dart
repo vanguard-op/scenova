@@ -153,6 +153,20 @@ abstract final class AppConfig {
     defaultValue: true,
   );
 
+  /// Whether saved clips replay with no connection before a runtime flag value
+  /// has been fetched (`enable_offline_history`).
+  ///
+  /// `release.md` starts the flag Off for its dark launch, but the Trust and
+  /// Continuity phase has rolled it out to the Beta audience and every
+  /// environment sets it on. The client's fallback matches that rolled-out
+  /// state, so a fetch that has not landed keeps offline replay working; the
+  /// kill switch is a Remote Config value of `false`. A local run can force the
+  /// fallback with `--dart-define=SCENOVA_OFFLINE_HISTORY=false`.
+  static const bool offlineHistoryEnabledByDefault = bool.fromEnvironment(
+    'SCENOVA_OFFLINE_HISTORY',
+    defaultValue: true,
+  );
+
   /// How long a Remote Config fetch may take before it is abandoned.
   static const Duration remoteConfigFetchTimeout = Duration(seconds: 10);
 

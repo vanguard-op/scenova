@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scenova/models/history_entry.dart';
 import 'package:scenova/screens/clip_view_screen.dart';
+import 'package:scenova/services/feature_flags.dart';
 import 'package:scenova/services/history_store.dart';
 import 'package:scenova/services/lookup_api.dart';
 import 'package:scenova/widgets/app_icons.dart';
@@ -278,6 +279,47 @@ void main() {
     // The saved clip plays rather than the offline "not on this device" state.
     expect(find.text('This word is not saved on this device'), findsNothing);
     expect(findIcon(AppIcons.pause), findsWidgets);
+    await teardown(tester);
+  });
+
+  testWidgets('with offline replay off a saved lookup cannot replay offline', (
+    tester,
+  ) async {
+    // The kill switch (`enable_offline_history`) disables offline replay; the
+    // on-device history stays, so the list is unchanged and the word and phrase
+    // still show, but the clip waits for a connection.
+    await pumpHistory(
+      tester,
+      online: false,
+      history: InMemoryHistoryStore(
+        seed: <HistoryEntry>[
+          seededEntry(
+            word: 'come',
+            phrase: 'to move towards someone',
+            clipUrl: 'https://clips.example/come.mp4',
+          ),
+        ],
+      ),
+      featureFlags: const FixedFeatureFlags(offlineHistoryEnabled: false),
+    );
+    await tester.pump();
+
+    // The saved lookup is still listed and the reader is told offline replay is
+    // paused.
+    expect(find.text('come'), findsOneWidget);
+    expect(
+      find.text('You are offline. Saved clips need a connection to play.'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('come'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.byType(ClipViewScreen), findsOneWidget);
+    expect(find.text('to move towards someone'), findsWidgets);
+    expect(find.text('Saved clips need a connection to play.'), findsOneWidget);
+    expect(findIcon(AppIcons.pause), findsNothing);
     await teardown(tester);
   });
 }

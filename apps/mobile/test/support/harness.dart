@@ -99,6 +99,7 @@ Future<Harness> pumpHarness(
   SettingsController? settings,
   Entitlement entitlement = Entitlement.unmeteredGuest,
   FeatureFlags? featureFlags,
+  ClipNoticeSource? clipNoticeSource,
 }) async {
   final services = buildServices(
     api: api,
@@ -107,6 +108,7 @@ Future<Harness> pumpHarness(
     settings: settings,
     entitlement: entitlement,
     featureFlags: featureFlags,
+    clipNoticeSource: clipNoticeSource,
   );
   final router = AppRouter(services: services);
   await tester.pumpWidget(
@@ -158,9 +160,15 @@ Future<Harness> pumpHistory(
   LookupApi? api,
   HistoryStore? history,
   bool online = true,
+  FeatureFlags? featureFlags,
 }) async {
   usePhoneWindow(tester);
-  final services = buildServices(api: api, history: history, online: online);
+  final services = buildServices(
+    api: api,
+    history: history,
+    online: online,
+    featureFlags: featureFlags,
+  );
   final router = AppRouter(services: services);
   await tester.pumpWidget(
     ScenovaScope(
@@ -381,6 +389,34 @@ class ThrowingLookupApi implements LookupApi {
 
   @override
   Future<LookupResult> getLookup(String lookupId) async => throw error;
+}
+
+/// A lookup service that answers a notice's lookup by id.
+///
+/// A notice opens the view for the lookup it names without starting one, so the
+/// only call it makes is the read (`C-002`). Records the ids it was asked for.
+class ScriptedGetLookupApi implements LookupApi {
+  ScriptedGetLookupApi({this.result, this.error});
+
+  /// The lookup a read resolves to.
+  final LookupResult? result;
+
+  /// The failure a read resolves to, for the clip-unavailable state.
+  final LookupApiException? error;
+
+  final List<String> requestedIds = <String>[];
+
+  @override
+  Future<LookupResult> createLookup(LookupRequest request) async =>
+      throw StateError('A notice starts no lookup.');
+
+  @override
+  Future<LookupResult> getLookup(String lookupId) async {
+    requestedIds.add(lookupId);
+    final failure = error;
+    if (failure != null) throw failure;
+    return result!;
+  }
 }
 
 /// Wraps a lookup service and counts the lookups that reach it, so a test can

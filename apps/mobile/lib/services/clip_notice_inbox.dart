@@ -26,12 +26,21 @@ class ClipNoticeInbox {
       StreamController<ClipNotice>.broadcast();
   late final StreamSubscription<ClipNotice> _subscription;
 
+  /// The notice the app was launched from, read once.
+  Future<ClipNotice?>? _launch;
+
   /// Notices that have arrived and are waiting for their lookup, oldest first.
   final Map<String, ClipNotice> _waiting = <String, ClipNotice>{};
   bool _disposed = false;
 
   /// Every notice that reaches the device, as it arrives.
   Stream<ClipNotice> get notices => _controller.stream;
+
+  /// The notice the app was launched from, when it was opened by one.
+  ///
+  /// Read once and shared, so a surface that routes the launch notice and the
+  /// inbox's own adoption do not ask the platform twice.
+  Future<ClipNotice?> openedNotice() => _launch ??= _source.openedFromNotice();
 
   /// The notice waiting for [lookupId], taken out of the inbox.
   ///
@@ -55,7 +64,7 @@ class ClipNoticeInbox {
 
   /// Takes up the notice the app was launched from, when there was one.
   Future<void> _adoptOpened() async {
-    final notice = await _source.openedFromNotice();
+    final notice = await openedNotice();
     if (notice != null) _receive(notice);
   }
 

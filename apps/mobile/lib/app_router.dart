@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'models/analytics_event.dart';
+import 'models/clip_notice.dart';
 import 'models/history_entry.dart';
 import 'screens/clip_controller.dart';
 import 'screens/clip_view_screen.dart';
@@ -92,6 +93,40 @@ class AppRouter {
 
   /// The reader dismissed a clip view.
   void dismissClip() => navigatorKey.currentState?.maybePop();
+
+  /// Opens the Clip View for the lookup a clip-ready notice names.
+  ///
+  /// A notice reaches the device when the reader is elsewhere in Scenova or
+  /// outside it; tapping it opens this view for the lookup the notice names and
+  /// plays the clip it delivered (`FEAT-008`; `C-008`). A view already watching
+  /// a lookup takes its notice itself, so a notice never opens a second view.
+  Future<void> openNoticedLookup(ClipNotice notice) async {
+    final navigator = navigatorKey.currentState;
+    if (navigator == null) return;
+    // One clip view at a time: an open view settles its own lookup's notice,
+    // and a second view is never stacked over it.
+    if (_activeClip != null) return;
+    // The notice is consumed here so a later view does not apply it twice.
+    services.clipNotices.takeFor(notice.lookupId);
+
+    final controller = ClipViewController(
+      services: services,
+      selection: CaptureSelection.empty,
+      notice: notice,
+    );
+    _activeClip = controller;
+    await navigator.push(
+      MaterialPageRoute<void>(
+        builder: (_) => ClipViewScreen(
+          controller: controller,
+          onDismiss: dismissClip,
+          onOpenHistory: openHistory,
+        ),
+      ),
+    );
+    _activeClip = null;
+    controller.dispose();
+  }
 
   /// Opens a saved lookup from History, replaying the clip the device holds.
   ///
