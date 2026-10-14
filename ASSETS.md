@@ -15,6 +15,8 @@ The build's asset ledger. Slots come from the docs: the branding doc's mark, its
 | A-009 | assets/motion/store-preview.mp4 | Store preview / master | Done |
 | A-010 | assets/motion/first-run-walkthrough.mp4 | First-run walkthrough / master | Done |
 | A-011 | assets/fonts/ | Typography / Lora + Inter (sourced) | Done |
+| A-012 | assets/brand/scenova-mark-splash.png | Brand mark / splash raster, light | Done |
+| A-013 | assets/brand/scenova-mark-splash-dark.png | Brand mark / splash raster, dark | Done |
 
 ## Brand mark — generation prompt
 
