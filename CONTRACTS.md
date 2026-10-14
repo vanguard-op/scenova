@@ -81,3 +81,17 @@ Auth: internal service identity; never reachable from the client
 Request: entryId: string (path), status: active|held|retired
 Response 200: entryId: string, status: active|held|retired
 Errors: 400 (unknown status), 401 (not an internal caller), 404 (unknown entry), 503 (library unavailable).
+
+### C-012: POST /v1/feedback
+Status: Frozen
+Auth: Firebase ID token in `Authorization` (anonymous before sign-in); rate-limited at the gateway. The lookup must belong to the caller's token subject.
+Request: lookupId: string, rating: helpful|not_helpful|wrong, clientFeedbackId: string (idempotency key)
+Response 202: recorded: boolean
+Errors: 400 (unknown rating; a lookup with no clip served to the reader), 401 (missing or invalid token), 404 (unknown lookup, or not owned by the caller), 409 (clientFeedbackId reused with a different rating), 429 (rate limited), 503 (feedback store unavailable). One reader's rating of a lookup replaces their earlier rating for the same entry rather than adding to it; a rating on a phrase lookup is recorded against the lookup and never touches the shared library; a rating that crosses the negative-feedback threshold queues the entry for review.
+
+### C-013: POST /v1/reports
+Status: Frozen
+Auth: Firebase ID token in `Authorization` (anonymous before sign-in); rate-limited at the gateway. The lookup must belong to the caller's token subject.
+Request: lookupId: string, reason: wrong_meaning|offensive|low_quality|other, note: string|null (at most 300), clientReportId: string (idempotency key)
+Response 202: reportId: string, status: queued
+Errors: 400 (unknown reason; a note over 300 characters; a lookup with no clip served to the reader), 401 (missing or invalid token), 404 (unknown lookup, or not owned by the caller), 409 (clientReportId reused with a different report; the same reader has already reported this entry), 429 (rate limited), 503 (feedback store unavailable). A report queues the entry for review and holds it from new readers until it is reviewed; a report on an entry already under review joins the existing queue item; a report on a phrase lookup is recorded against the lookup and has no shared effect.
