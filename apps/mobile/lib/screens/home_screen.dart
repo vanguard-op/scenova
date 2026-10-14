@@ -148,9 +148,15 @@ class _HomeScreenState extends State<HomeScreen> {
           children: <Widget>[
             BrandMark(size: tokens.sizing.iconMd),
             SizedBox(width: tokens.spacing.sm),
-            Text(
-              'Scenova',
-              style: styles.h2.copyWith(color: colors.textPrimary),
+            // The mark takes its width from its delivered aspect ratio, so the
+            // wordmark flexes rather than the row overflowing on a narrow phone.
+            Flexible(
+              child: Text(
+                'Scenova',
+                style: styles.h2.copyWith(color: colors.textPrimary),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
         ),

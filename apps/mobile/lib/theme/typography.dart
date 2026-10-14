@@ -8,9 +8,10 @@ import 'tokens.dart';
 /// serif carries the brand on the few headings the product has; body text
 /// stays on a neutral sans for legibility on a small card.
 ///
-/// The family names below match the branding spec. Their font files are not
-/// yet in the asset ledger, so a missing family falls back to the platform
-/// default until the assets land; this is reported rather than worked around.
+/// The family names below match the branding spec. Their files ship in the
+/// asset ledger (A-011) and are bundled from `assets/fonts/`, so the styles
+/// resolve to the brand's own type; the fallbacks cover the case where a
+/// platform cannot load a bundled family.
 abstract final class ScenovaTypography {
   /// Display and headings.
   static const String displayFamily = 'Lora';

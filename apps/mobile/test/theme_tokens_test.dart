@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scenova/theme/app_theme.dart';
 import 'package:scenova/theme/colors.dart';
@@ -6,6 +7,9 @@ import 'package:scenova/theme/tokens.dart';
 import 'package:scenova/theme/typography.dart';
 
 void main() {
+  // The brand-type test reads the bundled font files through the asset bundle.
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('DeviceClass', () {
     test('switches at the 600px breakpoint', () {
       expect(DeviceClass.fromWidth(599), DeviceClass.mobile);
@@ -171,6 +175,20 @@ void main() {
         (focused as OutlineInputBorder).borderSide.color,
         ScenovaPalette.primary500Light,
       );
+    });
+  });
+
+  group('brand type', () {
+    test('bundles the display and body families the styles name', () async {
+      // The styles resolve to Lora and Inter; a family that is named but not
+      // bundled silently falls back to the platform's own type.
+      for (final asset in <String>[
+        'assets/fonts/Lora[wght].ttf',
+        'assets/fonts/Inter[opsz,wght].ttf',
+      ]) {
+        final data = await rootBundle.load(asset);
+        expect(data.lengthInBytes, greaterThan(0), reason: asset);
+      }
     });
   });
 }

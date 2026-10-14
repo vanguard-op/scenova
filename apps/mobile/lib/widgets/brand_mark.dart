@@ -1,21 +1,41 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../theme/colors.dart';
 
-/// The Scenova mark.
+/// The Scenova mark, drawn from the delivered asset
+/// (`ASSETS.md` → A-001, `assets/brand/scenova-mark.svg`).
 ///
 /// `docs/Scenova/branding.md` → "Brand Mark & Logo System": three short
-/// horizontal strokes in a row, the middle one peeling upward into a shallow
-/// arc so the line breaks into movement. It reads in a single ink and is never
-/// rotated, outlined, or set inside a play triangle.
+/// horizontal strokes sit in a row, and the middle one peels upward into a
+/// shallow arc so the line breaks into movement. It reads in a single ink and is
+/// never rotated, outlined, or set inside a play triangle.
 ///
-/// The mark is drawn here rather than loaded from an asset because the asset
-/// ledger does not yet list the mark's file paths; this is reported. It takes
-/// its ink from the colour tokens, so it holds on light and dark surfaces and
-/// reverses on dark.
+/// The delivered master frames the mark in a square canvas with the ink held in
+/// a centred horizontal band (`ASSETS.md` → "centred at 76% of a square 1:1
+/// canvas"). Drawing that whole square at an icon size would shrink the mark to
+/// a sliver, so this widget frames the ink's band instead: [size] is the mark's
+/// height and the width follows the delivered aspect ratio, which is roughly
+/// 4.6:1. A caller gives the row that width rather than squaring the mark off.
+///
+/// The ink comes from the colour tokens, so the mark holds on light and dark
+/// surfaces and reverses on dark.
 class BrandMark extends StatelessWidget {
   const BrandMark({super.key, this.size = 24, this.color, this.semanticLabel});
 
+  /// The delivered mark: mark-only, transparent, in the ink token's light value.
+  static const String assetPath = 'assets/brand/scenova-mark.svg';
+
+  /// The mark's width over its height, taken from the delivered master's ink
+  /// band (778 × 170 in its 1024 canvas). The mark is far wider than it is tall,
+  /// so it is never drawn into a square.
+  static const double aspectRatio = 778 / 170;
+
+  /// The square canvas the master frames the ink band in, as a multiple of the
+  /// mark's height, so the band can be framed out of it.
+  static const double _canvasPerMarkHeight = 1024 / 170;
+
+  /// The mark's height. The width follows [aspectRatio].
   final double size;
 
   /// Defaults to the reader's primary text colour, a single ink.
@@ -27,50 +47,30 @@ class BrandMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ink = color ?? ScenovaColors.of(context).textPrimary;
+    // The master is square; scaling it so the ink band spans the widget's width
+    // and then clipping to the widget's box frames the band exactly. The band is
+    // centred in its canvas, so centring the canvas on the box is enough.
+    final canvas = size * _canvasPerMarkHeight;
     final mark = SizedBox(
-      width: size,
+      width: size * aspectRatio,
       height: size,
-      child: CustomPaint(
-        painter: _BrandMarkPainter(color: ink),
-        isComplex: false,
+      child: ClipRect(
+        child: OverflowBox(
+          maxWidth: canvas,
+          maxHeight: canvas,
+          child: SvgPicture.asset(
+            assetPath,
+            width: canvas,
+            height: canvas,
+            fit: BoxFit.fill,
+            // The master ships in the light ink; retinting it to the resolved
+            // token keeps it on the brand in both themes.
+            colorFilter: ColorFilter.mode(ink, BlendMode.srcIn),
+          ),
+        ),
       ),
     );
     if (semanticLabel == null) return ExcludeSemantics(child: mark);
     return Semantics(label: semanticLabel, image: true, child: mark);
   }
-}
-
-class _BrandMarkPainter extends CustomPainter {
-  const _BrandMarkPainter({required this.color});
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final s = size.shortestSide;
-    final stroke = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..strokeWidth = s * 0.13;
-
-    final left = 0.22 * s;
-
-    // Two shorter strokes hold the row, like lines of text of different
-    // lengths.
-    canvas.drawLine(Offset(left, 0.30 * s), Offset(0.62 * s, 0.30 * s), stroke);
-    canvas.drawLine(Offset(left, 0.76 * s), Offset(0.74 * s, 0.76 * s), stroke);
-
-    // The lead stroke leaves the row, peeling upward past the line above it.
-    final peel = Path()
-      ..moveTo(left, 0.53 * s)
-      ..lineTo(0.44 * s, 0.53 * s)
-      ..quadraticBezierTo(0.70 * s, 0.53 * s, 0.86 * s, 0.24 * s);
-    canvas.drawPath(peel, stroke);
-  }
-
-  @override
-  bool shouldRepaint(_BrandMarkPainter oldDelegate) =>
-      oldDelegate.color != color;
 }

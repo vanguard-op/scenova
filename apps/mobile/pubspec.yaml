@@ -67,6 +67,14 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
 
+  # Generates the launcher icon from the delivered app-icon asset (A-006) for
+  # Android and iOS.
+  flutter_launcher_icons: ^0.14.4
+
+  # Generates the native launch screens from the delivered mark (A-001) on the
+  # brand's surface colour, for Android and iOS, light and dark.
+  flutter_native_splash: ^2.4.8
+
   # Provides the in-memory platform store, so the shared_preferences-backed
   # settings store can be exercised without a device.
   shared_preferences_platform_interface: ^2.4.2
@@ -101,9 +109,30 @@ flutter:
   # The custom icon set (A-008). The active state uses the filled form; the
   # default and disabled states share the outlined form and take their tone from
   # the colour tokens, so only these two variants are bundled.
+  #
+  # The brand mark (A-001) is bundled as the master it ships as: the square
+  # canvas holds the ink in a centred 4.6:1 band, and the widget frames that
+  # band. Only the mark is bundled; the one-colour and knockout forms are the
+  # same art, and the mark retints to the ink token for dark surfaces.
   assets:
     - assets/icons/outlined/
     - assets/icons/filled/
+    - assets/brand/scenova-mark.svg
+
+  # The brand's type (A-011): Lora for display and headings, Inter for body.
+  # Both ship as variable fonts, so one file carries the whole weight axis and a
+  # `fontWeight` on a text style selects the instance.
+  fonts:
+    - family: Lora
+      fonts:
+        - asset: assets/fonts/Lora[wght].ttf
+        - asset: assets/fonts/Lora-Italic[wght].ttf
+          style: italic
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter[opsz,wght].ttf
+        - asset: assets/fonts/Inter-Italic[opsz,wght].ttf
+          style: italic
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
@@ -130,3 +159,36 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# The launcher icon comes from the delivered app-icon asset (A-006), a 1024×1024
+# mark on the app-icon field. The legacy icon uses it whole; the adaptive icon
+# reuses it as the foreground over the same field colour, so the field reads as
+# one surface and the inset keeps the mark inside the safe zone.
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/brand/scenova-app-icon.png"
+  adaptive_icon_background: "#F7F6F9"
+  adaptive_icon_foreground: "assets/brand/scenova-app-icon.png"
+  remove_alpha_ios: true
+  min_sdk_android: 24
+
+# The native launch screens carry the mark (A-001) on the brand's surface colour
+# in both themes. The mark ships as SVG, so it is exported beside the other brand
+# files as a transparent PNG, in the ink token for light and the knockout value
+# for dark. The export frames the mark inside a square canvas so Android 12+,
+# which clips the splash icon to a circle, never cuts its ends.
+flutter_native_splash:
+  color: "#F7F6F9"
+  color_dark: "#1B1A20"
+  image: assets/brand/scenova-mark-splash.png
+  image_dark: assets/brand/scenova-mark-splash-dark.png
+  # The app ships on iOS and Android; web is only the preview tooling, so no
+  # web splash is generated.
+  web: false
+  android_12:
+    color: "#F7F6F9"
+    color_dark: "#1B1A20"
+    image: assets/brand/scenova-mark-splash.png
+    image_dark: assets/brand/scenova-mark-splash-dark.png
+
