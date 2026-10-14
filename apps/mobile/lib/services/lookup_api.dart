@@ -343,9 +343,8 @@ class MockLookupApi implements LookupApi {
           entryId: null,
         ),
       ],
-      // The word is outside the sense inventory, so the best-guess note is the
-      // reader-facing signal; the sense label stays a plain human label.
-      notice: _bestGuessNotice,
+      // No notice: the reader is told nothing about the product's confidence.
+      notice: null,
       correlationId: 'mock-correlation',
     );
   }
@@ -365,7 +364,7 @@ class MockLookupApi implements LookupApi {
           entryId: null,
         ),
       ],
-      notice: _bestGuessNotice,
+      notice: null,
       correlationId: 'mock-correlation',
     );
   }
@@ -398,8 +397,4 @@ class MockLookupApi implements LookupApi {
   }
 
   String _nextId() => 'mock-${_counter++}';
-
-  /// Mirrors the service's own wording for a word it does not hold.
-  static const String _bestGuessNotice =
-      "We're not sure about this word, so this is our best guess.";
 }

@@ -114,9 +114,11 @@ docs/           BPRD (product-shaper)
 | T-066 | — | infra-engineer | Done | — |
 | T-067 | FEAT-007 | qa-engineer | Done | C-003, C-005 |
 | T-068 | — | infra-engineer | Done | — |
-| T-069 | FEAT-001, FEAT-002 | backend-engineer | In Progress | C-001, C-002 |
-| T-070 | FEAT-008 | frontend-engineer | In Progress | C-008 |
-| T-071 | — | infra-engineer | In Progress | C-008 |
+| T-069 | FEAT-001, FEAT-002 | backend-engineer | Done | C-001, C-002 |
+| T-070 | FEAT-008 | frontend-engineer | Done | C-008 |
+| T-071 | — | infra-engineer | Done | C-008 |
+| T-072 | FEAT-003, FEAT-004, FEAT-008 | backend-engineer | Done | C-001, C-002, C-004, C-009, C-010 |
+| T-073 | FEAT-003, FEAT-006 | qa-engineer | Done | C-001, C-002, C-009, C-010 |
 
 ## Decisions Log
 | # | Decision | Rationale | By |

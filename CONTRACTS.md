@@ -9,7 +9,7 @@ Auth: Firebase ID token in `Authorization` (anonymous before sign-in; upgraded t
 Request: selection: string (raw selected text, trimmed, at most six words), clientLookupId: string (idempotency key), platform: android|ios, locale: string, consentModelProcessing: boolean
 Response 200: lookupId: string, kind: word|phrase, rawSelection: string, normalisedLemma: string|null, status: served|generating|fallback|denied|empty, senses: [{ senseLabel: string, partOfSpeech: string, glossPhrase: string, entryId: string|null, clip: { url: string, durationSeconds: number, resolution: "360p", hasAudio: boolean }|null }], notice: string|null, correlationId: string
 Errors: 400 (empty or whitespace selection; selection over the six-word phrase limit), 401 (missing or invalid token), 409 (clientLookupId reused with a different selection), 429 (rate limited), 503 (upstream lookup unavailable; retryable)
-Body: error responses are `{"code": string, "message": string}`. `notice` carries any reader-facing advisory, including the best-guess note; `senseLabel` is a human label and is not a signal.
+Body: error responses are `{"code": string, "message": string}`. `notice` carries a clip-availability advisory; `senseLabel` is a plain human label and is not a signal.
 
 ### C-002: GET /v1/lookups/{lookupId}
 Status: Frozen (revision 1)
@@ -17,7 +17,7 @@ Auth: Firebase ID token; the lookup must belong to the caller's token subject (o
 Request: lookupId: string (path)
 Response 200: lookupId: string, kind: word|phrase, rawSelection: string, normalisedLemma: string|null, status: served|generating|fallback|denied|empty, senses: [{ senseLabel: string, partOfSpeech: string, glossPhrase: string, entryId: string|null, clip: { url: string, durationSeconds: number, resolution: "360p", hasAudio: boolean }|null }], notice: string|null, correlationId: string
 Errors: 401 (missing or invalid token), 404 (unknown lookup, or not owned by the caller), 503 (upstream lookup unavailable; retryable)
-Body: error responses are `{"code": string, "message": string}`. `notice` carries any reader-facing advisory, including the best-guess note; `senseLabel` is a human label and is not a signal.
+Body: error responses are `{"code": string, "message": string}`. `notice` carries a clip-availability advisory; `senseLabel` is a plain human label and is not a signal.
 
 ### C-003: POST /internal/generation-jobs
 Status: Frozen
@@ -64,7 +64,7 @@ Errors: 400 (missing or unreadable token, unknown platform, unknown lookup), 401
 ### C-009: POST /internal/library/entries
 Status: Frozen (revision 1)
 Auth: internal service identity; never reachable from the client
-Request: entry: { id: string, lemma: string, partOfSpeech: string, senseLabel: string, glossPhrase: string (at most 60), glossPhraseIsFallback: boolean, clipAssetId: string, status: active|held|retired, source: seeded|generated, createdAt: string, updatedAt: string }, asset: { id: string, durationSeconds: number (three to four), resolution: "360p", storageKey: string, url: string, hasAudio: boolean, synthIdWatermark: boolean, createdAt: string }
+Request: entry: { id: string, lemma: string, partOfSpeech: string, senseLabel: string, glossPhrase: string (at most 60), clipAssetId: string, status: active|held|retired, source: seeded|generated, createdAt: string, updatedAt: string }, asset: { id: string, durationSeconds: number (three to four), resolution: "360p", storageKey: string, url: string, hasAudio: boolean, synthIdWatermark: boolean, createdAt: string }
 Response 202: entryId: string, status: active|held|retired
 Errors: 400 (missing key fields or clip), 401 (not an internal caller), 503 (library unavailable). Upserts by the lemma and sense key.
 
@@ -72,7 +72,7 @@ Errors: 400 (missing key fields or clip), 401 (not an internal caller), 503 (lib
 Status: Frozen (revision 1)
 Auth: internal service identity; never reachable from the client
 Request: lemma: string, senseLabel: string, partOfSpeech: string (query)
-Response 200: entry: { entryId: string, status: active|held|retired, glossPhrase: string, glossPhraseIsFallback: boolean, clip: { url: string, durationSeconds: number, resolution: "360p", hasAudio: boolean } }|null
+Response 200: entry: { entryId: string, status: active|held|retired, glossPhrase: string, clip: { url: string, durationSeconds: number, resolution: "360p", hasAudio: boolean } }|null
 Errors: 401 (not an internal caller), 503 (library unavailable). Only an `active` entry is served; `held` and `retired` read as null to the lookup, which then regenerates.
 
 ### C-011: PATCH /internal/library/entries/{entryId}

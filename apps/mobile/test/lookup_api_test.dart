@@ -333,17 +333,14 @@ void main() {
       expect(result.primaryClip, isNull);
     });
 
-    test(
-      'signals a best guess through the notice, not the sense label',
-      () async {
-        final result = await MockLookupApi().createLookup(_request('quixotic'));
-        // The reader-facing best-guess signal is the notice; the sense label
-        // stays a plain human label.
-        expect(result.notice, isNotNull);
-        expect(result.senses.single.senseLabel, isNot(contains('guess')));
-        expect(result.displayWord, 'quixotic');
-      },
-    );
+    test("tells the reader nothing about the product's confidence", () async {
+      final result = await MockLookupApi().createLookup(_request('quixotic'));
+      // The reader is never told the product is guessing: no notice qualifies
+      // the meaning, and the sense label stays a plain human label.
+      expect(result.notice, isNull);
+      expect(result.senses.single.senseLabel, isNot(contains('guess')));
+      expect(result.displayWord, 'quixotic');
+    });
 
     test('leaves the notice empty for a library hit', () async {
       final result = await MockLookupApi().createLookup(_request('come'));
