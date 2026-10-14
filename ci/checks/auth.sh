@@ -21,7 +21,7 @@ set -euo pipefail
 
 PROJECT="${FIREBASE_PROJECT_ID:-}"
 [ -n "$PROJECT" ] \
-  || die "no project configured: set GCP_PROJECT_ID in .env (FIREBASE_PROJECT_ID is derived from it)"
+  || die "no project configured: set GCP_PROJECT_ID in .env (FIREBASE_PROJECT_ID, kept equal to it, is set by the Makefile and ci/lib.sh)"
 command -v gcloud >/dev/null 2>&1 \
   || die "gcloud is required for local credentials: https://cloud.google.com/sdk/docs/install"
 command -v curl >/dev/null 2>&1 || die "curl is required for the FCM send check"

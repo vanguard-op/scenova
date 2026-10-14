@@ -56,21 +56,28 @@ for key in "${CLIP_STORE_KEYS[@]}"; do
   grep -qE "^${key}=" "$SCHEMA" || die "$SCHEMA is missing the clip-store key $key"
 done
 
-# The project identifier is single-sourced (architecture.md "Identity provider";
-# D-005): GCP_PROJECT_ID is the one project, and FIREBASE_PROJECT_ID (the token
-# audience the services verify and the FCM target the notification service sends
-# to) and TASKS_PROJECT are derived from it by the Makefile and ci/lib.sh.
-# Declaring either here would reintroduce a second value that can silently
-# diverge — a mismatch makes the gateway reject every valid Firebase token with a
-# 401 and points FCM at the wrong project.
-grep -qE '^GCP_PROJECT_ID=' "$SCHEMA" \
+# One project, three names (architecture.md "Identity provider"; D-005): the
+# Firebase project — the token audience the services verify and the FCM target
+# the notification service sends to — and the Cloud Tasks project are the same
+# Google project as GCP_PROJECT_ID. The services read FIREBASE_PROJECT_ID
+# directly from the environment, so it is declared here (`.env` carries it to a
+# service started from the file) rather than left to be derived at the call
+# site; this check enforces that all three names resolve to the same value,
+# because a mismatch rejects every valid Firebase token with a 401 or points FCM
+# at the wrong project. The Makefile and ci/lib.sh also re-derive
+# FIREBASE_PROJECT_ID and TASKS_PROJECT from GCP_PROJECT_ID so the running stack
+# cannot use a divergent value.
+project_id="$(sed -n 's/^GCP_PROJECT_ID=//p' "$SCHEMA" | head -n1)"
+[ -n "$project_id" ] \
   || die "$SCHEMA must declare the project identifier GCP_PROJECT_ID"
-for derived in FIREBASE_PROJECT_ID TASKS_PROJECT; do
-  if grep -qE "^${derived}=" "$SCHEMA"; then
-    die "$SCHEMA must not declare $derived; it is derived from GCP_PROJECT_ID"
-  fi
+for alias in FIREBASE_PROJECT_ID TASKS_PROJECT; do
+  alias_value="$(sed -n "s/^${alias}=//p" "$SCHEMA" | head -n1)"
+  [ -n "$alias_value" ] \
+    || die "$SCHEMA must declare $alias (a service reads it from the environment)"
+  [ "$alias_value" = "$project_id" ] \
+    || die "$SCHEMA has $alias=$alias_value but GCP_PROJECT_ID=$project_id; they must agree"
 done
-info "project identifier ok: GCP_PROJECT_ID (FIREBASE_PROJECT_ID, TASKS_PROJECT derived)"
+info "project identifier ok: GCP_PROJECT_ID=$project_id (FIREBASE_PROJECT_ID, TASKS_PROJECT agree)"
 
 info "schema ok: ${#FLAG_DEFAULTS[@]} flags, ${#CLIP_STORE_KEYS[@]} clip-store keys"
 

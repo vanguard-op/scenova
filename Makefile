@@ -17,9 +17,10 @@ export
 
 # One project identifier (see `.env.example`): the Firebase project — the token
 # audience the services verify and the FCM target the notification service sends
-# to — and the Cloud Tasks project are the same Google project, derived from
+# to — and the Cloud Tasks project are the same Google project as
 # GCP_PROJECT_ID. Hard-assigned so a stale value left in a developer's `.env`
-# cannot silently diverge and 401 every valid token.
+# cannot silently diverge and 401 every valid token (`make env` guards the schema
+# itself).
 FIREBASE_PROJECT_ID := $(GCP_PROJECT_ID)
 TASKS_PROJECT := $(GCP_PROJECT_ID)
 export FIREBASE_PROJECT_ID TASKS_PROJECT
