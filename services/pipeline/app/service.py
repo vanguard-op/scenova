@@ -214,7 +214,11 @@ class GenerationService:
             # fallback (release.md "Rollout Phases & Feature Flags"). No
             # generation event is recorded: generation was never attempted, so
             # the stop must not count against the generation-failure rate.
-            logger.info("generation is disabled; job %s stopped without a clip", running.id)
+            logger.warning(
+                "generation is disabled by the kill switch; job %s stopped without a clip "
+                "(deliberate stop, not a provider failure)",
+                running.id,
+            )
             return await self._finish(running, JobStatus.FAILED, 0.0)
 
         if running.kind is Kind.PHRASE and not self._settings.enable_phrase_clip:
@@ -223,13 +227,21 @@ class GenerationService:
             # the fallback (release.md "Rollout Phases & Feature Flags"). The
             # word path is unaffected. No generation event is recorded, for the
             # same reason as the generation switch.
-            logger.info("phrase clips are disabled; job %s stopped without a clip", running.id)
+            logger.warning(
+                "phrase clips are disabled by the kill switch; job %s stopped without a clip "
+                "(deliberate stop, not a provider failure)",
+                running.id,
+            )
             return await self._finish(running, JobStatus.FAILED, 0.0)
 
         if not await self._admit():
             # The budget ceiling is a capacity decision, not a provider failure,
             # so it is not recorded as a generation failure either.
-            logger.info("generation budget exhausted; job %s stopped without a clip", running.id)
+            logger.warning(
+                "generation budget exhausted; job %s stopped without a clip "
+                "(deliberate stop, not a provider failure)",
+                running.id,
+            )
             return await self._finish(running, JobStatus.FAILED, 0.0)
 
         started_at = self._clock()
