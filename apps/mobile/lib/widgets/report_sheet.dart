@@ -100,7 +100,6 @@ class _ReportSheetState extends State<_ReportSheet> {
       case ReportDelivery.queued:
       case ReportDelivery.duplicate:
         Navigator.of(context).pop(outcome);
-      case ReportDelivery.sending:
       case ReportDelivery.failed:
         setState(() {
           _submitting = false;

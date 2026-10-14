@@ -648,7 +648,6 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
       ReportDelivery.queued =>
         "Saved. Your report will go out when you're back online.",
       ReportDelivery.duplicate => "You've already reported this clip. Thanks.",
-      ReportDelivery.sending ||
       ReportDelivery.failed => "We couldn't send that just now.",
     };
   }

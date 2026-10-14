@@ -31,9 +31,6 @@ enum ReportReason {
 
 /// Where a report has got to.
 enum ReportDelivery {
-  /// The report is on its way to the service.
-  sending,
-
   /// The service queued the report for review.
   sent,
 
