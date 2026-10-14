@@ -125,7 +125,9 @@ docs/           BPRD (product-shaper)
 | T-077 | FEAT-001, FEAT-002 | frontend-engineer | Done | — |
 | T-078 | FEAT-001, FEAT-008 | frontend-engineer | Done | — |
 | T-079 | FEAT-001, FEAT-008 | frontend-engineer | Done | C-007 |
-| T-080 | FEAT-001, FEAT-008 | frontend-engineer | In Progress | C-007 |
+| T-080 | FEAT-001, FEAT-008 | frontend-engineer | Done | C-007 |
+| T-081 | FEAT-001, FEAT-002, FEAT-003, FEAT-004, FEAT-005, FEAT-006, FEAT-007, FEAT-008 | qa-engineer | In Progress | C-001, C-002, C-003, C-004, C-005, C-006, C-007, C-008, C-009, C-010, C-011 |
+| T-082 | FEAT-007, FEAT-008 | frontend-engineer | Done | C-008 |
 
 ## Decisions Log
 | # | Decision | Rationale | By |
@@ -152,6 +154,8 @@ docs/           BPRD (product-shaper)
 | D-020 | Phase 1 closed conditionally: regression and NFR-050 green, but NFR-051 (word-clip quality) unmeasured and NFR-052 (reader-helpful) unavailable | NFR-051 needs a judged video run; NFR-052 is live rolling-30-day feedback. The generation path's release stays flagged until NFR-051 is measured | user |
 | D-021 | Library seeding is deferred: the shared library starts empty and fills only from real reader lookups; seeding is enabled later at the user's direction | The seed set is the project's largest one-time generation cost; the spend is held rather than committed. The roadmap's seeded-library outcome is deferred, not withdrawn | user |
 | D-022 | The setup panel keeps a slice of its setup content at the position it takes when dragged down, instead of reducing to its handle | A handle-only panel does not tell the reader there is setup they must attend to; the panel's resting and expanded positions are unchanged | user |
+| D-023 | Phase 2 closes conditionally: its integration, acceptance, and regression pass is gated, but the judged model bars are held | The phase's phrase-clip bar (NFR-053) and the carried-over word-clip bar (NFR-051) are judged generation runs; the spend is held rather than committed. The generation path's release stays flagged | user |
+| D-024 | Store release signing is deferred to the release workstream; no feature phase cuts a store-signed build | The feature phases build and test the app, and nothing they deliver is submitted to a store; the signing material and its handling belong with release, which the specification does not yet cover | user |
 
 ## Definition of Done
 - **Task:** the acceptance criteria in the cited feature doc are met; the frozen contract is conformed; unit tests pass; format, lint, analyze, and build are clean; work is committed to the dev branch and confined to `Own`.
