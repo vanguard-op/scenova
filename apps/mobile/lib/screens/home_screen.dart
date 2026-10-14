@@ -146,7 +146,7 @@ class _HomeScreenState extends State<HomeScreen> {
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            BrandMark(size: tokens.sizing.iconMd),
+            BrandMark(size: tokens.sizing.iconSm),
             SizedBox(width: tokens.spacing.sm),
             // The mark takes its width from its delivered aspect ratio, so the
             // wordmark flexes rather than the row overflowing on a narrow phone.

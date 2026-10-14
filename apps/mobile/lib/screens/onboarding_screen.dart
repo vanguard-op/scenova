@@ -163,7 +163,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       children: <Widget>[
         Row(
           children: <Widget>[
-            BrandMark(size: tokens.sizing.iconMd, semanticLabel: 'Scenova'),
+            BrandMark(size: tokens.sizing.iconSm, semanticLabel: 'Scenova'),
             SizedBox(width: tokens.spacing.sm),
             Text(
               'Scenova',
