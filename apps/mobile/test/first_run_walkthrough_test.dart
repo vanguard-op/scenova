@@ -3,17 +3,17 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scenova/theme/app_theme.dart';
+import 'package:scenova/theme/colors.dart';
 import 'package:scenova/theme/tokens.dart';
-import 'package:scenova/widgets/app_icons.dart';
-import 'package:scenova/widgets/brand_mark.dart';
 import 'package:scenova/widgets/first_run_walkthrough.dart';
+import 'package:video_player/video_player.dart';
 import 'package:video_player_platform_interface/video_player_platform_interface.dart';
 
 import 'support/harness.dart';
 
 /// A video platform that opens the bundled clip and records what the walkthrough
-/// asks of it, so the load, autoplay, silence, one-shot, and reduce-motion
-/// behaviours are exercised without a device.
+/// asks of it, so the load, autoplay, looping, and reduce-motion behaviours are
+/// exercised without a device.
 class FakeVideoPlayerPlatform extends VideoPlayerPlatform {
   final Map<int, StreamController<VideoEvent>> _events =
       <int, StreamController<VideoEvent>>{};
@@ -47,20 +47,13 @@ class FakeVideoPlayerPlatform extends VideoPlayerPlatform {
         events.add(
           VideoEvent(
             eventType: VideoEventType.initialized,
-            duration: const Duration(seconds: 12),
-            size: const Size(1080, 1920),
+            duration: const Duration(seconds: 10),
+            size: const Size(720, 1280),
           ),
         );
       }
     });
     return events.stream;
-  }
-
-  /// Emits an event to the open player, so a test can drive completion.
-  void emit(VideoEvent event) {
-    for (final events in _events.values) {
-      if (!events.isClosed) events.add(event);
-    }
   }
 
   @override
@@ -102,12 +95,13 @@ class FakeVideoPlayerPlatform extends VideoPlayerPlatform {
       const SizedBox.shrink();
 }
 
+/// Hosts the background full-bleed, the way Onboarding stacks it.
 Widget host(Widget child) => MaterialApp(
   theme: AppTheme.build(
     brightness: Brightness.light,
     deviceClass: DeviceClass.mobile,
   ),
-  home: Scaffold(body: Center(child: child)),
+  home: Scaffold(body: child),
 );
 
 /// Pumps the microtasks the clip opens over, without advancing far enough for
@@ -139,18 +133,22 @@ void main() {
     await teardown(tester);
   });
 
-  testWidgets('plays one silent pass and never loops', (tester) async {
+  testWidgets('runs on a seamless loop, silent', (tester) async {
     final platform = FakeVideoPlayerPlatform();
     VideoPlayerPlatform.instance = platform;
 
     await tester.pumpWidget(host(const FirstRunWalkthrough()));
     await open(tester);
 
-    expect(platform.calls, contains('play'));
+    // The clip is put on a loop after it opens, muted, and started once.
+    expect(platform.calls, contains('setLooping:true'));
     expect(platform.calls, contains('setVolume:0.0'));
-    expect(platform.calls, contains('setLooping:false'));
-    expect(platform.calls, isNot(contains('setLooping:true')));
     expect(platform.calls.where((call) => call == 'play').length, 1);
+    // Nothing turns looping back off, so the loop closes without a seam.
+    expect(
+      platform.calls.lastWhere((call) => call.startsWith('setLooping')),
+      'setLooping:true',
+    );
 
     await teardown(tester);
   });
@@ -166,30 +164,17 @@ void main() {
     );
     await open(tester);
 
+    // The frame is drawn, but nothing plays and nothing loops.
+    expect(find.byType(VideoPlayer), findsOneWidget);
     expect(platform.calls, isNot(contains('play')));
-    expect(findIcon(AppIcons.play), findsOneWidget);
+    expect(platform.calls, isNot(contains('setLooping:true')));
 
     await teardown(tester);
   });
 
-  testWidgets('plays on tap when reduce motion is on', (tester) async {
-    final platform = FakeVideoPlayerPlatform();
-    VideoPlayerPlatform.instance = platform;
-
-    await tester.pumpWidget(
-      host(const FirstRunWalkthrough(reduceMotion: true)),
-    );
-    await open(tester);
-
-    await tester.tap(find.byType(FirstRunWalkthrough));
-    await open(tester);
-
-    expect(platform.calls, contains('play'));
-
-    await teardown(tester);
-  });
-
-  testWidgets('pauses on tap while it plays', (tester) async {
+  testWidgets('turning reduce motion on mid-view holds the clip', (
+    tester,
+  ) async {
     final platform = FakeVideoPlayerPlatform();
     VideoPlayerPlatform.instance = platform;
 
@@ -197,7 +182,9 @@ void main() {
     await open(tester);
     expect(platform.calls, contains('play'));
 
-    await tester.tap(find.byType(FirstRunWalkthrough));
+    await tester.pumpWidget(
+      host(const FirstRunWalkthrough(reduceMotion: true)),
+    );
     await open(tester);
 
     expect(platform.calls, contains('pause'));
@@ -205,30 +192,63 @@ void main() {
     await teardown(tester);
   });
 
-  testWidgets('offers a replay once the clip ends', (tester) async {
+  testWidgets('turning reduce motion off resumes the seamless loop', (
+    tester,
+  ) async {
+    final platform = FakeVideoPlayerPlatform();
+    VideoPlayerPlatform.instance = platform;
+
+    await tester.pumpWidget(
+      host(const FirstRunWalkthrough(reduceMotion: true)),
+    );
+    await open(tester);
+    expect(platform.calls, isNot(contains('play')));
+
+    await tester.pumpWidget(host(const FirstRunWalkthrough()));
+    await open(tester);
+
+    expect(platform.calls, contains('setLooping:true'));
+    expect(platform.calls, contains('play'));
+
+    await teardown(tester);
+  });
+
+  testWidgets('shows the base surface when the clip cannot open', (
+    tester,
+  ) async {
+    // No platform is registered, so the clip cannot be opened: the background
+    // must fall back to the base surface rather than throw or leave a gap.
+    await tester.pumpWidget(host(const FirstRunWalkthrough()));
+    await open(tester);
+
+    expect(find.byType(VideoPlayer), findsNothing);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is ColoredBox && widget.color == ScenovaColors.light.surface,
+      ),
+      findsOneWidget,
+    );
+
+    await teardown(tester);
+  });
+
+  testWidgets('stays out of the semantics tree', (tester) async {
     final platform = FakeVideoPlayerPlatform();
     VideoPlayerPlatform.instance = platform;
 
     await tester.pumpWidget(host(const FirstRunWalkthrough()));
     await open(tester);
 
-    platform.emit(VideoEvent(eventType: VideoEventType.completed));
-    await open(tester);
-
-    expect(findIcon(AppIcons.replay), findsOneWidget);
-    expect(findIcon(AppIcons.play), findsNothing);
-
-    await teardown(tester);
-  });
-
-  testWidgets('holds the mark when the clip cannot open', (tester) async {
-    // No platform is registered, so the clip cannot be opened: the surface must
-    // fall back rather than throw or leave an empty box.
-    await tester.pumpWidget(host(const FirstRunWalkthrough()));
-    await open(tester);
-
-    expect(find.byType(BrandMark), findsOneWidget);
-    expect(findIcon(AppIcons.play), findsNothing);
+    // Decorative motion behind the setup panel is never announced.
+    expect(
+      find.descendant(
+        of: find.byType(FirstRunWalkthrough),
+        matching: find.byType(ExcludeSemantics),
+      ),
+      findsOneWidget,
+    );
+    expect(find.byType(InkWell), findsNothing);
 
     await teardown(tester);
   });

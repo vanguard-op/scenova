@@ -22,6 +22,12 @@ import 'onboarding_controller.dart';
 /// reader sent to settings (the enable card with a note to return), consent
 /// declined (the note that generation is off while library lookups and history
 /// still work), and completion, which is leaving for Home.
+///
+/// The walkthrough clip runs full-bleed behind the setup content on a seamless
+/// loop; the column sits on a solid surface panel so its text keeps its contrast
+/// against every frame of the clip behind it
+/// (`docs/Scenova/screens/01-onboarding.md` → Layout; `branding.md` → "Shadows"
+/// and "Accessibility").
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key, required this.onComplete});
 
@@ -81,12 +87,21 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   Widget build(BuildContext context) {
     final controller = _controller;
     if (controller == null) return const SizedBox.shrink();
+    // A full-bleed background layer holding the walkthrough, and a foreground
+    // layer holding the setup content over it. The background reaches the edges
+    // of the screen; only the foreground is inset by the SafeArea.
     return Scaffold(
-      body: SafeArea(
-        child: ListenableBuilder(
-          listenable: controller,
-          builder: (context, _) => _content(context, controller),
-        ),
+      body: Stack(
+        fit: StackFit.expand,
+        children: <Widget>[
+          _background(context),
+          SafeArea(
+            child: ListenableBuilder(
+              listenable: controller,
+              builder: (context, _) => _content(context, controller),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -108,52 +123,79 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         ),
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: contentWidth),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              _header(context),
-              SizedBox(height: tokens.spacing.lg),
-              _walkthrough(context),
-              SizedBox(height: tokens.spacing.lg),
-              _stepIndicator(context, controller),
-              SizedBox(height: tokens.spacing.lg),
-              if (showEnableStep) ...<Widget>[
-                EnableActionGuide(
-                  openLabel: 'Show me how',
-                  onOpen: controller.phase == OnboardingPhase.ready
-                      ? controller.beginEnableAction
-                      : null,
-                ),
-                if (controller.phase == OnboardingPhase.enablingAction) ...[
-                  SizedBox(height: tokens.spacing.md),
-                  _returnNote(context, controller),
-                ],
+          child: _panel(
+            context,
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                _header(context),
                 SizedBox(height: tokens.spacing.lg),
-              ],
-              _consentLine(context, controller),
-              if (controller.consentDeclined) ...[
-                SizedBox(height: tokens.spacing.sm),
-                _declinedNote(context),
-              ],
-              SizedBox(height: tokens.spacing.xl),
-              ScenovaButton(
-                label: 'Continue',
-                onPressed: controller.submitting ? null : _finish,
-                isSubmitting: controller.submitting,
-                expanded: true,
-                variant: ScenovaButtonVariant.primary,
-              ),
-              SizedBox(height: tokens.spacing.sm),
-              Center(
-                child: ScenovaButton(
-                  label: 'Skip for now',
+                _stepIndicator(context, controller),
+                SizedBox(height: tokens.spacing.lg),
+                if (showEnableStep) ...<Widget>[
+                  EnableActionGuide(
+                    openLabel: 'Show me how',
+                    onOpen: controller.phase == OnboardingPhase.ready
+                        ? controller.beginEnableAction
+                        : null,
+                  ),
+                  if (controller.phase == OnboardingPhase.enablingAction) ...[
+                    SizedBox(height: tokens.spacing.md),
+                    _returnNote(context, controller),
+                  ],
+                  SizedBox(height: tokens.spacing.lg),
+                ],
+                _consentLine(context, controller),
+                if (controller.consentDeclined) ...[
+                  SizedBox(height: tokens.spacing.sm),
+                  _declinedNote(context),
+                ],
+                SizedBox(height: tokens.spacing.xl),
+                ScenovaButton(
+                  label: 'Continue',
                   onPressed: controller.submitting ? null : _finish,
-                  variant: ScenovaButtonVariant.ghost,
+                  isSubmitting: controller.submitting,
+                  expanded: true,
+                  variant: ScenovaButtonVariant.primary,
                 ),
-              ),
-            ],
+                SizedBox(height: tokens.spacing.sm),
+                Center(
+                  child: ScenovaButton(
+                    label: 'Skip for now',
+                    onPressed: controller.submitting ? null : _finish,
+                    variant: ScenovaButtonVariant.ghost,
+                  ),
+                ),
+              ],
+            ),
           ),
+        ),
+      ),
+    );
+  }
+
+  /// The solid surface panel the setup content sits on. It carries content over
+  /// the moving clip, so it is opaque and takes `shadow-xl`: the text's contrast
+  /// holds against every frame behind it, and it is never a translucent scrim
+  /// (`docs/Scenova/branding.md` → "Shadows" and "Accessibility").
+  Widget _panel(BuildContext context, Widget child) {
+    final colors = ScenovaColors.of(context);
+    final tokens = ScenovaTokens.of(context);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(ScenovaRadius.lg),
+        boxShadow: tokens.shadowXl,
+      ),
+      // The panel paints its own surface, so the content's controls need a
+      // Material of their own to carry their ink over it.
+      child: Material(
+        type: MaterialType.transparency,
+        child: Padding(
+          padding: EdgeInsets.all(tokens.spacing.lg),
+          child: child,
         ),
       ),
     );
@@ -193,12 +235,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     );
   }
 
-  /// The first-run walkthrough, shown across the setup steps as the visual
-  /// explanation of what Scenova does while reading
-  /// (`docs/Scenova/screens/01-onboarding.md` → Declared Assets). Reduce motion
-  /// is read from the reader's settings so the clip holds on a still frame when
-  /// the platform asks it to.
-  Widget _walkthrough(BuildContext context) {
+  /// The first-run walkthrough, run full-bleed behind the setup content on a
+  /// seamless loop (`docs/Scenova/screens/01-onboarding.md` → Layout and
+  /// Declared Assets). Reduce motion is read from the reader's settings so the
+  /// clip holds on a still frame when the platform asks it to.
+  Widget _background(BuildContext context) {
     final settings = _settings!;
     return ListenableBuilder(
       listenable: settings,

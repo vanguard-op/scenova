@@ -5,6 +5,7 @@ import 'package:scenova/screens/home_screen.dart';
 import 'package:scenova/screens/onboarding_controller.dart';
 import 'package:scenova/screens/onboarding_screen.dart';
 import 'package:scenova/services/settings_controller.dart';
+import 'package:scenova/theme/colors.dart';
 import 'package:scenova/widgets/enable_action_guide.dart';
 import 'package:scenova/widgets/first_run_walkthrough.dart';
 
@@ -33,6 +34,14 @@ Future<void> tapConsent(WidgetTester tester) async {
   await tester.tap(finder);
   await tester.pump();
 }
+
+/// The setup content's panel: the only decorated surface on the screen that
+/// casts a shadow.
+BoxDecoration panelDecoration(WidgetTester tester) => tester
+    .widgetList<DecoratedBox>(find.byType(DecoratedBox))
+    .map((widget) => widget.decoration)
+    .whereType<BoxDecoration>()
+    .firstWhere((decoration) => decoration.boxShadow?.isNotEmpty ?? false);
 
 void main() {
   testWidgets('first open shows the explanation, progress, and enable card', (
@@ -65,6 +74,70 @@ void main() {
     // Consent is declined.
     await tapConsent(tester);
     expect(find.byType(FirstRunWalkthrough), findsOneWidget);
+
+    await teardown(tester);
+  });
+
+  testWidgets('the walkthrough runs full-bleed behind the setup column', (
+    tester,
+  ) async {
+    await pumpOnboarding(tester, settings: freshInstall());
+
+    // It is a background layer, not an element inside the scrolling column.
+    expect(
+      find.ancestor(
+        of: find.byType(FirstRunWalkthrough),
+        matching: find.byType(SingleChildScrollView),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.ancestor(
+        of: find.byType(FirstRunWalkthrough),
+        matching: find.byType(Stack),
+      ),
+      findsWidgets,
+    );
+    // The setup content is a sibling over it.
+    expect(
+      find.descendant(
+        of: find.byType(Stack),
+        matching: find.byType(SingleChildScrollView),
+      ),
+      findsOneWidget,
+    );
+
+    await teardown(tester);
+  });
+
+  testWidgets('the setup content sits on a solid panel over the walkthrough', (
+    tester,
+  ) async {
+    await pumpOnboarding(tester, settings: freshInstall());
+
+    final panel = panelDecoration(tester);
+    // Solid, so the text's contrast holds against every frame of the clip.
+    expect(panel.color, ScenovaColors.light.surface);
+    expect(panel.color!.a, 1.0);
+    expect(panel.boxShadow, isNotEmpty);
+    // Never a translucent scrim over the clip.
+    expect(find.byType(BackdropFilter), findsNothing);
+
+    await teardown(tester);
+  });
+
+  testWidgets('reduce motion is passed to the walkthrough background', (
+    tester,
+  ) async {
+    final settings = freshInstall()..platformReduceMotion = true;
+    await pumpOnboarding(tester, settings: settings);
+
+    expect(
+      tester
+          .widget<FirstRunWalkthrough>(find.byType(FirstRunWalkthrough))
+          .reduceMotion,
+      isTrue,
+    );
 
     await teardown(tester);
   });
