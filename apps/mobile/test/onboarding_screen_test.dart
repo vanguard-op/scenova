@@ -6,6 +6,7 @@ import 'package:scenova/screens/onboarding_controller.dart';
 import 'package:scenova/screens/onboarding_screen.dart';
 import 'package:scenova/services/settings_controller.dart';
 import 'package:scenova/widgets/enable_action_guide.dart';
+import 'package:scenova/widgets/first_run_walkthrough.dart';
 
 import 'support/harness.dart';
 
@@ -24,6 +25,15 @@ Future<void> tapText(WidgetTester tester, String label) async {
   await tester.pump();
 }
 
+/// Taps the consent switch, scrolling it into view first for the same reason.
+Future<void> tapConsent(WidgetTester tester) async {
+  final finder = find.byType(Switch);
+  await tester.ensureVisible(finder);
+  await tester.pumpAndSettle();
+  await tester.tap(finder);
+  await tester.pump();
+}
+
 void main() {
   testWidgets('first open shows the explanation, progress, and enable card', (
     tester,
@@ -32,11 +42,29 @@ void main() {
 
     expect(find.text('See what a word means'), findsOneWidget);
     expect(find.byType(OnboardingScreen), findsOneWidget);
+    expect(find.byType(FirstRunWalkthrough), findsOneWidget);
     expect(find.byType(EnableActionGuide), findsOneWidget);
     expect(find.text('Step 1 of 2'), findsOneWidget);
     expect(find.text('Send the word to the model provider'), findsOneWidget);
     expect(find.text('Continue'), findsOneWidget);
     expect(find.text('Skip for now'), findsOneWidget);
+
+    await teardown(tester);
+  });
+
+  testWidgets('the walkthrough holds across the setup states', (tester) async {
+    await pumpOnboarding(tester, settings: freshInstall());
+
+    // The default first open.
+    expect(find.byType(FirstRunWalkthrough), findsOneWidget);
+
+    // The reader is sent to settings to turn the action on.
+    await tapText(tester, 'Show me how');
+    expect(find.byType(FirstRunWalkthrough), findsOneWidget);
+
+    // Consent is declined.
+    await tapConsent(tester);
+    expect(find.byType(FirstRunWalkthrough), findsOneWidget);
 
     await teardown(tester);
   });
@@ -109,15 +137,13 @@ void main() {
     final settings = freshInstall();
     await pumpOnboarding(tester, settings: settings);
 
-    await tester.tap(find.byType(Switch));
-    await tester.pump();
+    await tapConsent(tester);
 
     expect(find.textContaining('Generation is off.'), findsOneWidget);
     expect(settings.consentModelProcessing, isFalse);
 
     // Consent can be granted again from the same line.
-    await tester.tap(find.byType(Switch));
-    await tester.pump();
+    await tapConsent(tester);
     expect(find.textContaining('Generation is off.'), findsNothing);
     expect(settings.consentModelProcessing, isTrue);
 
@@ -154,8 +180,7 @@ void main() {
       onComplete: () => completed = true,
     );
 
-    await tester.tap(find.byType(Switch));
-    await tester.pump();
+    await tapConsent(tester);
     await tapText(tester, 'Continue');
     await tester.pump();
 

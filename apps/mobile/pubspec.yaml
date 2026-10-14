@@ -83,6 +83,10 @@ dev_dependencies:
   # statuses to the app's permission states is exercised without a device.
   permission_handler_platform_interface: ^4.4.1
 
+  # The video player's platform interface, so the first-run walkthrough's load,
+  # autoplay, and reduce-motion behaviour are exercised without a device.
+  video_player_platform_interface: ^6.9.0
+
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
   # activated in the `analysis_options.yaml` file located at the root of your
@@ -114,10 +118,15 @@ flutter:
   # canvas holds the ink in a centred 4.6:1 band, and the widget frames that
   # band. Only the mark is bundled; the one-colour and knockout forms are the
   # same art, and the mark retints to the ink token for dark surfaces.
+  #
+  # The first-run walkthrough clip (A-010) is bundled for Onboarding. Only the
+  # walkthrough is included: the store preview (A-009) belongs to the store
+  # listing, not an in-app surface.
   assets:
     - assets/icons/outlined/
     - assets/icons/filled/
     - assets/brand/scenova-mark.svg
+    - assets/motion/first-run-walkthrough.mp4
 
   # The brand's type (A-011): Lora for display and headings, Inter for body.
   # Both ship as variable fonts, so one file carries the whole weight axis and a

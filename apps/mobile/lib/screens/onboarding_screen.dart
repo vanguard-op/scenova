@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../services/app_services.dart';
+import '../services/settings_controller.dart';
 import '../theme/colors.dart';
 import '../theme/tokens.dart';
 import '../theme/typography.dart';
 import '../widgets/app_icons.dart';
 import '../widgets/brand_mark.dart';
 import '../widgets/enable_action_guide.dart';
+import '../widgets/first_run_walkthrough.dart';
 import '../widgets/scenova_button.dart';
 import 'onboarding_controller.dart';
 
@@ -33,6 +35,7 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen>
     with WidgetsBindingObserver {
   OnboardingController? _controller;
+  SettingsController? _settings;
 
   @override
   void initState() {
@@ -45,8 +48,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     super.didChangeDependencies();
     // The settings are read here rather than in initState so the inherited
     // scope is safe to depend on.
+    _settings = ScenovaScope.of(context).settings;
     _controller ??= OnboardingController(
-      settings: ScenovaScope.of(context).settings,
+      settings: _settings!,
       analytics: ScenovaScope.of(context).analytics,
     );
   }
@@ -109,6 +113,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               _header(context),
+              SizedBox(height: tokens.spacing.lg),
+              _walkthrough(context),
               SizedBox(height: tokens.spacing.lg),
               _stepIndicator(context, controller),
               SizedBox(height: tokens.spacing.lg),
@@ -184,6 +190,20 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           style: styles.body.copyWith(color: colors.textSecondary),
         ),
       ],
+    );
+  }
+
+  /// The first-run walkthrough, shown across the setup steps as the visual
+  /// explanation of what Scenova does while reading
+  /// (`docs/Scenova/screens/01-onboarding.md` → Declared Assets). Reduce motion
+  /// is read from the reader's settings so the clip holds on a still frame when
+  /// the platform asks it to.
+  Widget _walkthrough(BuildContext context) {
+    final settings = _settings!;
+    return ListenableBuilder(
+      listenable: settings,
+      builder: (context, _) =>
+          FirstRunWalkthrough(reduceMotion: settings.reduceMotion),
     );
   }
 
