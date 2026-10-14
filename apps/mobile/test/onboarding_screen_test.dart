@@ -8,6 +8,7 @@ import 'package:scenova/services/settings_controller.dart';
 import 'package:scenova/theme/colors.dart';
 import 'package:scenova/widgets/enable_action_guide.dart';
 import 'package:scenova/widgets/first_run_walkthrough.dart';
+import 'package:scenova/widgets/setup_sheet.dart';
 
 import 'support/harness.dart';
 
@@ -34,6 +35,11 @@ Future<void> tapConsent(WidgetTester tester) async {
   await tester.tap(finder);
   await tester.pump();
 }
+
+/// The setup panel's drag handle, found without needing semantics enabled.
+Finder handle() => find.byWidgetPredicate(
+  (widget) => widget is Semantics && widget.properties.label == 'Setup panel',
+);
 
 /// The setup content's panel: the only decorated surface on the screen that
 /// casts a shadow.
@@ -78,12 +84,12 @@ void main() {
     await teardown(tester);
   });
 
-  testWidgets('the walkthrough runs full-bleed behind the setup column', (
+  testWidgets('the walkthrough runs full-bleed behind the setup panel', (
     tester,
   ) async {
     await pumpOnboarding(tester, settings: freshInstall());
 
-    // It is a background layer, not an element inside the scrolling column.
+    // It is a background layer, not an element inside the panel's content.
     expect(
       find.ancestor(
         of: find.byType(FirstRunWalkthrough),
@@ -94,18 +100,65 @@ void main() {
     expect(
       find.ancestor(
         of: find.byType(FirstRunWalkthrough),
-        matching: find.byType(Stack),
+        matching: find.byType(SetupSheet),
       ),
-      findsWidgets,
+      findsNothing,
     );
-    // The setup content is a sibling over it.
+    // The setup panel is a sibling over it, carrying the setup content.
+    expect(find.byType(SetupSheet), findsOneWidget);
     expect(
       find.descendant(
-        of: find.byType(Stack),
+        of: find.byType(SetupSheet),
         matching: find.byType(SingleChildScrollView),
       ),
       findsOneWidget,
     );
+
+    await teardown(tester);
+  });
+
+  testWidgets('the default state leaves the clip visible above the panel', (
+    tester,
+  ) async {
+    await pumpOnboarding(tester, settings: freshInstall());
+
+    // The walkthrough reaches the top of the screen, and the panel rests below
+    // it at the height of its content, so the clip's upper band shows.
+    expect(tester.getTopLeft(find.byType(FirstRunWalkthrough)).dy, 0);
+    expect(tester.getTopLeft(find.byType(SetupSheet)).dy, greaterThan(0));
+
+    await teardown(tester);
+  });
+
+  testWidgets('dragging the panel down reveals the clip, and Continue works', (
+    tester,
+  ) async {
+    final settings = freshInstall();
+    var completed = false;
+    await pumpOnboarding(
+      tester,
+      settings: settings,
+      onComplete: () => completed = true,
+    );
+
+    // The reader drags the setup panel down to its handle.
+    await tester.drag(handle(), const Offset(0, 900));
+    await tester.pumpAndSettle();
+
+    final sheet = tester.state<SetupSheetState>(find.byType(SetupSheet));
+    expect(sheet.clipRevealed, isTrue);
+    // The setup content is unaffected, and the panel comes back to full height.
+    expect(find.text('See what a word means'), findsOneWidget);
+    await tester.drag(handle(), const Offset(0, -900));
+    await tester.pumpAndSettle();
+    expect(sheet.clipRevealed, isFalse);
+
+    // Continuing still completes setup after the panel has been dragged down.
+    await tapText(tester, 'Continue');
+    await tester.pump();
+
+    expect(completed, isTrue);
+    expect(settings.onboardingComplete, isTrue);
 
     await teardown(tester);
   });
