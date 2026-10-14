@@ -195,7 +195,7 @@ void main() {
     await teardown(tester);
   });
 
-  testWidgets('the app records an open on launch and on resume', (
+  testWidgets('a warm entry reports one open for the foregrounding', (
     tester,
   ) async {
     usePhoneWindow(tester);
@@ -212,16 +212,87 @@ void main() {
     expect(launched.name, AnalyticsEventName.appOpened);
     expect(launched.properties, <String, Object?>{'source': 'launch'});
 
+    // Android pauses and resumes the activity around an intent delivered to
+    // one already in the foreground, so the warm entry reports a resume for a
+    // foregrounding the app never left. The launch already reported it.
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pump();
     await tester.pump();
 
-    // The resume open is recorded, and the background flush delivers both.
+    expect(
+      api.sent
+          .where((event) => event.name == AnalyticsEventName.appOpened)
+          .map((event) => event.properties['source']),
+      <String>['launch'],
+    );
+
+    await teardown(tester);
+  });
+
+  testWidgets('leaving the foreground and returning records a second open', (
+    tester,
+  ) async {
+    usePhoneWindow(tester);
+    final api = MockAnalyticsApi();
+    final services = buildServices(
+      settings: SettingsController(onboardingComplete: true),
+      analyticsApi: api,
+    );
+
+    await tester.pumpWidget(ScenovaApp(services: services));
+    await tester.pump();
+
+    // The app leaves the screen, then comes back: the launch is delivered on
+    // the way out and the return is a foregrounding of its own.
+    for (final state in <AppLifecycleState>[
+      AppLifecycleState.inactive,
+      AppLifecycleState.hidden,
+      AppLifecycleState.paused,
+      AppLifecycleState.hidden,
+      AppLifecycleState.inactive,
+      AppLifecycleState.resumed,
+    ]) {
+      tester.binding.handleAppLifecycleStateChanged(state);
+    }
+    await tester.pump();
+    await tester.pump();
+
     expect(
       api.sent
           .where((event) => event.name == AnalyticsEventName.appOpened)
           .map((event) => event.properties['source']),
       <String>['launch', 'resume'],
+    );
+
+    await teardown(tester);
+  });
+
+  testWidgets('losing focus without leaving the screen is not an open', (
+    tester,
+  ) async {
+    usePhoneWindow(tester);
+    final api = MockAnalyticsApi();
+    final services = buildServices(
+      settings: SettingsController(onboardingComplete: true),
+      analyticsApi: api,
+    );
+
+    await tester.pumpWidget(ScenovaApp(services: services));
+    await tester.pump();
+
+    // The notify offer's permission prompt takes focus away and gives it back;
+    // the reader never left the app.
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.pump();
+
+    expect(
+      api.sent
+          .where((event) => event.name == AnalyticsEventName.appOpened)
+          .map((event) => event.properties['source']),
+      <String>['launch'],
     );
 
     await teardown(tester);

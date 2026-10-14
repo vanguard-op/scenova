@@ -22,5 +22,12 @@
          This Theme is only used starting with V2 of Flutter's Android embedding. -->
     <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:windowBackground">?android:colorBackground</item>
+        <!-- The selection action's clip card sits over the reading app, so the
+             window it runs in has to be translucent. Android reads
+             `windowIsTranslucent` from the theme in force when the window is
+             laid out, and Flutter switches to this theme before the first
+             frame draws, so the running theme declares it as well as the
+             splash theme (`FEAT-008`). -->
+        <item name="android:windowIsTranslucent">true</item>
     </style>
 </resources>

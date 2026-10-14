@@ -43,6 +43,18 @@ class _ScenovaAppState extends State<ScenovaApp> with WidgetsBindingObserver {
   late final AppRouter _router = AppRouter(services: widget.services);
   late DeviceClass _deviceClass = _resolveDeviceClass();
 
+  /// Whether the app has been out of the foreground since it launched.
+  ///
+  /// The open recorded on launch is the app's first foregrounding. Android
+  /// pauses and resumes the activity around an intent it delivers to an
+  /// activity already in the foreground, and the selection action's entry
+  /// rebuilds the activity to be the in-place card, so one warm entry reports
+  /// the same foregrounding twice: a resume from before the rebuild and the
+  /// rebuilt app's own launch. A resume counts as a foregrounding of its own
+  /// only once the app has actually been out of the foreground in between
+  /// (`EVT-001`).
+  bool _wasBackgrounded = false;
+
   @override
   void initState() {
     super.initState();
@@ -68,16 +80,28 @@ class _ScenovaAppState extends State<ScenovaApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      widget.services.analytics.appOpened(source: AppOpenSource.resume);
-      unawaited(widget.services.analytics.flush());
-      // A kill switch disabled while the app was backgrounded takes effect on
-      // the next lookup rather than the next release.
-      unawaited(widget.services.featureFlags.refresh());
-    } else if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.detached) {
-      // Deliver what has been recorded before the app may be stopped.
-      unawaited(widget.services.analytics.flush());
+    switch (state) {
+      case AppLifecycleState.resumed:
+        // A resume is a foregrounding of its own only once the app has left the
+        // foreground; the pause and resume around a delivered intent is not.
+        if (_wasBackgrounded) {
+          _wasBackgrounded = false;
+          widget.services.analytics.appOpened(source: AppOpenSource.resume);
+        }
+        unawaited(widget.services.analytics.flush());
+        // A kill switch disabled while the app was backgrounded takes effect on
+        // the next lookup rather than the next release.
+        unawaited(widget.services.featureFlags.refresh());
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+        _wasBackgrounded = true;
+        // Deliver what has been recorded before the app may be stopped.
+        unawaited(widget.services.analytics.flush());
+      case AppLifecycleState.inactive:
+        // Losing focus without leaving the screen — a permission prompt, the
+        // notification shade — leaves the app in the foreground.
+        break;
     }
   }
 
