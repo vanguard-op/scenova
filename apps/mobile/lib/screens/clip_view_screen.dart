@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../models/analytics_event.dart';
+import '../models/feedback.dart';
 import '../models/lookup.dart';
 import '../services/app_services.dart';
 import '../services/push_registrar.dart';
@@ -516,8 +517,6 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
 
   Widget _actions(BuildContext context) {
     final tokens = ScenovaTokens.of(context);
-    final colors = ScenovaColors.of(context);
-    final styles = ScenovaTextStyles.of(context);
     final settings = _settings;
     final clip = _controller.clip;
     final canPlay = _controller.phase == ClipPhase.playing;
@@ -557,22 +556,38 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
                     );
                   },
                 ),
-              ScenovaIconButton(
-                icon: AppIcons.helpful,
-                tooltip: 'This showed the meaning',
-                active: feedback == FeedbackMark.helpful,
-                onPressed: () => _controller.markFeedback(FeedbackMark.helpful),
-              ),
-              ScenovaIconButton(
-                icon: AppIcons.notHelpful,
-                tooltip: 'This did not show the meaning',
-                active: feedback == FeedbackMark.notHelpful,
-                onPressed: () =>
-                    _controller.markFeedback(FeedbackMark.notHelpful),
-              ),
+              // The reader's rating of the clip: whether it showed the meaning,
+              // or that it showed the wrong one (`FEAT-010`).
+              if (canPlay) ...<Widget>[
+                ScenovaIconButton(
+                  icon: AppIcons.helpful,
+                  tooltip: 'This showed the meaning',
+                  active: feedback == ClipRating.helpful,
+                  onPressed: () =>
+                      unawaited(_controller.markFeedback(ClipRating.helpful)),
+                ),
+                ScenovaIconButton(
+                  icon: AppIcons.notHelpful,
+                  tooltip: 'This did not show the meaning',
+                  active: feedback == ClipRating.notHelpful,
+                  onPressed: () => unawaited(
+                    _controller.markFeedback(ClipRating.notHelpful),
+                  ),
+                ),
+                ScenovaIconButton(
+                  icon: AppIcons.wrong,
+                  tooltip: 'This showed the wrong meaning',
+                  active: feedback == ClipRating.wrong,
+                  onPressed: () =>
+                      unawaited(_controller.markFeedback(ClipRating.wrong)),
+                ),
+              ],
             ],
           ),
-          SizedBox(height: tokens.spacing.sm),
+          if (canPlay) ...<Widget>[
+            SizedBox(height: tokens.spacing.sm),
+            _feedbackNote(context),
+          ],
         ],
         Wrap(
           spacing: tokens.spacing.sm,
@@ -600,17 +615,59 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
               ),
           ],
         ),
-        if (feedback != null) ...<Widget>[
-          SizedBox(height: tokens.spacing.sm),
-          Semantics(
-            liveRegion: true,
+      ],
+    );
+  }
+
+  /// What came of the reader's rating: the wait while it is sent, the
+  /// confirmation, the note that it is held for the connection, or the failure
+  /// with a retry (`FEAT-010`).
+  ///
+  /// A rating is never silently lost: when the service could not take it the
+  /// reader is told, and the clip's own rating stays on the control.
+  Widget _feedbackNote(BuildContext context) {
+    final colors = ScenovaColors.of(context);
+    final tokens = ScenovaTokens.of(context);
+    final styles = ScenovaTextStyles.of(context);
+    final delivery = _controller.feedbackDelivery;
+    if (delivery == null) return const SizedBox.shrink();
+
+    final (String message, bool retry) = switch (delivery) {
+      FeedbackDelivery.sending => ('Saving…', false),
+      FeedbackDelivery.recorded => ('Thanks — noted.', false),
+      FeedbackDelivery.queued => (
+        "Saved. It will go out when you're back online.",
+        false,
+      ),
+      FeedbackDelivery.failed => ("We couldn't save that just now.", true),
+    };
+
+    return Semantics(
+      liveRegion: true,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: <Widget>[
+          Expanded(
             child: Text(
-              'Thanks — noted.',
-              style: styles.caption.copyWith(color: colors.textSecondary),
+              message,
+              style: styles.caption.copyWith(
+                color: delivery == FeedbackDelivery.failed
+                    ? colors.error.text
+                    : colors.textSecondary,
+              ),
             ),
           ),
+          if (retry) ...<Widget>[
+            SizedBox(width: tokens.spacing.sm),
+            ScenovaButton(
+              label: 'Try again',
+              variant: ScenovaButtonVariant.ghost,
+              icon: AppIcons.retry,
+              onPressed: () => unawaited(_controller.retryFeedback()),
+            ),
+          ],
         ],
-      ],
+      ),
     );
   }
 

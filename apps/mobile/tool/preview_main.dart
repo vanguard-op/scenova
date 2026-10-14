@@ -4,10 +4,13 @@
 // without a reading app: `?frame=<n>`, add `?dark=1` for the dark theme and
 // `?device=tablet` for the tablet device class. Built with `flutter build web -t tool/preview_main.dart`; this is tooling, never
 // shipped.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:scenova/app_router.dart';
 import 'package:scenova/models/clip_notice.dart';
 import 'package:scenova/models/entitlement.dart';
+import 'package:scenova/models/feedback.dart';
 import 'package:scenova/models/history_entry.dart';
 import 'package:scenova/models/lookup.dart';
 import 'package:scenova/screens/clip_controller.dart';
@@ -24,6 +27,9 @@ import 'package:scenova/services/clip_notice_source.dart';
 import 'package:scenova/services/connectivity.dart';
 import 'package:scenova/services/entitlement_provider.dart';
 import 'package:scenova/services/feature_flags.dart';
+import 'package:scenova/services/feedback_api.dart';
+import 'package:scenova/services/feedback_outbox.dart';
+import 'package:scenova/services/feedback_store.dart';
 import 'package:scenova/services/history_store.dart';
 import 'package:scenova/services/identity.dart';
 import 'package:scenova/services/lookup_api.dart';
@@ -169,6 +175,24 @@ List<(String, Widget)> _frames() {
     ),
     ('Clip — serving from library (playing)', _clip('come')),
     ('Clip — sense choice', _clip('bank')),
+    ('Clip — rating noted', _clip('come', rating: ClipRating.helpful)),
+    (
+      'Clip — rating kept for the connection',
+      _clip(
+        'come',
+        online: false,
+        rating: ClipRating.notHelpful,
+        history: <HistoryEntry>[_savedLibraryHit()],
+      ),
+    ),
+    (
+      'Clip — rating could not be saved',
+      _clip(
+        'come',
+        rating: ClipRating.wrong,
+        feedbackApi: MockFeedbackApi()..failStatus = 400,
+      ),
+    ),
     (
       'Clip — generating',
       _clip('xylograph', api: MockLookupApi(pollsUntilReady: 100000)),
@@ -296,6 +320,8 @@ Widget _clip(
   List<HistoryEntry> history = const <HistoryEntry>[],
   FeatureFlags featureFlags = const FixedFeatureFlags(),
   Clip? noticeClip,
+  FeedbackApi? feedbackApi,
+  ClipRating? rating,
 }) {
   final noticeSource = ScriptedClipNoticeSource();
   final services = _services(
@@ -306,6 +332,7 @@ Widget _clip(
     history: history,
     featureFlags: featureFlags,
     clipNoticeSource: noticeSource,
+    feedbackApi: feedbackApi,
   );
   return ScenovaScope(
     services: services,
@@ -317,7 +344,22 @@ Widget _clip(
       noticeThreshold: noticeThreshold,
       noticeSource: noticeSource,
       noticeClip: noticeClip,
+      rating: rating,
     ),
+  );
+}
+
+/// A saved lookup the device holds with the service lookup it came from, so the
+/// offline frames replay it and can still rate it.
+HistoryEntry _savedLibraryHit() {
+  return HistoryEntry(
+    id: 'come-1',
+    word: 'come',
+    phrase: 'to move towards someone or something',
+    kind: LookupKind.word,
+    savedAt: DateTime.now(),
+    clipUrl: 'mock://clip/library-hit',
+    lookupId: 'lookup-come',
   );
 }
 
@@ -388,6 +430,8 @@ ScenovaServices _services({
   ClipNoticeSource? clipNoticeSource,
   NotificationPermissionGate notificationPermission =
       const PlatformNotificationPermission(),
+  FeedbackApi? feedbackApi,
+  PendingFeedbackStore? feedbackStore,
 }) {
   final connectivity = ManualConnectivity(online: online);
   final settingsController = settings ?? SettingsController();
@@ -417,6 +461,11 @@ ScenovaServices _services({
     ),
     notificationPermission: notificationPermission,
     featureFlags: featureFlags,
+    feedbackOutbox: FeedbackOutbox(
+      api: feedbackApi ?? MockFeedbackApi(),
+      store: feedbackStore ?? InMemoryPendingFeedbackStore(),
+      connectivity: connectivity,
+    ),
     locale: 'en-GB',
   );
 }
@@ -452,6 +501,7 @@ class _PreviewClip extends StatefulWidget {
     this.noticeThreshold,
     this.noticeSource,
     this.noticeClip,
+    this.rating,
   });
 
   final ScenovaServices services;
@@ -467,6 +517,10 @@ class _PreviewClip extends StatefulWidget {
   /// The clip the notice carries, when the frame shows that path.
   final Clip? noticeClip;
 
+  /// The rating this frame shows the reader having given, so the delivery state
+  /// is visible without a tap. Tooling only.
+  final ClipRating? rating;
+
   @override
   State<_PreviewClip> createState() => _PreviewClipState();
 }
@@ -479,17 +533,25 @@ class _PreviewClipState extends State<_PreviewClip> {
     noticeThreshold: widget.noticeThreshold,
   );
 
+  bool _noticeDelivered = false;
+  bool _rated = false;
+
   @override
   void initState() {
     super.initState();
-    _controller.addListener(_deliverNoticeOnce);
+    _controller.addListener(_onControllerChanged);
   }
 
   @override
   void dispose() {
-    _controller.removeListener(_deliverNoticeOnce);
+    _controller.removeListener(_onControllerChanged);
     _controller.dispose();
     super.dispose();
+  }
+
+  void _onControllerChanged() {
+    _deliverNoticeOnce();
+    _rateOnce();
   }
 
   /// Delivers the clip-ready notice for the lookup once the view is waiting on
@@ -498,8 +560,13 @@ class _PreviewClipState extends State<_PreviewClip> {
     final clip = widget.noticeClip;
     final source = widget.noticeSource;
     final lookupId = _controller.result?.lookupId;
-    if (clip == null || source == null || lookupId == null) return;
-    _controller.removeListener(_deliverNoticeOnce);
+    if (_noticeDelivered ||
+        clip == null ||
+        source == null ||
+        lookupId == null) {
+      return;
+    }
+    _noticeDelivered = true;
     source.deliver(
       ClipNotice(
         lookupId: lookupId,
@@ -509,6 +576,15 @@ class _PreviewClipState extends State<_PreviewClip> {
         hasAudio: clip.hasAudio,
       ),
     );
+  }
+
+  /// Rates the clip once it is on screen, so a delivery state can be looked at.
+  void _rateOnce() {
+    final rating = widget.rating;
+    if (_rated || rating == null) return;
+    if (_controller.phase != ClipPhase.playing) return;
+    _rated = true;
+    unawaited(_controller.markFeedback(rating));
   }
 
   @override

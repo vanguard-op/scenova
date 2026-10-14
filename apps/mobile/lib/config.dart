@@ -53,6 +53,13 @@ abstract final class AppConfig {
     defaultValue: false,
   );
 
+  /// The feedback intake (`C-012`). Live by default; opt into the recording
+  /// intake with `--dart-define=SCENOVA_USE_MOCK_FEEDBACK=true`.
+  static const bool useMockFeedbackApi = bool.fromEnvironment(
+    'SCENOVA_USE_MOCK_FEEDBACK',
+    defaultValue: false,
+  );
+
   /// The hosts that resolve to the developer's own machine, where the local
   /// stack runs over plaintext. `10.0.2.2` is the Android emulator's alias for
   /// the host's loopback interface, so it reaches the same machine as
@@ -112,6 +119,12 @@ abstract final class AppConfig {
   /// A bound on the offline queue, so a long offline stretch cannot grow it
   /// without limit. This is backpressure, not sampling.
   static const int analyticsQueueLimit = 500;
+
+  /// A bound on the ratings the device holds for the feedback intake, so a long
+  /// offline stretch cannot grow the queue without limit. The reader's latest
+  /// rating of a clip is the one that counts, so the bound costs nothing the
+  /// reader would miss (`C-012`).
+  static const int feedbackQueueLimit = 100;
 
   /// How the lookup path authenticates (`C-001`/`C-002` auth).
   ///

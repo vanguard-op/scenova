@@ -96,6 +96,7 @@ abstract final class AppIcons {
   static const AppIcon remove = SystemIcon(Icons.delete_outline_rounded);
   static const AppIcon helpful = SystemIcon(Icons.thumb_up_outlined);
   static const AppIcon notHelpful = SystemIcon(Icons.thumb_down_outlined);
+  static const AppIcon wrong = SystemIcon(Icons.flag_outlined);
 }
 
 /// Draws an [AppIcon] at one of the iconography direction's three states.

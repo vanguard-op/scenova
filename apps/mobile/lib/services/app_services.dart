@@ -12,6 +12,9 @@ import 'clip_notice_source.dart';
 import 'connectivity.dart';
 import 'entitlement_provider.dart';
 import 'feature_flags.dart';
+import 'feedback_api.dart';
+import 'feedback_outbox.dart';
+import 'feedback_store.dart';
 import 'history_store.dart';
 import 'identity.dart';
 import 'lookup_api.dart';
@@ -39,6 +42,7 @@ class ScenovaServices {
     required this.clipNotices,
     required this.notificationPermission,
     required this.featureFlags,
+    required this.feedbackOutbox,
     this.locale = 'en',
   });
 
@@ -71,6 +75,10 @@ class ScenovaServices {
   /// The client-side release flags the build honours (`release.md`).
   final FeatureFlags featureFlags;
 
+  /// Delivers the reader's clip ratings, holding them on the device until a
+  /// connection returns (`C-012`, `FEAT-010`).
+  final FeedbackOutbox feedbackOutbox;
+
   /// The reader's locale, sent with a lookup.
   final String locale;
 
@@ -83,6 +91,7 @@ class ScenovaServices {
     List<HistoryEntry> history = const <HistoryEntry>[],
     SettingsStore? settingsStore,
     FeatureFlags? featureFlags,
+    PendingFeedbackStore? feedbackStore,
   }) {
     // The live intakes carry reader input over the network, so the gateway must
     // be reached over TLS (`NFR-022`). A build that points at a plaintext remote
@@ -90,7 +99,8 @@ class ScenovaServices {
     final useLiveGateway =
         !AppConfig.useMockLookupApi ||
         !AppConfig.useMockAnalyticsApi ||
-        !AppConfig.useMockPushApi;
+        !AppConfig.useMockPushApi ||
+        !AppConfig.useMockFeedbackApi;
     if (useLiveGateway) AppConfig.ensureSecureGateway(AppConfig.apiBaseUrl);
 
     // The identity the lookup path presents: an anonymous Firebase ID token in
@@ -168,6 +178,16 @@ class ScenovaServices {
       ),
       notificationPermission: notificationPermission,
       featureFlags: featureFlags ?? RemoteConfigFeatureFlags(),
+      feedbackOutbox: FeedbackOutbox(
+        api: AppConfig.useMockFeedbackApi
+            ? MockFeedbackApi(latency: AppConfig.mockLatency)
+            : HttpFeedbackApi(
+                baseUrl: AppConfig.apiBaseUrl,
+                idTokenProvider: identity.idToken,
+              ),
+        store: feedbackStore ?? SharedPreferencesPendingFeedbackStore(),
+        connectivity: connectivity,
+      ),
       locale: locale,
     );
   }
@@ -179,6 +199,7 @@ class ScenovaServices {
     analytics.dispose();
     pushRegistrar.dispose();
     clipNotices.dispose();
+    feedbackOutbox.dispose();
   }
 }
 
@@ -214,5 +235,8 @@ HistoryEntry historyEntryFrom(
     savedAt: savedAt,
     clipUrl: chosen?.clip?.url,
     hasAudio: chosen?.clip?.hasAudio ?? false,
+    // The lookup the service issued, so a clip replayed from the device can
+    // still be rated against the entry it came from (`C-012`).
+    lookupId: result.lookupId,
   );
 }

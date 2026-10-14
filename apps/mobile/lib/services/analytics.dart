@@ -176,7 +176,8 @@ class AnalyticsClient {
     },
   );
 
-  /// The reader rated a clip (`EVT-011`).
+  /// The reader rated a clip (`EVT-011`). The `rating` is a clip rating's wire
+  /// value — the taxonomy's `rating` property.
   void clipFeedbackGiven({
     required String rating,
     required ClipSource clipSource,

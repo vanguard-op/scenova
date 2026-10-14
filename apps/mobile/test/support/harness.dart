@@ -21,6 +21,9 @@ import 'package:scenova/services/clip_notice_source.dart';
 import 'package:scenova/services/connectivity.dart';
 import 'package:scenova/services/entitlement_provider.dart';
 import 'package:scenova/services/feature_flags.dart';
+import 'package:scenova/services/feedback_api.dart';
+import 'package:scenova/services/feedback_outbox.dart';
+import 'package:scenova/services/feedback_store.dart';
 import 'package:scenova/services/history_store.dart';
 import 'package:scenova/services/identity.dart';
 import 'package:scenova/services/lookup_api.dart';
@@ -46,6 +49,8 @@ ScenovaServices buildServices({
   NotificationPermissionGate? notificationPermission,
   ClipNoticeSource? clipNoticeSource,
   FeatureFlags? featureFlags,
+  FeedbackApi? feedbackApi,
+  PendingFeedbackStore? feedbackStore,
   String locale = 'en',
 }) {
   final connectivity = ManualConnectivity(online: online);
@@ -78,6 +83,11 @@ ScenovaServices buildServices({
     notificationPermission:
         notificationPermission ?? ScriptedNotificationPermission(),
     featureFlags: featureFlags ?? const FixedFeatureFlags(),
+    feedbackOutbox: FeedbackOutbox(
+      api: feedbackApi ?? MockFeedbackApi(),
+      store: feedbackStore ?? InMemoryPendingFeedbackStore(),
+      connectivity: connectivity,
+    ),
     locale: locale,
   );
 }
@@ -100,6 +110,8 @@ Future<Harness> pumpHarness(
   Entitlement entitlement = Entitlement.unmeteredGuest,
   FeatureFlags? featureFlags,
   ClipNoticeSource? clipNoticeSource,
+  FeedbackApi? feedbackApi,
+  PendingFeedbackStore? feedbackStore,
 }) async {
   final services = buildServices(
     api: api,
@@ -109,6 +121,8 @@ Future<Harness> pumpHarness(
     entitlement: entitlement,
     featureFlags: featureFlags,
     clipNoticeSource: clipNoticeSource,
+    feedbackApi: feedbackApi,
+    feedbackStore: feedbackStore,
   );
   final router = AppRouter(services: services);
   await tester.pumpWidget(
@@ -446,6 +460,7 @@ HistoryEntry seededEntry({
   bool hasAudio = false,
   LookupKind kind = LookupKind.word,
   Duration age = const Duration(minutes: 1),
+  String? lookupId,
 }) {
   return HistoryEntry(
     id: 'seed-$word',
@@ -455,5 +470,6 @@ HistoryEntry seededEntry({
     savedAt: DateTime.now().subtract(age),
     clipUrl: clipUrl,
     hasAudio: hasAudio,
+    lookupId: lookupId,
   );
 }

@@ -6,6 +6,7 @@ import '../config.dart';
 import '../models/analytics_event.dart';
 import '../models/clip_notice.dart';
 import '../models/entitlement.dart';
+import '../models/feedback.dart';
 import '../models/history_entry.dart';
 import '../models/lookup.dart';
 import '../services/app_services.dart';
@@ -35,9 +36,6 @@ enum ClipPhase {
   /// the reader sees the selected word and its phrase with no clip.
   wordAndPhrase,
 }
-
-/// How the reader marked a clip.
-enum FeedbackMark { helpful, notHelpful }
 
 /// Drives one clip view from the moment a word arrives to the moment a clip
 /// plays.
@@ -115,7 +113,8 @@ class ClipViewController extends ChangeNotifier {
   /// Whether the first load has run. Until it has, a newer selection is left to
   /// the load that mounting triggers rather than starting a second lookup.
   bool _loaded = false;
-  FeedbackMark? _feedback;
+  ClipRating? _feedback;
+  FeedbackDelivery? _feedbackDelivery;
 
   CaptureSelection get selection => _selection;
   LookupResult? get result => _result;
@@ -125,7 +124,12 @@ class ClipViewController extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   bool get playing => _playing;
   bool get willNotify => _willNotify;
-  FeedbackMark? get feedback => _feedback;
+
+  /// The reader's rating of the clip on screen, or null before they rate it.
+  ClipRating? get feedback => _feedback;
+
+  /// Where that rating has got to, or null before they rate it.
+  FeedbackDelivery? get feedbackDelivery => _feedbackDelivery;
 
   /// The word to show, preferring the result's normalised form.
   String get word => _result?.displayWord ?? _selection.text;
@@ -212,6 +216,7 @@ class ClipViewController extends ChangeNotifier {
     _cancelPoll();
     _playing = false;
     _feedback = null;
+    _feedbackDelivery = null;
     _willNotify = false;
     _pastThreshold = false;
     _noticeDismissed = false;
@@ -273,7 +278,7 @@ class ClipViewController extends ChangeNotifier {
     // its own history without a new generation (`FEAT-007`). With the clip view
     // switched off there is no clip to serve, so the phrase resolves normally.
     if (_selection.kind == LookupKind.phrase && _clipViewEnabled) {
-      final saved = await _savedClipFor(_selection);
+      final saved = await _savedEntryFor(_selection);
       if (_disposed) return;
       if (saved != null) {
         _serveSavedClip(saved);
@@ -341,16 +346,57 @@ class ClipViewController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void markFeedback(FeedbackMark mark) {
-    _feedback = mark;
+  /// Records the reader's rating of the clip on screen (`FEAT-010`).
+  ///
+  /// The rating is kept against the lookup and delivered by the outbox, which
+  /// holds it on the device until a connection returns. Rating the same clip
+  /// again replaces the earlier rating, since only the reader's latest one
+  /// counts (`C-012`).
+  Future<void> markFeedback(ClipRating rating) async {
+    _feedback = rating;
     services.analytics.clipFeedbackGiven(
-      rating: mark == FeedbackMark.helpful
-          ? AnalyticsRating.helpful
-          : AnalyticsRating.notHelpful,
+      rating: rating.wire,
       clipSource: _clipSource,
     );
+    await _sendFeedback(rating);
+  }
+
+  /// Sends the rating already on screen again, after it could not be recorded.
+  /// The rating is not counted twice on the event stream for a retry.
+  Future<void> retryFeedback() async {
+    final rating = _feedback;
+    if (rating == null) return;
+    await _sendFeedback(rating);
+  }
+
+  Future<void> _sendFeedback(ClipRating rating) async {
+    final lookupId = _feedbackLookupId;
+    if (lookupId == null) {
+      // The clip was replayed from the device and no service lookup stands
+      // behind it, so there is nothing to record the rating against (`C-012`
+      // answers 404). The reader's mark is kept on screen and nothing is sent.
+      _feedbackDelivery = FeedbackDelivery.recorded;
+      notifyListeners();
+      return;
+    }
+    _feedbackDelivery = FeedbackDelivery.sending;
+    notifyListeners();
+    final outcome = await services.feedbackOutbox.submit(
+      lookupId: lookupId,
+      rating: rating,
+    );
+    if (_disposed) return;
+    _feedbackDelivery = outcome;
     notifyListeners();
   }
+
+  /// The service's lookup for the clip on screen, when there is one.
+  ///
+  /// A lookup this view started carries its own id; a lookup replayed from the
+  /// device carries the one its saved entry was kept with, so a clip seen
+  /// earlier can still be rated — offline included (`FEAT-010`, Edge Cases).
+  String? get _feedbackLookupId =>
+      _fromHistory ? _savedEntry?.lookupId : _result?.lookupId;
 
   /// Records that the generating notice has been raised, so it is shown once.
   void markGeneratingNoticeShown() => _noticeDismissed = true;
@@ -679,7 +725,7 @@ class ClipViewController extends ChangeNotifier {
 
   Future<void> _serveFromHistoryOrOffline() async {
     if (_clipViewEnabled && offlineReplayEnabled) {
-      final saved = await _savedClipFor(_selection);
+      final saved = await _savedEntryFor(_selection);
       if (_disposed) return;
       if (saved != null) {
         _serveSavedClip(saved);
@@ -689,12 +735,19 @@ class ClipViewController extends ChangeNotifier {
     _setPhase(ClipPhase.offline);
   }
 
-  /// Plays [sense], which came from the device's own history rather than a
+  /// Plays [entry], which came from the device's own history rather than a
   /// fresh lookup, and records it as a saved-clip replay.
-  void _serveSavedClip(Sense sense) {
+  ///
+  /// The entry is kept as the view's saved lookup, so the service lookup it was
+  /// saved from is still at hand: a clip replayed with no connection can still
+  /// be rated, and the rating goes out when the connection returns
+  /// (`FEAT-010`, Edge Cases).
+  void _serveSavedClip(HistoryEntry entry) {
     _fromHistory = true;
-    _result = _placeholderResult(sense: sense);
-    _chosenSense = _result!.senses.first;
+    _savedEntry = entry;
+    final result = _resultFromEntry(entry, includeClip: true);
+    _result = result;
+    _chosenSense = result.senses.first;
     _setPhase(ClipPhase.playing);
     _autoplayOrHold();
   }
@@ -763,13 +816,13 @@ class ClipViewController extends ChangeNotifier {
     );
   }
 
-  /// The clip saved for [selection] on this device, or null.
+  /// The saved lookup for [selection] on this device, or null.
   ///
   /// Matching on the selection's kind and text keeps a phrase served only by
   /// its own phrase entry; a word and a phrase that share text stay separate.
-  Future<Sense?> _savedClipFor(CaptureSelection selection) async {
+  Future<HistoryEntry?> _savedEntryFor(CaptureSelection selection) async {
     final entries = await services.historyStore.all();
-    final match = entries
+    return entries
         .where(
           (entry) =>
               entry.kind == selection.kind &&
@@ -777,18 +830,6 @@ class ClipViewController extends ChangeNotifier {
               entry.clipUrl != null,
         )
         .firstOrNull;
-    if (match == null) return null;
-    return Sense(
-      senseLabel: '1',
-      partOfSpeech: '',
-      glossPhrase: match.phrase,
-      clip: Clip(
-        url: match.clipUrl!,
-        durationSeconds: AppConfig.clipDurationFallback.inSeconds.toDouble(),
-        resolution: '360p',
-        hasAudio: match.hasAudio,
-      ),
-    );
   }
 
   Future<void> _saveToHistory() async {
@@ -802,29 +843,6 @@ class ClipViewController extends ChangeNotifier {
     if (result.status != LookupStatus.served && (sense?.clip == null)) return;
     await services.historyStore.save(
       historyEntryFrom(result, savedAt: DateTime.now(), sense: sense),
-    );
-  }
-
-  /// A result that carries the word and phrase but no clip, used for the
-  /// allowance-exhausted and offline-with-saved-clip cases.
-  LookupResult _placeholderResult({Sense? sense}) {
-    return LookupResult(
-      lookupId: 'local-${_selection.text}',
-      kind: _selection.kind ?? LookupKind.word,
-      rawSelection: _selection.text,
-      normalisedLemma: _selection.text,
-      status: sense == null ? LookupStatus.fallback : LookupStatus.served,
-      senses: <Sense>[
-        sense ??
-            Sense(
-              senseLabel: '1',
-              partOfSpeech: '',
-              glossPhrase: '',
-              entryId: null,
-            ),
-      ],
-      notice: null,
-      correlationId: 'local',
     );
   }
 

@@ -136,12 +136,6 @@ abstract final class AnalyticsProperty {
   static const String resolution = 'resolution';
 }
 
-/// The `rating` values on `clip_feedback_given`.
-abstract final class AnalyticsRating {
-  static const String helpful = 'helpful';
-  static const String notHelpful = 'not_helpful';
-}
-
 /// The `setting` values on `preference_changed`.
 abstract final class AnalyticsSetting {
   static const String sound = 'sound';

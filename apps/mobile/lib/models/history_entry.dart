@@ -17,6 +17,7 @@ class HistoryEntry {
     required this.savedAt,
     this.clipUrl,
     this.hasAudio = false,
+    this.lookupId,
   });
 
   final String id;
@@ -26,6 +27,14 @@ class HistoryEntry {
   final DateTime savedAt;
   final String? clipUrl;
   final bool hasAudio;
+
+  /// The service's id for the lookup this entry was saved from, when it had one.
+  ///
+  /// A lookup replayed from the device carries it back to the service, so the
+  /// reader can still rate a clip they saw earlier — offline included
+  /// (`FEAT-010`, Edge Cases; `C-012`). An entry with no service lookup (a
+  /// seeded or pre-existing one) has none.
+  final String? lookupId;
 
   bool get hasClip => clipUrl != null;
 
@@ -44,6 +53,7 @@ class HistoryEntry {
           DateTime.fromMillisecondsSinceEpoch(0),
       clipUrl: json['clipUrl'] as String?,
       hasAudio: json['hasAudio'] as bool? ?? false,
+      lookupId: json['lookupId'] as String?,
     );
   }
 
@@ -55,6 +65,7 @@ class HistoryEntry {
     'savedAt': savedAt.toUtc().toIso8601String(),
     'clipUrl': clipUrl,
     'hasAudio': hasAudio,
+    'lookupId': lookupId,
   };
 
   HistoryEntry copyWith({
@@ -64,6 +75,7 @@ class HistoryEntry {
     DateTime? savedAt,
     String? clipUrl,
     bool? hasAudio,
+    String? lookupId,
   }) {
     return HistoryEntry(
       id: id,
@@ -73,6 +85,7 @@ class HistoryEntry {
       savedAt: savedAt ?? this.savedAt,
       clipUrl: clipUrl ?? this.clipUrl,
       hasAudio: hasAudio ?? this.hasAudio,
+      lookupId: lookupId ?? this.lookupId,
     );
   }
 }
