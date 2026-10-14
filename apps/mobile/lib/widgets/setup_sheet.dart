@@ -10,10 +10,11 @@ import '../theme/tokens.dart';
 /// Components, and States).
 ///
 /// It rests at the height of its content, so the clip's upper band stays visible
-/// above it. Dragging it down reduces it to its handle at the foot of the screen
-/// and reveals the clip in full; dragging it up returns the setup content to
-/// full height. The content scrolls inside the sheet when it is taller than the
-/// room the sheet has.
+/// above it. Dragging it down lowers it to its shortest position and reveals the
+/// clip above; the handle and a slice of the setup content stay visible at the
+/// foot, so the panel still tells the reader it carries setup to attend to.
+/// Dragging it up returns the setup content to full height. The content scrolls
+/// inside the sheet when it is taller than the room the sheet has.
 ///
 /// The panel carries content over moving imagery, so it is opaque at every
 /// position it can rest at: its composite colour never changes with the frame
@@ -35,6 +36,18 @@ class SetupSheet extends StatefulWidget {
     this.reduceMotion = false,
   });
 
+  /// The slice of setup content the lowered panel keeps above its foot padding.
+  ///
+  /// The panel's shortest position holds a slice of the content instead of
+  /// reducing to its handle, so the reader can see the panel carries setup to
+  /// attend to (`docs/Scenova/screens/01-onboarding.md` → Layout and States).
+  /// The slice is one layout step plus one section step of the spacing scale, so
+  /// the panel's own head — the brand lockup and the line under it — stays whole
+  /// and the cut falls in the text that follows, which reads as a panel that
+  /// scrolls rather than as a clipped heading.
+  static double loweredSliceExtent(ScenovaTokens tokens) =>
+      tokens.spacing.xxxl + tokens.spacing.xl;
+
   /// The setup content the sheet carries.
   final Widget child;
 
@@ -52,12 +65,12 @@ class SetupSheet extends StatefulWidget {
 
 /// The setup sheet's state.
 ///
-/// Public so a test can read the sheet's resting position, including the
-/// "Clip revealed" state (`docs/Scenova/screens/01-onboarding.md` → States).
+/// Public so a test can read whether the sheet rests at its lowered position
+/// (`docs/Scenova/screens/01-onboarding.md` → States).
 class SetupSheetState extends State<SetupSheet>
     with SingleTickerProviderStateMixin {
-  /// The tolerance within which a position counts as the handle rest, so a
-  /// floating-point settle lands on the state it visually is.
+  /// The tolerance within which a position counts as the lowered rest, so a
+  /// floating-point settle lands on the state it visibly is.
   static const double _restTolerance = 0.5;
 
   /// The sheet's own surface, so its laid-out height gives the distance between
@@ -79,14 +92,15 @@ class SetupSheetState extends State<SetupSheet>
   /// How far the sheet is moved down from its resting position, in pixels.
   double _offset = 0;
 
-  /// Whether the sheet is resting at its handle with the clip revealed.
-  bool _revealed = false;
+  /// Whether the sheet rests at its lowered position, over the clip with a
+  /// slice of the setup content still showing.
+  bool _lowered = false;
 
   /// Whether a rest-position sync is already queued for the end of this frame.
   bool _restSyncScheduled = false;
 
-  /// Whether the sheet rests at its handle with the walkthrough clip revealed.
-  bool get clipRevealed => _revealed;
+  /// Whether the sheet rests at its lowered position.
+  bool get isLowered => _lowered;
 
   /// The padding under the content: the bottom inset the content must clear,
   /// plus the panel's own padding.
@@ -97,12 +111,20 @@ class SetupSheetState extends State<SetupSheet>
   /// The height of the handle strip at the head of the sheet.
   double get _handleExtent => ScenovaTokens.of(context).sizing.buttonHeight;
 
+  /// The height of the sheet at its lowered position: the handle, the slice of
+  /// the setup content that stays visible, and the padding under it.
+  double get _loweredHeight =>
+      _handleExtent +
+      SetupSheet.loweredSliceExtent(ScenovaTokens.of(context)) +
+      _bottomPad;
+
   /// The distance between the two positions the sheet can rest at.
   ///
-  /// The handle and the padding under the content stay on screen when the clip
-  /// is revealed, so the content's height is the whole of the travel.
+  /// The handle, the content slice, and the padding under the content stay on
+  /// screen when the sheet is lowered, so the rest of the content's height is
+  /// the whole of the travel.
   double get _maxOffset {
-    final max = _restHeight - _handleExtent - _bottomPad;
+    final max = _restHeight - _loweredHeight;
     return max > 0 ? max : 0;
   }
 
@@ -166,18 +188,20 @@ class SetupSheetState extends State<SetupSheet>
   }
 
   void _recordRestPosition() {
-    final revealed = _revealedAt(_offset);
-    if (revealed != _revealed) setState(() => _revealed = revealed);
+    final lowered = _loweredAt(_offset);
+    if (lowered != _lowered) setState(() => _lowered = lowered);
   }
 
-  bool _revealedAt(double offset) {
+  /// Whether [offset] is the sheet's lowered rest position. The tolerance keeps
+  /// a floating-point settle landing on the state it visibly is.
+  bool _loweredAt(double offset) {
     final max = _maxOffset;
     return max > 0 && offset >= max - _restTolerance;
   }
 
   void _onDragStart(DragStartDetails details) {
     _settle.stop();
-    setState(() => _revealed = false);
+    setState(() => _lowered = false);
   }
 
   void _onDragUpdate(DragUpdateDetails details) {
@@ -191,10 +215,10 @@ class SetupSheetState extends State<SetupSheet>
 
   /// The handle's accessible action: move the sheet to its other rest position,
   /// for a reader who cannot drag it.
-  void _toggle() => _settleTo(clipRevealed ? 0 : _maxOffset);
+  void _toggle() => _settleTo(isLowered ? 0 : _maxOffset);
 
-  /// Reads the sheet's resting height, and keeps the sheet at its handle when
-  /// the content changes height while the clip is revealed.
+  /// Reads the sheet's resting height, and keeps the sheet lowered when the
+  /// content changes height while it sits there.
   ///
   /// Runs after layout, because both facts come from the laid-out sheet.
   void _scheduleRestSync() {
@@ -211,7 +235,7 @@ class SetupSheetState extends State<SetupSheet>
         }
         return;
       }
-      if (_revealed) {
+      if (_lowered) {
         final max = _maxOffset;
         if (_offset != max) setState(() => _offset = max);
       }
@@ -225,7 +249,7 @@ class SetupSheetState extends State<SetupSheet>
     final padding = MediaQuery.paddingOf(context);
     final bottomPad = _bottomPad;
 
-    if (_offset == 0 || _revealed) _scheduleRestSync();
+    if (_offset == 0 || _lowered) _scheduleRestSync();
 
     // The sheet never covers the clip completely: a band stays visible above it
     // even when the content is taller than the room the sheet has.
@@ -236,11 +260,11 @@ class SetupSheetState extends State<SetupSheet>
 
     // At rest the sheet sizes to its content. Once the reader drags it, its
     // height shrinks with the drag, so the content leaves the foot of the screen
-    // and the handle comes to rest above the bottom inset with the clip behind
-    // the panel below it.
-    final collapsedHeight = _handleExtent + bottomPad;
+    // and the handle, with a slice of the content under it, comes to rest above
+    // the bottom inset with the clip behind the panel below it.
+    final loweredHeight = _loweredHeight;
     final height = _offset > 0
-        ? math.max(collapsedHeight, _restHeight - _offset)
+        ? math.max(loweredHeight, _restHeight - _offset)
         : null;
 
     return Positioned(
@@ -306,7 +330,9 @@ class SetupSheetState extends State<SetupSheet>
     final colors = ScenovaColors.of(context);
     return Semantics(
       label: 'Setup panel',
-      hint: _revealed ? 'Show the setup steps' : 'Show the walkthrough',
+      hint: _lowered
+          ? 'Raise the panel to see all the setup'
+          : 'Lower the panel to see the walkthrough',
       button: true,
       onTap: _toggle,
       child: SizedBox(

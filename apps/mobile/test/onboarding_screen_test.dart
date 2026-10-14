@@ -130,7 +130,7 @@ void main() {
     await teardown(tester);
   });
 
-  testWidgets('dragging the panel down reveals the clip, and Continue works', (
+  testWidgets('dragging the panel down lowers it, and Continue works', (
     tester,
   ) async {
     final settings = freshInstall();
@@ -141,17 +141,17 @@ void main() {
       onComplete: () => completed = true,
     );
 
-    // The reader drags the setup panel down to its handle.
+    // The reader drags the setup panel down to its lowered position.
     await tester.drag(handle(), const Offset(0, 900));
     await tester.pumpAndSettle();
 
     final sheet = tester.state<SetupSheetState>(find.byType(SetupSheet));
-    expect(sheet.clipRevealed, isTrue);
+    expect(sheet.isLowered, isTrue);
     // The setup content is unaffected, and the panel comes back to full height.
     expect(find.text('See what a word means'), findsOneWidget);
     await tester.drag(handle(), const Offset(0, -900));
     await tester.pumpAndSettle();
-    expect(sheet.clipRevealed, isFalse);
+    expect(sheet.isLowered, isFalse);
 
     // Continuing still completes setup after the panel has been dragged down.
     await tapText(tester, 'Continue');

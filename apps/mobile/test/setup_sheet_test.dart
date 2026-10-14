@@ -15,9 +15,14 @@ final double handleExtent = ScenovaSizing.mobile.buttonHeight;
 /// The sheet's bottom padding below the content, from the layout spacing scale.
 final double bottomPad = ScenovaSpacing.mobile.lg;
 
-/// What stays on screen once the clip is revealed: the handle and the panel's
-/// own padding under the content, with no content between them.
-final double collapsedStrip = handleExtent + bottomPad;
+/// What stays on screen once the panel is lowered: the handle, the slice of the
+/// setup content that keeps the panel's purpose apparent, and the panel's own
+/// padding under the content.
+final double loweredStrip =
+    handleExtent +
+    ScenovaSpacing.mobile.xxxl +
+    ScenovaSpacing.mobile.xl +
+    bottomPad;
 
 /// Sizes the test window so a layout resolves against known numbers.
 void useWindow(WidgetTester tester, Size size) {
@@ -118,7 +123,7 @@ void main() {
       expect(atRest.color!.a, 1.0);
       expect(atRest.boxShadow, isNotEmpty);
 
-      // The panel stays opaque once it is dragged down to its handle.
+      // The panel stays opaque once it is dragged down to its lowered position.
       await tester.drag(handle(), const Offset(0, 600));
       await tester.pumpAndSettle();
 
@@ -156,7 +161,7 @@ void main() {
     await teardown(tester);
   });
 
-  testWidgets('dragging down reveals the clip and reduces it to its handle', (
+  testWidgets('dragging down reveals the clip and lowers the panel', (
     tester,
   ) async {
     useWindow(tester, const Size(400, 900));
@@ -170,11 +175,47 @@ void main() {
     await tester.drag(handle(), const Offset(0, 600));
     await tester.pumpAndSettle();
 
-    expect(sheetState(tester).clipRevealed, isTrue);
-    // Only the handle and the panel's own padding are left at the foot.
-    expect(sheetHeight(tester), closeTo(collapsedStrip, 0.5));
-    expect(sheetTop(tester), closeTo(900 - collapsedStrip, 0.5));
+    expect(sheetState(tester).isLowered, isTrue);
+    expect(sheetHeight(tester), closeTo(loweredStrip, 0.5));
+    expect(sheetTop(tester), closeTo(900 - loweredStrip, 0.5));
     expect(sheetTop(tester), greaterThan(restTop));
+
+    await teardown(tester);
+  });
+
+  testWidgets('the lowered panel keeps a slice of the setup content visible', (
+    tester,
+  ) async {
+    useWindow(tester, const Size(400, 900));
+    await tester.pumpWidget(
+      host(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            const Text('Setup content'),
+            const SizedBox(height: 480, width: double.infinity),
+          ],
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.drag(handle(), const Offset(0, 600));
+    await tester.pumpAndSettle();
+
+    final sheet = tester.getRect(find.byType(SetupSheet));
+    final viewport = tester.getRect(find.byType(SingleChildScrollView));
+
+    // The panel is not reduced to its handle: setup content stays between the
+    // handle and the padding, so the reader sees the panel carries setup.
+    expect(sheet.height, greaterThan(handleExtent + bottomPad));
+    expect(viewport.top, closeTo(sheet.top + handleExtent, 0.5));
+    expect(viewport.bottom, closeTo(sheet.bottom - bottomPad, 0.5));
+    // It is the head of the content that shows, not a slice from its middle.
+    final head = tester.getRect(find.text('Setup content'));
+    expect(head.top, closeTo(viewport.top, 0.5));
+    expect(head.bottom, lessThanOrEqualTo(viewport.bottom));
 
     await teardown(tester);
   });
@@ -192,12 +233,12 @@ void main() {
 
     await tester.drag(handle(), const Offset(0, 600));
     await tester.pumpAndSettle();
-    expect(sheetState(tester).clipRevealed, isTrue);
+    expect(sheetState(tester).isLowered, isTrue);
 
     await tester.drag(handle(), const Offset(0, -600));
     await tester.pumpAndSettle();
 
-    expect(sheetState(tester).clipRevealed, isFalse);
+    expect(sheetState(tester).isLowered, isFalse);
     expect(sheetTop(tester), closeTo(restTop, 0.5));
 
     await teardown(tester);
@@ -218,7 +259,7 @@ void main() {
     await tester.drag(find.byType(SetupSheet), const Offset(0, 300));
     await tester.pumpAndSettle();
 
-    expect(sheetState(tester).clipRevealed, isTrue);
+    expect(sheetState(tester).isLowered, isTrue);
     expect(sheetTop(tester), greaterThan(restTop));
 
     await teardown(tester);
@@ -233,7 +274,7 @@ void main() {
 
     final restTop = sheetTop(tester);
 
-    // Past the halfway point, so the sheet settles at the handle.
+    // Past the halfway point, so the sheet settles at its lowered position.
     await tester.drag(handle(), const Offset(0, 320));
 
     final tops = <double>[];
@@ -249,7 +290,7 @@ void main() {
     for (var i = 1; i < tops.length; i++) {
       expect(tops[i], greaterThanOrEqualTo(tops[i - 1] - 0.5));
     }
-    expect(sheetState(tester).clipRevealed, isTrue);
+    expect(sheetState(tester).isLowered, isTrue);
 
     await teardown(tester);
   });
@@ -269,14 +310,14 @@ void main() {
     await tester.drag(handle(), const Offset(0, 320));
     await tester.pump();
 
-    // The panel follows the drag and lands where it was let go, in one step.
-    expect(sheetState(tester).clipRevealed, isTrue);
-    expect(sheetTop(tester), closeTo(900 - collapsedStrip, 0.5));
+    // The panel follows the drag and lands at its rest in one step.
+    expect(sheetState(tester).isLowered, isTrue);
+    expect(sheetTop(tester), closeTo(900 - loweredStrip, 0.5));
 
     await tester.drag(handle(), const Offset(0, -320));
     await tester.pump();
 
-    expect(sheetState(tester).clipRevealed, isFalse);
+    expect(sheetState(tester).isLowered, isFalse);
     expect(
       sheetTop(tester),
       closeTo(900 - (handleExtent + 500 + bottomPad), 0.5),
@@ -320,19 +361,17 @@ void main() {
 
     tester.semantics.tap(find.semantics.byLabel('Setup panel'));
     await tester.pumpAndSettle();
-    expect(sheetState(tester).clipRevealed, isTrue);
+    expect(sheetState(tester).isLowered, isTrue);
 
     tester.semantics.tap(find.semantics.byLabel('Setup panel'));
     await tester.pumpAndSettle();
-    expect(sheetState(tester).clipRevealed, isFalse);
+    expect(sheetState(tester).isLowered, isFalse);
 
     semantics.dispose();
     await teardown(tester);
   });
 
-  testWidgets('stays at its handle when the content changes height', (
-    tester,
-  ) async {
+  testWidgets('stays lowered when the content changes height', (tester) async {
     useWindow(tester, const Size(400, 900));
     await tester.pumpWidget(
       host(child: const SizedBox(height: 500, width: double.infinity)),
@@ -341,18 +380,19 @@ void main() {
 
     await tester.drag(handle(), const Offset(0, 600));
     await tester.pumpAndSettle();
-    expect(sheetState(tester).clipRevealed, isTrue);
+    expect(sheetState(tester).isLowered, isTrue);
 
-    // The content grows while the clip is revealed.
+    // The content grows while the panel is lowered.
     await tester.pumpWidget(
       host(child: const SizedBox(height: 700, width: double.infinity)),
     );
     await tester.pumpAndSettle();
 
-    // The panel is still reduced to its handle over the clip.
-    expect(sheetState(tester).clipRevealed, isTrue);
-    expect(sheetHeight(tester), closeTo(collapsedStrip, 0.5));
-    expect(sheetTop(tester), closeTo(900 - collapsedStrip, 0.5));
+    // The panel still sits at its lowered position over the clip, and still
+    // keeps its slice of the content visible.
+    expect(sheetState(tester).isLowered, isTrue);
+    expect(sheetHeight(tester), closeTo(loweredStrip, 0.5));
+    expect(sheetTop(tester), closeTo(900 - loweredStrip, 0.5));
 
     await teardown(tester);
   });

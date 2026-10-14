@@ -22,8 +22,8 @@ import 'onboarding_controller.dart';
 /// The five states from the screen spec are covered: the default first open, the
 /// reader sent to settings (the enable card with a note to return), consent
 /// declined (the note that generation is off while library lookups and history
-/// still work), the clip revealed by dragging the setup panel down to its
-/// handle, and completion, which is leaving for Home.
+/// still work), the panel lowered by dragging it down, which leaves a slice of
+/// the setup content over the clip, and completion, which is leaving for Home.
 ///
 /// The walkthrough clip runs full-bleed behind the setup panel on a seamless
 /// loop; the panel is a solid, draggable sheet so its text keeps its contrast
