@@ -1,7 +1,7 @@
 # DELIVERY — Scenova
 
 ## Source of Truth
-`docs/Scenova/` (BPRD), a git submodule of `vanguard-op/scenova-docs`, pinned at `96fdd51e72b08b4cd533224850cfecd8c5b16b04` (`96fdd51e72b0`). Read-only for the squad; `product-shaper` is the only writer. The roadmap owns the build order. The lead is the only agent who runs git against the submodule: commit and push `product-shaper`'s changes to the docs repo, then stage the pointer bump in the same commit as the code built against it, and never leave the parent pointing at an unpushed docs commit.
+`docs/Scenova/` (BPRD), a git submodule of `vanguard-op/scenova-docs`, pinned at `3b0bb9b7418df8c55d793d9cceb028df4c16cec6` (`3b0bb9b7418d`). Read-only for the squad; `product-shaper` is the only writer. The roadmap owns the build order. The lead is the only agent who runs git against the submodule: commit and push `product-shaper`'s changes to the docs repo, then stage the pointer bump in the same commit as the code built against it, and never leave the parent pointing at an unpushed docs commit.
 
 ## Team & File Ownership
 | Owner | Owns |
@@ -83,51 +83,11 @@ docs/           BPRD (product-shaper)
 ### Completed Phases
 | Phase | Closed | Notes |
 |---|---|---|
-| — | — | No verified phase closed yet; the conditional close of the first phase is a decisions-log entry. |
+| — | — | No verified phase closed yet; the conditional closes of the first two phases are decisions-log entries (`D-020`, `D-023`). |
 
-### Active Phase: Phase 2: The Reading Loop
+### Active Phase: Phase 3: Trust and Continuity
 | Task | Feature | Owner | Status | Contract |
 |---|---|---|---|---|
-| T-043 | FEAT-006 | backend-engineer | Done | C-001, C-002, C-003, C-006 |
-| T-044 | FEAT-007 | ai-engineer | Done | C-005 |
-| T-045 | FEAT-008 | backend-engineer | Done | C-008 |
-| T-046 | FEAT-008 | frontend-engineer | Done | C-001, C-002, C-008 |
-| T-047 | FEAT-007, FEAT-008 | frontend-engineer | Done | C-001, C-002, C-008 |
-| T-048 | FEAT-006 | qa-engineer | Done | C-009, C-010, C-011 |
-| T-049 | — | infra-engineer | Done | C-008 |
-| T-050 | FEAT-008 | backend-engineer | Done | C-008 |
-| T-051 | FEAT-006 | qa-engineer | Done | C-009, C-010, C-011 |
-| T-052 | FEAT-008 | frontend-engineer | Done | C-008 |
-| T-053 | FEAT-006, FEAT-007, FEAT-008 | qa-engineer | Done | C-001, C-002, C-003, C-005, C-006, C-008, C-009, C-010, C-011 |
-| T-054 | FEAT-005, FEAT-007 | ai-engineer | Done | C-005 |
-| T-055 | FEAT-008 | backend-engineer | Done | C-008 |
-| T-056 | FEAT-008 | qa-engineer | Done | C-008 |
-| T-057 | FEAT-005 | qa-engineer | Done | C-005 |
-| T-058 | FEAT-005, FEAT-007 | backend-engineer | Done | C-005, C-009 |
-| T-059 | FEAT-006 | qa-engineer | Done | C-003, C-006, C-009 |
-| T-060 | FEAT-001, FEAT-002, FEAT-008 | frontend-engineer | Done | C-001, C-002, C-007, C-008 |
-| T-061 | FEAT-005, FEAT-006 | ai-engineer | Done | C-005, C-009 |
-| T-062 | FEAT-008 | frontend-engineer | Done | C-001, C-002 |
-| T-063 | FEAT-001, FEAT-002, FEAT-008 | frontend-engineer | Done | C-001, C-002, C-008 |
-| T-064 | FEAT-008 | frontend-engineer | Done | C-001, C-002 |
-| T-065 | FEAT-007 | backend-engineer | Done | C-003, C-005 |
-| T-066 | — | infra-engineer | Done | — |
-| T-067 | FEAT-007 | qa-engineer | Done | C-003, C-005 |
-| T-068 | — | infra-engineer | Done | — |
-| T-069 | FEAT-001, FEAT-002 | backend-engineer | Done | C-001, C-002 |
-| T-070 | FEAT-008 | frontend-engineer | Done | C-008 |
-| T-071 | — | infra-engineer | Done | C-008 |
-| T-072 | FEAT-003, FEAT-004, FEAT-008 | backend-engineer | Done | C-001, C-002, C-004, C-009, C-010 |
-| T-073 | FEAT-003, FEAT-006 | qa-engineer | Done | C-001, C-002, C-009, C-010 |
-| T-074 | FEAT-001, FEAT-002 | frontend-engineer | Done | — |
-| T-075 | FEAT-001, FEAT-002 | frontend-engineer | Done | — |
-| T-076 | FEAT-001, FEAT-002 | frontend-engineer | Done | — |
-| T-077 | FEAT-001, FEAT-002 | frontend-engineer | Done | — |
-| T-078 | FEAT-001, FEAT-008 | frontend-engineer | Done | — |
-| T-079 | FEAT-001, FEAT-008 | frontend-engineer | Done | C-007 |
-| T-080 | FEAT-001, FEAT-008 | frontend-engineer | Done | C-007 |
-| T-081 | FEAT-001, FEAT-002, FEAT-003, FEAT-004, FEAT-005, FEAT-006, FEAT-007, FEAT-008 | qa-engineer | In Progress | C-001, C-002, C-003, C-004, C-005, C-006, C-007, C-008, C-009, C-010, C-011 |
-| T-082 | FEAT-007, FEAT-008 | frontend-engineer | Done | C-008 |
 
 ## Decisions Log
 | # | Decision | Rationale | By |
