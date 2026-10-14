@@ -67,3 +67,6 @@ coverage/
 # Cloud / CI artifacts
 .gcloud/
 *.log
+
+# Kotlin/Gradle build cache
+apps/mobile/android/.kotlin/
