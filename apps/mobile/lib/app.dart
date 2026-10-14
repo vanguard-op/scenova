@@ -6,6 +6,7 @@ import 'app_router.dart';
 import 'models/analytics_event.dart';
 import 'models/lookup.dart';
 import 'screens/clip_action_screen.dart';
+import 'screens/history_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/placeholder_screen.dart';
@@ -180,11 +181,7 @@ class _ScenovaAppState extends State<ScenovaApp> with WidgetsBindingObserver {
         themeMode: ThemeMode.system,
         home: _landing,
         routes: <String, WidgetBuilder>{
-          AppRoutes.history: (_) => const PlaceholderScreen(
-            title: 'History',
-            message:
-                'Saved lookups and their clips appear here in a later phase.',
-          ),
+          AppRoutes.history: (_) => HistoryScreen(router: _router),
           AppRoutes.preferences: (_) => const PlaceholderScreen(
             title: 'Preferences',
             message:

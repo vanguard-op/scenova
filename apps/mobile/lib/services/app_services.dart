@@ -75,10 +75,11 @@ class ScenovaServices {
   final String locale;
 
   /// The development wiring: scripted data that speaks the frozen contract,
-  /// an in-memory history, and a manual connectivity switch.
+  /// the device's own history, and a manual connectivity switch.
   factory ScenovaServices.development({
     String locale = 'en',
     Entitlement entitlement = Entitlement.unmeteredGuest,
+    HistoryStore? historyStore,
     List<HistoryEntry> history = const <HistoryEntry>[],
     SettingsStore? settingsStore,
     FeatureFlags? featureFlags,
@@ -122,7 +123,7 @@ class ScenovaServices {
               localeProvider: () => locale,
             ),
       identity: identity,
-      historyStore: InMemoryHistoryStore(seed: history),
+      historyStore: historyStore ?? InMemoryHistoryStore(seed: history),
       connectivity: connectivity,
       settings: settings,
       entitlements: FixedEntitlementProvider(entitlement),

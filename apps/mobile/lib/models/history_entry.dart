@@ -29,6 +29,34 @@ class HistoryEntry {
 
   bool get hasClip => clipUrl != null;
 
+  /// The stored form of this entry.
+  ///
+  /// History is kept on the device and never leaves it, so the shape is the
+  /// device's own; only what a row needs to render and replay is kept.
+  factory HistoryEntry.fromJson(Map<String, dynamic> json) {
+    return HistoryEntry(
+      id: json['id'] as String? ?? '',
+      word: json['word'] as String? ?? '',
+      phrase: json['phrase'] as String? ?? '',
+      kind: LookupKind.fromWire(json['kind']) ?? LookupKind.word,
+      savedAt:
+          DateTime.tryParse(json['savedAt'] as String? ?? '')?.toLocal() ??
+          DateTime.fromMillisecondsSinceEpoch(0),
+      clipUrl: json['clipUrl'] as String?,
+      hasAudio: json['hasAudio'] as bool? ?? false,
+    );
+  }
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+    'id': id,
+    'word': word,
+    'phrase': phrase,
+    'kind': kind.wire,
+    'savedAt': savedAt.toUtc().toIso8601String(),
+    'clipUrl': clipUrl,
+    'hasAudio': hasAudio,
+  };
+
   HistoryEntry copyWith({
     String? word,
     String? phrase,

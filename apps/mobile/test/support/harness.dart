@@ -9,6 +9,7 @@ import 'package:scenova/models/history_entry.dart';
 import 'package:scenova/models/lookup.dart';
 import 'package:scenova/screens/clip_controller.dart';
 import 'package:scenova/screens/clip_view_screen.dart';
+import 'package:scenova/screens/history_screen.dart';
 import 'package:scenova/screens/home_screen.dart';
 import 'package:scenova/screens/onboarding_screen.dart';
 import 'package:scenova/services/analytics.dart';
@@ -148,6 +149,33 @@ Future<void> pumpClipView(
       ),
     ),
   );
+}
+
+/// Builds History on its own, with the router the row uses to open a saved
+/// lookup, so a test drives the list and its navigation.
+Future<Harness> pumpHistory(
+  WidgetTester tester, {
+  LookupApi? api,
+  HistoryStore? history,
+  bool online = true,
+}) async {
+  usePhoneWindow(tester);
+  final services = buildServices(api: api, history: history, online: online);
+  final router = AppRouter(services: services);
+  await tester.pumpWidget(
+    ScenovaScope(
+      services: services,
+      child: MaterialApp(
+        navigatorKey: router.navigatorKey,
+        theme: AppTheme.build(
+          brightness: Brightness.light,
+          deviceClass: DeviceClass.mobile,
+        ),
+        home: HistoryScreen(router: router),
+      ),
+    ),
+  );
+  return Harness(services, router);
 }
 
 /// Finds the widget drawing [icon], whether it is a custom-set glyph or a
@@ -302,6 +330,9 @@ class DelayedHistoryStore implements HistoryStore {
 
   @override
   Future<void> clear() async {}
+
+  @override
+  Future<HistoryStorageState> storageState() async => HistoryStorageState.ok;
 }
 
 /// A history that fails to read, for the error state.
@@ -323,6 +354,9 @@ class ThrowingHistoryStore implements HistoryStore {
 
   @override
   Future<void> clear() async {}
+
+  @override
+  Future<HistoryStorageState> storageState() async => HistoryStorageState.ok;
 }
 
 /// A lookup service that holds its first response open, for the loading state.

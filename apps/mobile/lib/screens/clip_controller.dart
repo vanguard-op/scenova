@@ -6,6 +6,7 @@ import '../config.dart';
 import '../models/analytics_event.dart';
 import '../models/clip_notice.dart';
 import '../models/entitlement.dart';
+import '../models/history_entry.dart';
 import '../models/lookup.dart';
 import '../services/app_services.dart';
 import '../services/capture_intake.dart';
@@ -51,6 +52,7 @@ class ClipViewController extends ChangeNotifier {
     required this.services,
     required CaptureSelection selection,
     this.source = LookupSource.typed,
+    HistoryEntry? savedEntry,
     Duration? pollInterval,
     Duration? noticeThreshold,
     Duration? pollTimeout,
@@ -59,6 +61,7 @@ class ClipViewController extends ChangeNotifier {
            noticeThreshold ?? AppConfig.generatingNoticeThreshold,
        _pollTimeout = pollTimeout ?? AppConfig.lookupPollTimeout {
     _selection = selection;
+    _savedEntry = savedEntry;
     // The clip-ready notice is listened for from the moment the view opens, so
     // a notice that arrives while the reader waits reaches this view (`C-008`).
     _noticeSub = services.clipNotices.notices.listen(_onNotice);
@@ -73,6 +76,14 @@ class ClipViewController extends ChangeNotifier {
   final Duration _pollTimeout;
 
   late CaptureSelection _selection;
+
+  /// The saved lookup this view replays, when it was opened from History.
+  ///
+  /// A saved lookup plays from the device with no lookup and no generation; it
+  /// is cleared when a new selection replaces it, so the view stops replaying
+  /// and resolves the new selection normally (`docs/Scenova/user-flow.md` →
+  /// Flow 3).
+  HistoryEntry? _savedEntry;
   LookupResult? _result;
   Sense? _chosenSense;
   ClipPhase _phase = ClipPhase.loading;
@@ -198,6 +209,14 @@ class ClipViewController extends ChangeNotifier {
       return;
     }
 
+    // A lookup opened from History replays the clip the device already holds;
+    // it starts no lookup and no generation.
+    final saved = _savedEntry;
+    if (saved != null) {
+      _serveSavedEntry(saved);
+      return;
+    }
+
     if (announceStart) {
       services.analytics.lookupStarted(
         kind: _selection.kind ?? LookupKind.word,
@@ -240,6 +259,9 @@ class ClipViewController extends ChangeNotifier {
   Future<void> submit(CaptureSelection selection) async {
     if (_isShowing(selection)) return;
     _selection = selection;
+    // The view has moved on from the saved lookup it opened on, so the new
+    // selection resolves normally rather than replaying the old entry.
+    _savedEntry = null;
     // A selection that arrives before the first frame is loaded by the mount,
     // which reads [_selection]; loading here as well would start the same
     // lookup twice.
@@ -604,6 +626,44 @@ class ClipViewController extends ChangeNotifier {
     _chosenSense = _result!.senses.first;
     _setPhase(ClipPhase.playing);
     _autoplayOrHold();
+  }
+
+  /// Shows the saved lookup the reader chose in History.
+  ///
+  /// The word and its phrase come from the device, and the clip the device holds
+  /// plays without a lookup — so a saved lookup replays with no connection
+  /// (`FEAT-009`). A saved lookup whose clip the device no longer holds shows
+  /// the word and phrase with the clip unavailable, which is the fallback state.
+  void _serveSavedEntry(HistoryEntry entry) {
+    _fromHistory = true;
+    final url = entry.clipUrl;
+    final sense = Sense(
+      senseLabel: '1',
+      partOfSpeech: '',
+      glossPhrase: entry.phrase,
+      clip: url == null
+          ? null
+          : Clip(
+              url: url,
+              durationSeconds: AppConfig.clipDurationFallback.inSeconds
+                  .toDouble(),
+              resolution: '360p',
+              hasAudio: entry.hasAudio,
+            ),
+    );
+    _result = LookupResult(
+      lookupId: entry.id,
+      kind: entry.kind,
+      rawSelection: entry.word,
+      normalisedLemma: entry.word,
+      status: url == null ? LookupStatus.fallback : LookupStatus.served,
+      senses: <Sense>[sense],
+      notice: null,
+      correlationId: 'local',
+    );
+    _chosenSense = sense;
+    _setPhase(url == null ? ClipPhase.fallback : ClipPhase.playing);
+    if (url != null) _autoplayOrHold();
   }
 
   /// The clip saved for [selection] on this device, or null.

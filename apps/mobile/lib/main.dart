@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'app.dart';
@@ -9,15 +10,29 @@ import 'models/history_entry.dart';
 import 'models/lookup.dart';
 import 'services/app_services.dart';
 import 'services/extension_channel.dart';
+import 'services/history_store.dart';
 import 'services/settings_store.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final locale = WidgetsBinding.instance.platformDispatcher.locale
       .toLanguageTag();
+  // The reader's lookups live on the device and outlive the launch
+  // (`FEAT-009`).
+  final historyStore = SharedPreferencesHistoryStore();
+  // A development run seeds a few lookups so the loaded state is visible; the
+  // seeds are written into the device's own store and never in a release build.
+  if (kDebugMode && AppConfig.seedHistory) {
+    final existing = await historyStore.all();
+    if (existing.isEmpty) {
+      for (final entry in _seedHistory()) {
+        await historyStore.save(entry);
+      }
+    }
+  }
   final services = ScenovaServices.development(
     locale: locale,
-    history: _seedHistory(),
+    historyStore: historyStore,
   );
   // The reader's stored settings are read before the first frame, so the app
   // opens on the surface they left it on rather than back at Onboarding. The

@@ -93,6 +93,7 @@ abstract final class AppIcons {
   static const AppIcon info = SystemIcon(Icons.info_outline_rounded);
   static const AppIcon retry = SystemIcon(Icons.refresh_rounded);
   static const AppIcon close = SystemIcon(Icons.close_rounded);
+  static const AppIcon remove = SystemIcon(Icons.delete_outline_rounded);
   static const AppIcon helpful = SystemIcon(Icons.thumb_up_outlined);
   static const AppIcon notHelpful = SystemIcon(Icons.thumb_down_outlined);
 }

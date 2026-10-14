@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'models/analytics_event.dart';
+import 'models/history_entry.dart';
 import 'screens/clip_controller.dart';
 import 'screens/clip_view_screen.dart';
 import 'services/app_services.dart';
@@ -91,6 +92,31 @@ class AppRouter {
 
   /// The reader dismissed a clip view.
   void dismissClip() => navigatorKey.currentState?.maybePop();
+
+  /// Opens a saved lookup from History, replaying the clip the device holds.
+  ///
+  /// The saved lookup plays from the device without a new lookup, so a replay
+  /// works with no connection (`FEAT-009`; `docs/Scenova/user-flow.md` → Flow 3).
+  Future<void> openSavedLookup(HistoryEntry entry) async {
+    final navigator = navigatorKey.currentState;
+    if (navigator == null) return;
+
+    final controller = ClipViewController(
+      services: services,
+      selection: CaptureSelection.parse(entry.word),
+      savedEntry: entry,
+    );
+    await navigator.push(
+      MaterialPageRoute<void>(
+        builder: (_) => ClipViewScreen(
+          controller: controller,
+          onDismiss: dismissClip,
+          onOpenHistory: openHistory,
+        ),
+      ),
+    );
+    controller.dispose();
+  }
 
   void openHistory() => _pushNamed(AppRoutes.history);
 
