@@ -14,8 +14,16 @@ enum PushNoticeResult {
   /// so the view will settle on its own.
   noNoticeNeeded,
 
-  /// The registration did not reach the service, or was refused. A registration
-  /// held for the connection is retried when it returns.
+  /// The reader refused notifications, so no notice can be shown. The platform
+  /// will ask again the next time they take the offer.
+  notificationsDenied,
+
+  /// The reader refused notifications and the platform will not ask again; the
+  /// choice has to be changed in the device's settings.
+  notificationsPermanentlyDenied,
+
+  /// The registration did not reach the service, or the device had no token to
+  /// send. A registration held for the connection is retried when it returns.
   notRegistered,
 }
 
@@ -30,7 +38,9 @@ enum PushNoticeResult {
 /// intake asked the client to slow down — is held, with its lookup, and retried
 /// when the connection returns, matching the app's offline rule that work which
 /// needs the network is queued rather than lost. A rejected or unauthenticated
-/// registration is dropped, since resending it unchanged cannot succeed.
+/// registration is dropped, since resending it unchanged cannot succeed. A
+/// reader who refuses the notification permission is reported as a refusal and
+/// holds nothing: there is no later event for a device that cannot be reached.
 class PushRegistrar {
   PushRegistrar({
     required this.api,
@@ -59,15 +69,24 @@ class PushRegistrar {
   /// Registers this device for a clip-ready notice about [lookupId].
   ///
   /// Returns whether a notice will come. A registration held for the connection,
-  /// or refused because no token is available, reports [PushNoticeResult
+  /// or one that could not take a token, reports [PushNoticeResult
   /// .notRegistered]; a lookup the service has already finished reports
-  /// [PushNoticeResult.noNoticeNeeded].
+  /// [PushNoticeResult.noNoticeNeeded]; a reader who refused the permission is
+  /// reported as the refusal it is, so the app can say so plainly.
   Future<PushNoticeResult> requestClipReadyNotice({
     required String lookupId,
   }) async {
     if (_disposed) return PushNoticeResult.notRegistered;
-    final token = await tokens.token();
-    if (token == null || token.isEmpty) return PushNoticeResult.notRegistered;
+    final outcome = await tokens.request();
+    if (outcome is PushTokenRefused) {
+      // A refusal is not a connectivity problem: nothing is held for the
+      // connection, and the reader is told what actually happened.
+      return outcome.permanently
+          ? PushNoticeResult.notificationsPermanentlyDenied
+          : PushNoticeResult.notificationsDenied;
+    }
+    if (outcome is! PushTokenIssued) return PushNoticeResult.notRegistered;
+    final token = outcome.token;
     if (!connectivity.isOnline) {
       _pendingLookupId = lookupId;
       return PushNoticeResult.notRegistered;

@@ -364,6 +364,8 @@ ScenovaServices _services({
   Entitlement entitlement = Entitlement.unmeteredGuest,
   SettingsController? settings,
   FeatureFlags featureFlags = const FixedFeatureFlags(),
+  NotificationPermissionGate notificationPermission =
+      const PlatformNotificationPermission(),
 }) {
   final connectivity = ManualConnectivity(online: online);
   final settingsController = settings ?? SettingsController();
@@ -388,6 +390,7 @@ ScenovaServices _services({
       tokens: DevelopmentPushTokenProvider(token: 'preview-push'),
       connectivity: connectivity,
     ),
+    notificationPermission: notificationPermission,
     featureFlags: featureFlags,
     locale: 'en-GB',
   );

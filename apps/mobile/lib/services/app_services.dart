@@ -34,6 +34,7 @@ class ScenovaServices {
     required this.captureChannel,
     required this.analytics,
     required this.pushRegistrar,
+    required this.notificationPermission,
     required this.featureFlags,
     this.locale = 'en',
   });
@@ -54,6 +55,11 @@ class ScenovaServices {
 
   /// Registers the device for a clip-ready notice (`C-008`).
   final PushRegistrar pushRegistrar;
+
+  /// The platform notification prompt (`FEAT-008`): raised when the reader takes
+  /// the notify offer, and the route back to the device settings when they have
+  /// refused it for good.
+  final NotificationPermissionGate notificationPermission;
 
   /// The client-side release flags the build honours (`release.md`).
   final FeatureFlags featureFlags;
@@ -96,6 +102,10 @@ class ScenovaServices {
       store: settingsStore ?? SharedPreferencesSettingsStore(),
     );
 
+    // The reader is asked for the notification permission only when they take
+    // the notify offer, so the app never prompts at launch.
+    const notificationPermission = PlatformNotificationPermission();
+
     return ScenovaServices(
       lookupApi: AppConfig.useMockLookupApi
           ? MockLookupApi(latency: AppConfig.mockLatency)
@@ -134,10 +144,13 @@ class ScenovaServices {
         // real Firebase Cloud Messaging token in production, and a pseudonymous
         // development token on a laptop, mirroring the identity above.
         tokens: AppConfig.useFirebaseMessaging
-            ? FirebaseMessagingPushTokenProvider()
+            ? FirebaseMessagingPushTokenProvider(
+                permission: notificationPermission,
+              )
             : DevelopmentPushTokenProvider(),
         connectivity: connectivity,
       ),
+      notificationPermission: notificationPermission,
       featureFlags: featureFlags ?? RemoteConfigFeatureFlags(),
       locale: locale,
     );

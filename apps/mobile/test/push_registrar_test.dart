@@ -6,13 +6,15 @@ import 'package:scenova/services/push_registrar.dart';
 import 'package:scenova/services/push_tokens.dart';
 
 class _FixedTokens implements PushTokenProvider {
-  _FixedTokens(this.value);
+  _FixedTokens(this.outcome);
 
-  final String? value;
+  final PushTokenOutcome outcome;
 
   @override
-  Future<String?> token() async => value;
+  Future<PushTokenOutcome> request() async => outcome;
 }
+
+const _deviceToken = PushTokenIssued('device-token');
 
 void main() {
   test(
@@ -21,7 +23,7 @@ void main() {
       final api = MockPushRegistrationApi();
       final registrar = PushRegistrar(
         api: api,
-        tokens: _FixedTokens('device-token'),
+        tokens: _FixedTokens(_deviceToken),
         connectivity: ManualConnectivity(),
       );
       addTearDown(registrar.dispose);
@@ -41,7 +43,7 @@ void main() {
     final api = MockPushRegistrationApi();
     final registrar = PushRegistrar(
       api: api,
-      tokens: _FixedTokens(null),
+      tokens: _FixedTokens(const PushTokenUnavailable()),
       connectivity: ManualConnectivity(),
     );
     addTearDown(registrar.dispose);
@@ -54,11 +56,50 @@ void main() {
     expect(registrar.pendingRegistration, isFalse);
   });
 
+  test(
+    'reports a refused permission as a refusal, not a connectivity problem',
+    () async {
+      final api = MockPushRegistrationApi();
+      final registrar = PushRegistrar(
+        api: api,
+        tokens: _FixedTokens(const PushTokenRefused(permanently: false)),
+        connectivity: ManualConnectivity(),
+      );
+      addTearDown(registrar.dispose);
+
+      expect(
+        await registrar.requestClipReadyNotice(lookupId: 'lk_1'),
+        PushNoticeResult.notificationsDenied,
+      );
+      expect(api.tokens, isEmpty);
+      // A refusal is not held for the connection: there is no later event for a
+      // device that cannot be reached, so nothing is queued.
+      expect(registrar.pendingRegistration, isFalse);
+    },
+  );
+
+  test('reports a refusal the platform will not ask again', () async {
+    final api = MockPushRegistrationApi();
+    final registrar = PushRegistrar(
+      api: api,
+      tokens: _FixedTokens(const PushTokenRefused(permanently: true)),
+      connectivity: ManualConnectivity(),
+    );
+    addTearDown(registrar.dispose);
+
+    expect(
+      await registrar.requestClipReadyNotice(lookupId: 'lk_1'),
+      PushNoticeResult.notificationsPermanentlyDenied,
+    );
+    expect(api.tokens, isEmpty);
+    expect(registrar.pendingRegistration, isFalse);
+  });
+
   test('reports a lookup the service has already finished', () async {
     final api = MockPushRegistrationApi()..declinesRegistration = true;
     final registrar = PushRegistrar(
       api: api,
-      tokens: _FixedTokens('device-token'),
+      tokens: _FixedTokens(_deviceToken),
       connectivity: ManualConnectivity(),
     );
     addTearDown(registrar.dispose);
@@ -76,7 +117,7 @@ void main() {
     final connectivity = ManualConnectivity(online: false);
     final registrar = PushRegistrar(
       api: api,
-      tokens: _FixedTokens('device-token'),
+      tokens: _FixedTokens(_deviceToken),
       connectivity: connectivity,
     );
     addTearDown(registrar.dispose);
@@ -103,7 +144,7 @@ void main() {
     final connectivity = ManualConnectivity();
     final registrar = PushRegistrar(
       api: api,
-      tokens: _FixedTokens('device-token'),
+      tokens: _FixedTokens(_deviceToken),
       connectivity: connectivity,
     );
     addTearDown(registrar.dispose);
@@ -129,7 +170,7 @@ void main() {
     final connectivity = ManualConnectivity();
     final registrar = PushRegistrar(
       api: api,
-      tokens: _FixedTokens('device-token'),
+      tokens: _FixedTokens(_deviceToken),
       connectivity: connectivity,
     );
     addTearDown(registrar.dispose);

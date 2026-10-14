@@ -39,6 +39,8 @@ ScenovaServices buildServices({
   IdentityProvider? identity,
   AnalyticsApi? analyticsApi,
   PushRegistrationApi? pushApi,
+  PushTokenProvider? pushTokens,
+  NotificationPermissionGate? notificationPermission,
   FeatureFlags? featureFlags,
   String locale = 'en',
 }) {
@@ -62,9 +64,12 @@ ScenovaServices buildServices({
     ),
     pushRegistrar: PushRegistrar(
       api: pushApi ?? MockPushRegistrationApi(),
-      tokens: DevelopmentPushTokenProvider(token: 'test-push-token'),
+      tokens:
+          pushTokens ?? DevelopmentPushTokenProvider(token: 'test-push-token'),
       connectivity: connectivity,
     ),
+    notificationPermission:
+        notificationPermission ?? ScriptedNotificationPermission(),
     featureFlags: featureFlags ?? const FixedFeatureFlags(),
     locale: locale,
   );
@@ -199,6 +204,45 @@ Future<void> deliverCapture(WidgetTester tester, String? text) async {
     ),
     (_) {},
   );
+}
+
+/// A notification prompt whose answer is scripted, and which records how many
+/// times it was raised and how often the settings were opened.
+class ScriptedNotificationPermission implements NotificationPermissionGate {
+  ScriptedNotificationPermission({
+    this.answer = NotificationPermission.granted,
+  });
+
+  NotificationPermission answer;
+
+  /// How many times the prompt was raised.
+  int requests = 0;
+
+  /// How many times the device settings were opened.
+  int settingsOpened = 0;
+
+  @override
+  Future<NotificationPermission> request() async {
+    requests++;
+    return answer;
+  }
+
+  @override
+  Future<bool> openSettings() async {
+    settingsOpened++;
+    return true;
+  }
+}
+
+/// A token source whose outcome is scripted, so the registrar and the screen can
+/// be driven through a refusal without a messaging service.
+class ScriptedPushTokenProvider implements PushTokenProvider {
+  ScriptedPushTokenProvider(this.outcome);
+
+  PushTokenOutcome outcome;
+
+  @override
+  Future<PushTokenOutcome> request() async => outcome;
 }
 
 /// A history whose read resolves only when the test completes it.

@@ -117,11 +117,22 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
     }
   }
 
-  void _showMessage(String message) {
+  void _showMessage(
+    String message, {
+    String? actionLabel,
+    VoidCallback? onAction,
+  }) {
     _generatingNoticeVisible = false;
     _messengerKey.currentState
       ?..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          action: (actionLabel == null || onAction == null)
+              ? null
+              : SnackBarAction(label: actionLabel, onPressed: onAction),
+        ),
+      );
   }
 
   void _showGeneratingNotice() {
@@ -147,16 +158,38 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
   Future<void> _notifyWhenReady() async {
     final outcome = await _controller.notifyWhenReady();
     if (!mounted) return;
-    _showMessage(switch (outcome) {
-      PushNoticeResult.registered =>
-        "We'll let you know when your clip is ready.",
+    switch (outcome) {
+      case PushNoticeResult.registered:
+        _showMessage("We'll let you know when your clip is ready.");
       // The service had nothing left to watch: the lookup has resolved, so the
       // view is about to settle instead of waiting on a notice.
-      PushNoticeResult.noNoticeNeeded =>
-        'This lookup already finished. It will update here.',
-      PushNoticeResult.notRegistered =>
-        'We could not set up the notice. Try again when you are online.',
-    });
+      case PushNoticeResult.noNoticeNeeded:
+        _showMessage('This lookup already finished. It will update here.');
+      // A refusal is not a connectivity problem, so the reader is told what
+      // actually happened rather than sent to try again later.
+      case PushNoticeResult.notificationsDenied:
+        _showMessage(
+          'Notifications are off, so we cannot send a heads-up. You can turn '
+          'them on any time.',
+        );
+      case PushNoticeResult.notificationsPermanentlyDenied:
+        _showMessage(
+          'Notifications are off for Scenova. Turn them on in your phone '
+          'settings to get a heads-up.',
+          actionLabel: 'Settings',
+          onAction: _openNotificationSettings,
+        );
+      case PushNoticeResult.notRegistered:
+        _showMessage(
+          'We could not set up the notice. Try again when you are online.',
+        );
+    }
+  }
+
+  /// Opens the device settings where a refused notification permission is
+  /// changed, for the reader who refused it for good.
+  void _openNotificationSettings() {
+    unawaited(ScenovaScope.of(context).notificationPermission.openSettings());
   }
 
   @override

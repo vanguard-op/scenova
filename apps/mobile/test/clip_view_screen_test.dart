@@ -13,6 +13,7 @@ import 'package:scenova/services/feature_flags.dart';
 import 'package:scenova/services/history_store.dart';
 import 'package:scenova/services/lookup_api.dart';
 import 'package:scenova/services/push_registration_api.dart';
+import 'package:scenova/services/push_tokens.dart';
 import 'package:scenova/services/settings_controller.dart';
 import 'package:scenova/widgets/app_icons.dart';
 import 'package:scenova/widgets/clip_player.dart';
@@ -21,6 +22,21 @@ import 'package:scenova/widgets/offline_banner.dart';
 import 'support/harness.dart';
 
 const String _libraryPhrase = 'a short clip that shows what the word means';
+
+/// A messaging service that hands back a fixed token, so the notify offer can
+/// be driven through the real token provider without Firebase.
+class _StubMessaging implements PushMessaging {
+  _StubMessaging(this.token);
+
+  final String token;
+  int calls = 0;
+
+  @override
+  Future<String?> currentToken() async {
+    calls++;
+    return token;
+  }
+}
 
 ClipViewController controllerFor(
   ScenovaServices services,
@@ -314,6 +330,166 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     await tester.pump();
     expect(controller.phase, ClipPhase.error);
+    await teardown(tester);
+  });
+
+  testWidgets(
+    'a refused permission reads as a refusal, not a connectivity problem',
+    (tester) async {
+      final pushApi = MockPushRegistrationApi();
+      final services = buildServices(
+        api: MockLookupApi(pollsUntilReady: 100),
+        pushApi: pushApi,
+        pushTokens: ScriptedPushTokenProvider(
+          const PushTokenRefused(permanently: false),
+        ),
+      );
+      final controller = controllerFor(
+        services,
+        'xylograph',
+        pollInterval: const Duration(milliseconds: 100),
+        noticeThreshold: const Duration(milliseconds: 250),
+        pollTimeout: const Duration(milliseconds: 900),
+      );
+      addTearDown(controller.dispose);
+
+      await pumpClipView(tester, services, controller);
+      await tester.pump();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      await tester.tap(find.text('Notify me'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pump(const Duration(milliseconds: 400));
+
+      // A refusal is what happened, so the reader is not sent to try again when
+      // they are online.
+      expect(
+        find.text(
+          'Notifications are off, so we cannot send a heads-up. You can turn '
+          'them on any time.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Try again when you are online'),
+        findsNothing,
+      );
+      expect(pushApi.tokens, isEmpty);
+
+      // Let the wait time out so the poll stops rather than outliving the test.
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
+      await teardown(tester);
+    },
+  );
+
+  testWidgets('a refusal the platform will not ask again offers the settings', (
+    tester,
+  ) async {
+    final permission = ScriptedNotificationPermission();
+    final services = buildServices(
+      api: MockLookupApi(pollsUntilReady: 100),
+      pushTokens: ScriptedPushTokenProvider(
+        const PushTokenRefused(permanently: true),
+      ),
+      notificationPermission: permission,
+    );
+    final controller = controllerFor(
+      services,
+      'xylograph',
+      pollInterval: const Duration(milliseconds: 100),
+      noticeThreshold: const Duration(milliseconds: 250),
+      pollTimeout: const Duration(milliseconds: 900),
+    );
+    addTearDown(controller.dispose);
+
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await tester.tap(find.text('Notify me'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(
+      find.text(
+        'Notifications are off for Scenova. Turn them on in your phone '
+        'settings to get a heads-up.',
+      ),
+      findsOneWidget,
+    );
+    // The reader has a way forward rather than a dead end.
+    expect(find.text('Settings'), findsOneWidget);
+    await tester.tap(find.text('Settings'));
+    await tester.pump();
+    expect(permission.settingsOpened, 1);
+
+    // Let the wait time out so the poll stops rather than outliving the test.
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
+    await teardown(tester);
+  });
+
+  testWidgets('the permission prompt is raised when the offer is taken', (
+    tester,
+  ) async {
+    final permission = ScriptedNotificationPermission();
+    final messaging = _StubMessaging('fcm-token');
+    final pushApi = MockPushRegistrationApi();
+    final services = buildServices(
+      api: MockLookupApi(pollsUntilReady: 100),
+      pushApi: pushApi,
+      pushTokens: FirebaseMessagingPushTokenProvider(
+        permission: permission,
+        messagingOverride: messaging,
+      ),
+    );
+    final controller = controllerFor(
+      services,
+      'xylograph',
+      pollInterval: const Duration(milliseconds: 100),
+      noticeThreshold: const Duration(milliseconds: 250),
+      pollTimeout: const Duration(milliseconds: 900),
+    );
+    addTearDown(controller.dispose);
+
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // Nothing has been asked at launch: the prompt waits for the reader.
+    expect(permission.requests, 0);
+    expect(messaging.calls, 0);
+
+    await tester.tap(find.text('Notify me'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    // Taking the offer is the moment the prompt is raised, and the granted
+    // token is then registered against the lookup.
+    expect(permission.requests, 1);
+    expect(messaging.calls, 1);
+    expect(pushApi.tokens, <String>['fcm-token']);
+    expect(
+      find.text("We'll let you know when your clip is ready."),
+      findsOneWidget,
+    );
+
+    // Let the wait time out so the poll stops rather than outliving the test.
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
     await teardown(tester);
   });
 
