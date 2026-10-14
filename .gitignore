@@ -68,5 +68,8 @@ coverage/
 .gcloud/
 *.log
 
+# Firebase CLI working files (generated Hosting config for the review console)
+.firebase/
+
 # Kotlin/Gradle build cache
 apps/mobile/android/.kotlin/

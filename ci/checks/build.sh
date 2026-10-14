@@ -34,6 +34,13 @@ if has_flutter; then
   built_any=1
 fi
 
+if has_console; then
+  log "Build · flutter build web (apps/console)"
+  mapfile -t console_defines < <(console_dart_defines)
+  (cd apps/console && flutter build web "${console_defines[@]}")
+  built_any=1
+fi
+
 if [ "$built_any" -eq 0 ]; then
   skip "nothing to build yet"
 fi

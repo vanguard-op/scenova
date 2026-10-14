@@ -24,4 +24,14 @@ else
   skip "no Flutter app yet (apps/mobile/pubspec.yaml)"
 fi
 
+if has_console; then
+  log "Console · dart format --set-exit-if-changed"
+  (cd apps/console && dart format --output=none --set-exit-if-changed .)
+  log "Console · flutter analyze"
+  (cd apps/console && flutter analyze)
+  ran=1
+else
+  skip "no review console yet (apps/console/pubspec.yaml)"
+fi
+
 [ "$ran" -eq 1 ] || info "nothing to lint yet"

@@ -37,3 +37,23 @@ output "deploy_service_account" {
   description = "Service account the deploy pipeline impersonates."
   value       = google_service_account.deploy.email
 }
+
+output "console_url" {
+  description = "Public URL of the review console (FEAT-015)."
+  value       = module.console.default_url
+}
+
+output "console_site_id" {
+  description = "Firebase Hosting site id the review console deploys to."
+  value       = module.console.site_id
+}
+
+output "console_web_app_config" {
+  description = "Firebase client config the review console initialises with (a public project identifier, not a credential)."
+  value       = module.console.web_app_config
+}
+
+output "identity_mfa_state" {
+  description = "Project second-factor policy behind the curator gate (NFR-020)."
+  value       = module.identity.mfa_state
+}

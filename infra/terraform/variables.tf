@@ -48,6 +48,18 @@ variable "firebase_project_id" {
   type        = string
 }
 
+variable "console_site_id" {
+  description = "Globally unique Firebase Hosting site id for the review console (FEAT-015)."
+  type        = string
+  default     = "scenova-console"
+}
+
+variable "console_review_api_base_url" {
+  description = "Base URL the review console calls for the review endpoints (C-014 to C-016). Empty uses the console's own origin, which Firebase Hosting rewrites to the gateway."
+  type        = string
+  default     = ""
+}
+
 variable "tasks_queue" {
   description = "Cloud Tasks queue name for generation jobs."
   type        = string

@@ -54,6 +54,14 @@ done
 
 if service_present "ai"; then any=1; fi
 
+# The review console (FEAT-015): bootable once its web bundle has been built
+# (`make build` / `make bundle` produce it; `make ci` builds before it boots).
+console_built=0
+if has_console && [ -d apps/console/build/web ]; then
+  console_built=1
+  any=1
+fi
+
 if [ "$any" -eq 0 ]; then
   skip "no services to boot yet (services/**, ai/**)"
   exit 0
@@ -74,6 +82,33 @@ done
 
 if service_present "ai"; then
   boot_one "model" "ai" "$MODEL_MODULE" "$(port_for "$MODEL_PORT_VAR")"
+fi
+
+# The review console: serve the built web bundle and assert it comes up, so a
+# console that will not start fails here and prints its log.
+if [ "$console_built" -eq 1 ]; then
+  port="$(port_for CONSOLE_PORT)"
+  [ -n "$port" ] || die "no CONSOLE_PORT configured (check .env)"
+  log "Boot · console on :$port"
+  log_file="$logs_dir/console.log"
+  ( cd apps/console/build/web && exec "$(py)" -m http.server "$port" --bind 127.0.0.1 ) \
+    >"$log_file" 2>&1 &
+  pid=$!
+  pids+=("$pid")
+
+  ok=0
+  for i in $(seq 1 40); do
+    if curl -fsS "http://127.0.0.1:$port/" 2>/dev/null | grep -qi '<script'; then ok=1; break; fi
+    kill -0 "$pid" 2>/dev/null || break
+    sleep 0.5
+  done
+
+  if [ "$ok" -ne 1 ]; then
+    printf '\n----- console did not start — log follows -----\n' >&2
+    cat "$log_file" >&2 || true
+    die "review console failed the boot check on :$port"
+  fi
+  info "console healthy"
 fi
 
 log "Boot check passed"

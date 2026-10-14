@@ -79,6 +79,28 @@ for alias in FIREBASE_PROJECT_ID TASKS_PROJECT; do
 done
 info "project identifier ok: GCP_PROJECT_ID=$project_id (FIREBASE_PROJECT_ID, TASKS_PROJECT agree)"
 
+# The review console's environment (FEAT-015): the operator console verifies
+# against the same Firebase project as the reader client, so its project id must
+# equal GCP_PROJECT_ID — a mismatch would have the console mint tokens the
+# gateway refuses. The keys are required so the console's build is described in
+# one place, the same as the reader app's.
+CONSOLE_KEYS=(
+  CONSOLE_REVIEW_API_BASE_URL
+  CONSOLE_FIREBASE_PROJECT_ID
+  CONSOLE_FIREBASE_AUTH_DOMAIN
+  CONSOLE_FIREBASE_API_KEY
+  CONSOLE_FIREBASE_APP_ID
+  CONSOLE_FIREBASE_MESSAGING_SENDER_ID
+  CONSOLE_PORT
+)
+for key in "${CONSOLE_KEYS[@]}"; do
+  grep -qE "^${key}=" "$SCHEMA" || die "$SCHEMA is missing the console key $key"
+done
+console_project="$(sed -n 's/^CONSOLE_FIREBASE_PROJECT_ID=//p' "$SCHEMA" | head -n1)"
+[ "$console_project" = "$project_id" ] \
+  || die "$SCHEMA has CONSOLE_FIREBASE_PROJECT_ID=$console_project but GCP_PROJECT_ID=$project_id; they must agree"
+info "console environment ok: CONSOLE_FIREBASE_PROJECT_ID=$console_project"
+
 info "schema ok: ${#FLAG_DEFAULTS[@]} flags, ${#CLIP_STORE_KEYS[@]} clip-store keys"
 
 shopt -s nullglob

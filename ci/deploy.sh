@@ -82,3 +82,16 @@ for svc in "${services[@]}"; do
 done
 
 log "Deploy complete — canary at 5%. Promote with: make promote ENV=$ENV SVC=<service>"
+
+# The review console is a static Flutter Web app on Firebase Hosting, not a Cloud
+# Run service, so it deploys through its own path (FEAT-015). It is skipped, with
+# a warning, when the console or the Firebase CLI is not present, so a service
+# deploy never fails on the console's account.
+if has_console; then
+  if command -v firebase >/dev/null 2>&1; then
+    log "Deploy · review console (Firebase Hosting)"
+    bash "$(dirname "$0")/deploy_console.sh" "$ENV"
+  else
+    warn "firebase-tools not found — skipped the review console (install: npm install -g firebase-tools)"
+  fi
+fi

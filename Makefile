@@ -41,12 +41,12 @@ PYTEST    := $(VENV)/bin/pytest
 
 .PHONY: help setup auth fmt lint env typecheck test qa qa-model model-bar build bundle boot security \
         infra-init infra-fmt infra-validate infra-plan infra-apply \
-        deploy promote rollback ci clean
+        deploy deploy-console curator promote rollback ci clean
 
 help: ## Show the documented commands
 	@printf '\nScenova platform commands (env=%s, venv=%s)\n\n' "$(ENVIRONMENT)" "$(VENV)"
 	@awk 'BEGIN{FS=":.*## "} /^[a-zA-Z0-9_-]+:.*## /{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
-	@printf '\nTargets: make setup · make auth · make ci · make qa · make model-bar · make deploy ENV=staging\n\n'
+	@printf '\nTargets: make setup · make auth · make ci · make qa · make model-bar · make deploy ENV=staging · make deploy-console ENV=staging · make curator OPERATOR=…\n\n'
 
 # --- Setup -------------------------------------------------------------------
 
@@ -61,7 +61,8 @@ setup: ## Create .venv, install pinned dev tooling, seed .env, fetch Flutter dep
 		echo "==> deps $$req"; $(PIP) install --quiet -r "$$req"; \
 	done; \
 	if [ ! -f .env ]; then cp .env.example .env; echo "==> created .env from .env.example"; fi; \
-	if [ -f apps/mobile/pubspec.yaml ]; then (cd apps/mobile && flutter pub get); else echo "==> skip: no Flutter app yet"; fi
+	if [ -f apps/mobile/pubspec.yaml ]; then (cd apps/mobile && flutter pub get); else echo "==> skip: no Flutter app yet"; fi; \
+	if [ -f apps/console/pubspec.yaml ]; then (cd apps/console && flutter pub get); else echo "==> skip: no review console yet"; fi
 
 auth: ## Set up local Application Default Credentials for the project (ADC + quota project) and verify it
 	@bash ci/checks/auth.sh
@@ -94,10 +95,10 @@ qa-model: ## Run the QA model-marked gate checks (golden sets present; pinned-mo
 model-bar: ## Run the model quality bar (BAR=NFR-050|NFR-051|NFR-053|all; ARGS="--ratings …")
 	@bash ci/checks/model_bar.sh "$(BAR)" $(ARGS)
 
-build: ## Build every present workspace (compile, container images, APK)
+build: ## Build every present workspace (compile, container images, APK, console web)
 	@bash ci/checks/build.sh
 
-bundle: ## Produce deployable artifacts (container images; APK/appbundle)
+bundle: ## Produce deployable artifacts (container images; APK/appbundle; console web bundle)
 	@bash ci/checks/build.sh
 	@if [ -f apps/mobile/pubspec.yaml ]; then (cd apps/mobile && flutter build appbundle --debug); else echo "skip: no Flutter app"; fi
 
@@ -130,6 +131,12 @@ infra-apply: ## Apply infrastructure for an environment (ENV=dev|staging|prod)
 deploy: ## Deploy services to an environment (ENV=dev|staging|prod)
 	@bash ci/deploy.sh $(ENV)
 
+deploy-console: ## Deploy the review console to Firebase Hosting (ENV=dev|staging|prod)
+	@bash ci/deploy_console.sh $(ENV)
+
+curator: ## Grant or revoke the curator role on an operator's account (OPERATOR=email [ARGS=--revoke])
+	@bash ci/curator.sh $(OPERATOR) $(ARGS)
+
 promote: ## Promote a canary service to full traffic (ENV=… SVC=…)
 	@bash ci/promote.sh $(ENV) $(SVC)
 
@@ -145,4 +152,6 @@ clean: ## Remove build and tool caches
 	@rm -rf $(VENV) .pytest_cache .ruff_cache .mypy_cache
 	@find services ai -name '__pycache__' -type d -prune -exec rm -rf {} + 2>/dev/null || true
 	@if [ -f apps/mobile/pubspec.yaml ]; then (cd apps/mobile && flutter clean) || true; fi
+	@if [ -f apps/console/pubspec.yaml ]; then (cd apps/console && flutter clean) || true; fi
+	@rm -rf .firebase
 	@echo "cleaned"

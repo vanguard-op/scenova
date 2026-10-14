@@ -22,4 +22,12 @@ else
   skip "no Flutter tests found (apps/mobile/test)"
 fi
 
+if has_console && [ -d apps/console/test ]; then
+  log "Console · flutter test"
+  (cd apps/console && flutter test)
+  ran=1
+else
+  skip "no console tests found (apps/console/test)"
+fi
+
 [ "$ran" -eq 1 ] || info "nothing to test yet"

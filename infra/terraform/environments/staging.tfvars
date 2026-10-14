@@ -9,6 +9,7 @@ region              = "us-central1"
 artifact_repo       = "scenova"
 clip_bucket         = "scenova-clips-staging"
 firebase_project_id = "scenova-staging"
+console_site_id     = "scenova-console-staging"
 
 deletion_protection = false
 

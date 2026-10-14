@@ -53,7 +53,29 @@ has_python() {
 
 has_flutter() { [ -f apps/mobile/pubspec.yaml ]; }
 
+has_console() { [ -f apps/console/pubspec.yaml ]; }
+
 has_terraform() { [ -d infra/terraform ] && find infra/terraform -name '*.tf' -print -quit 2>/dev/null | grep -q .; }
+
+# The review console's build-time configuration (FEAT-015). Values come from
+# `.env` locally and from the environment in CI, so the same build command runs
+# in both; the Firebase client config is a public project identifier, not a
+# credential (access is gated by the curator role and MFA, not by hiding these).
+CONSOLE_DEFINE_KEYS=(
+  CONSOLE_REVIEW_API_BASE_URL
+  CONSOLE_FIREBASE_PROJECT_ID
+  CONSOLE_FIREBASE_AUTH_DOMAIN
+  CONSOLE_FIREBASE_API_KEY
+  CONSOLE_FIREBASE_APP_ID
+  CONSOLE_FIREBASE_MESSAGING_SENDER_ID
+)
+
+console_dart_defines() {
+  local key
+  for key in "${CONSOLE_DEFINE_KEYS[@]}"; do
+    printf -- '--dart-define=%s=%s\n' "$key" "${!key:-}"
+  done
+}
 
 py() { if [ -x "$VENV_DIR/bin/python" ]; then echo "$VENV_DIR/bin/python"; else echo "python3"; fi; }
 tool() {

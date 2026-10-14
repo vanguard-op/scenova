@@ -268,6 +268,42 @@ resource "google_project_iam_audit_config" "iam" {
   audit_log_config { log_type = "DATA_WRITE" }
 }
 
+# --- Review console (FEAT-015) ------------------------------------------------
+
+# The operator-only console is a static Flutter Web app on its own Firebase
+# Hosting site. It gets no Cloud Run service and no runtime service account: it
+# holds no Google Cloud identity and no secret, and its access is gated by the
+# curator role and MFA at sign-in, not by a network boundary.
+module "console" {
+  source = "./modules/console"
+
+  providers = {
+    google-beta = google-beta
+  }
+
+  project_id  = var.firebase_project_id
+  environment = var.environment
+  site_id     = var.console_site_id
+}
+
+# --- Identity: the curator role's multi-factor gate (NFR-020) ------------------
+
+module "identity" {
+  source = "./modules/identity"
+
+  project_id = var.firebase_project_id
+
+  # The console signs in through OAuth redirects, so its Hosting domains and
+  # localhost are authorized; the project's own Firebase domains are implied by
+  # the provider but listed for clarity.
+  authorized_domains = [
+    "localhost",
+    "${var.firebase_project_id}.firebaseapp.com",
+    "${var.firebase_project_id}.web.app",
+    replace(module.console.default_url, "https://", ""),
+  ]
+}
+
 # --- Monitoring ---------------------------------------------------------------
 
 module "monitoring" {
