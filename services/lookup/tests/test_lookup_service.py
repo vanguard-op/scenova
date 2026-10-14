@@ -31,12 +31,9 @@ from lookup.app.library import (
 )
 from lookup.app.models import CreateLookupRequest, Kind, LookupStatus, PartOfSpeech
 from lookup.app.service import (
-    BEST_GUESS_NOTICE,
-    BEST_GUESS_SENSE_LABEL,
     GENERATION_FAILED_NOTICE,
     GENERATION_UNAVAILABLE_NOTICE,
-    INVENTORY_UNAVAILABLE_NOTICE,
-    PHRASE_FALLBACK_NOTICE,
+    OUT_OF_INVENTORY_SENSE_LABEL,
     PHRASE_SENSE_LABEL,
     LookupService,
 )
@@ -82,13 +79,11 @@ def _entry(
     entry_id: str,
     gloss: str,
     *,
-    is_fallback: bool = False,
     status: LibraryEntryStatus = LibraryEntryStatus.ACTIVE,
 ) -> LibraryEntry:
     return LibraryEntry(
         id=entry_id,
         gloss_phrase=gloss,
-        gloss_phrase_is_fallback=is_fallback,
         status=status,
         clip=LibraryClip(
             url=f"https://cdn.example/{entry_id}.mp4",
@@ -164,15 +159,14 @@ async def test_a_word_lookup_carries_a_sense_per_common_meaning() -> None:
 
 
 @pytest.mark.asyncio
-async def test_a_word_absent_from_the_inventory_keeps_the_word_and_flags_a_best_guess() -> None:
+async def test_a_word_absent_from_the_inventory_keeps_the_word_as_the_key() -> None:
     response = await _service().create_lookup(_request("zephyr"), "corr")
 
     assert response.normalisedLemma == "zephyr"
-    # The reader-facing signal is the notice, never the sense label (C-001
-    # revision 1): the label stays a plain human string.
-    assert response.notice == BEST_GUESS_NOTICE
-    assert response.senses[0].senseLabel == BEST_GUESS_SENSE_LABEL
-    assert "guess" not in response.senses[0].senseLabel.casefold()
+    # The meaning is never qualified for the reader: the lookup carries no
+    # notice, and the sense label is a plain neutral string.
+    assert response.notice is None
+    assert response.senses[0].senseLabel == OUT_OF_INVENTORY_SENSE_LABEL
     assert response.senses[0].partOfSpeech == PartOfSpeech.OTHER
     assert response.senses[0].entryId is None
 
@@ -182,7 +176,7 @@ async def test_a_proper_noun_keeps_its_written_form() -> None:
     response = await _service().create_lookup(_request("Zephyr"), "corr")
 
     assert response.normalisedLemma == "Zephyr"
-    assert response.notice == BEST_GUESS_NOTICE
+    assert response.notice is None
 
 
 @pytest.mark.asyncio
@@ -190,7 +184,7 @@ async def test_a_hyphenated_compound_keeps_its_written_form() -> None:
     response = await _service().create_lookup(_request("well-known"), "corr")
 
     assert response.normalisedLemma == "well-known"
-    assert response.notice == BEST_GUESS_NOTICE
+    assert response.notice is None
 
 
 @pytest.mark.asyncio
@@ -255,7 +249,7 @@ async def test_an_unavailable_inventory_falls_back_to_the_word_as_the_key() -> N
     )
 
     assert response.normalisedLemma == "coming"
-    assert response.notice == INVENTORY_UNAVAILABLE_NOTICE
+    assert response.notice is None
 
 
 @pytest.mark.asyncio
@@ -361,26 +355,25 @@ async def test_a_served_word_starts_no_generation() -> None:
 
 
 @pytest.mark.asyncio
-async def test_a_served_fallback_phrase_is_told_as_a_best_guess() -> None:
+async def test_a_served_phrase_carries_no_notice() -> None:
     library = InMemoryLibrary()
     library.add(
         "come",
         "arrive",
         PartOfSpeech.VERB,
-        _entry("e-come", "a come", is_fallback=True),
+        _entry("e-come", "a come"),
     )
 
     response = await _service(library=library).create_lookup(_request("coming"), "corr")
 
     assert response.status == LookupStatus.SERVED
     assert response.senses[0].glossPhrase == "a come"
-    # The phrase's origin travels in the notice, the reader-facing best-guess
-    # signal (C-001 revision 1, FEAT-004).
-    assert response.notice == PHRASE_FALLBACK_NOTICE
+    # How the phrase was produced is never shown to the reader.
+    assert response.notice is None
 
 
 @pytest.mark.asyncio
-async def test_a_served_generated_phrase_carries_no_best_guess_notice() -> None:
+async def test_a_served_generated_phrase_carries_no_notice() -> None:
     library = InMemoryLibrary()
     library.add(
         "come",
@@ -396,7 +389,7 @@ async def test_a_served_generated_phrase_carries_no_best_guess_notice() -> None:
 
 
 @pytest.mark.asyncio
-async def test_a_poll_that_gains_a_fallback_phrase_is_told_as_a_best_guess() -> None:
+async def test_a_poll_that_gains_a_phrase_carries_no_notice() -> None:
     library = InMemoryLibrary()
     service = _service(library=library)
     created = await service.create_lookup(_request("coming"), "corr")
@@ -406,15 +399,15 @@ async def test_a_poll_that_gains_a_fallback_phrase_is_told_as_a_best_guess() -> 
         "come",
         "arrive",
         PartOfSpeech.VERB,
-        _entry("e-come", "a come", is_fallback=True),
+        _entry("e-come", "a come"),
     )
     polled = await service.get_lookup(created.lookupId, "reader-1", "corr-2")
     again = await service.get_lookup(created.lookupId, "reader-1", "corr-3")
 
     assert polled.status == LookupStatus.SERVED
-    assert polled.notice == PHRASE_FALLBACK_NOTICE
-    # The notice stays on a later poll of the already-served lookup.
-    assert again.notice == PHRASE_FALLBACK_NOTICE
+    assert polled.notice is None
+    # A later poll of the already-served lookup stays notice-free.
+    assert again.notice is None
 
 
 @pytest.mark.asyncio
@@ -481,7 +474,7 @@ async def test_with_the_phrase_clip_flag_off_a_phrase_falls_back_to_the_word_pat
 
     assert response.kind == Kind.WORD
     assert response.normalisedLemma == "kick the bucket"
-    assert response.notice == BEST_GUESS_NOTICE
+    assert response.notice is None
     assert len(generation.jobs) == 1
     job = generation.jobs[0]
     assert job.kind == Kind.WORD

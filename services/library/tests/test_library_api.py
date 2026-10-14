@@ -27,7 +27,6 @@ def _entry(**overrides: object) -> dict[str, object]:
         "partOfSpeech": "verb",
         "senseLabel": "arrive",
         "glossPhrase": "to move toward a place",
-        "glossPhraseIsFallback": False,
         "clipAssetId": "clip_1",
         "status": "active",
         "source": "generated",

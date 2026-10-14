@@ -38,7 +38,6 @@ class ResolvedWord:
 
     lemma: str
     senses: tuple[SenseRecord, ...]
-    best_guess: bool
 
 
 class SenseInventory(Protocol):
@@ -69,7 +68,7 @@ class SeededSenseInventory:
             return None
         records = tuple(sorted(self._entries[lemma], key=lambda sense: sense.rank))
         common = tuple(record for record in records if record.common) or records[:1]
-        return ResolvedWord(lemma=lemma, senses=common, best_guess=False)
+        return ResolvedWord(lemma=lemma, senses=common)
 
     def _match_candidate(self, folded: str) -> str | None:
         for candidate in _lemma_candidates(folded):

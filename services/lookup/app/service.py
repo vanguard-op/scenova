@@ -1,10 +1,11 @@
 """Lookup orchestration: normalise a selection, choose senses, resolve clips.
 
 FEAT-003 lives here. A word lookup reduces to its base form and returns the
-common senses; a word absent from the inventory keeps the word as the key and is
-told as a best guess through the `notice`; a two-to-six-word selection is routed
-to the phrase path; punctuation-only selections resolve empty; and an unavailable
-inventory falls back to the word as the key.
+common senses; a word absent from the inventory keeps the word as the key; a
+two-to-six-word selection is routed to the phrase path; punctuation-only
+selections resolve empty; and an unavailable inventory falls back to the word as
+the key. A lookup carries no notice about the meaning itself: `notice` is for
+clip availability only.
 
 FEAT-005 is wired here: a sense the library cannot serve is handed to the
 generation pipeline (C-003), so a later poll of the lookup (C-002) serves the
@@ -72,23 +73,15 @@ from .models import (
 from .normalisation import MAX_PHRASE_WORDS, tokenise
 from .store import InMemoryLookupStore, LookupStore, StoredLookup
 
-BEST_GUESS_NOTICE = "We're not sure about this word, so this is our best guess."
-INVENTORY_UNAVAILABLE_NOTICE = (
-    "We couldn't check this word just now, so this is our best guess."
-)
 GENERATION_UNAVAILABLE_NOTICE = (
     "We couldn't start a clip for this one. Please try again in a moment."
 )
 GENERATION_FAILED_NOTICE = "We couldn't make a clip for this one. Please try again."
-# A served phrase that is the fallback template is a best guess, and the
-# reader-facing advisory travels in `notice` (C-001 revision 1, FEAT-004).
-PHRASE_FALLBACK_NOTICE = "This is our best guess at the meaning."
 EMPTY_NOTICE = "There was nothing to look up in that selection."
 
 # The sense label shown for a word outside the sense inventory. It is a plain
-# human label and never a signal: the reader-facing best-guess advisory travels
-# in `notice` (C-001 revision 1), so the label stays readable copy.
-BEST_GUESS_SENSE_LABEL = "most likely meaning"
+# human label for the key, not a signal about how sure the meaning is.
+OUT_OF_INVENTORY_SENSE_LABEL = "meaning"
 
 # A phrase has no sense, but C-003 requires a sense label; this marks the job as
 # the phrase path.
@@ -109,7 +102,6 @@ class _SenseResolution:
     """
 
     sense: Sense
-    gloss_is_fallback: bool
     regeneration_seed: str | None
 
 
@@ -200,21 +192,14 @@ class LookupService:
             resolved = self._inventory.resolve(token)
         except InventoryUnavailableError:
             resolved = None
-            notice = INVENTORY_UNAVAILABLE_NOTICE
         if resolved is None:
             lemma = token
-            records: tuple[SenseRecord, ...] = (_best_guess_sense(token),)
-            if notice is None:
-                notice = BEST_GUESS_NOTICE
+            records: tuple[SenseRecord, ...] = (_out_of_inventory_sense(token),)
         else:
             lemma = resolved.lemma
             records = resolved.senses
         resolved_senses = [await self._sense(lemma, record) for record in records]
         senses = tuple(resolution.sense for resolution in resolved_senses)
-        if any(resolution.gloss_is_fallback for resolution in resolved_senses):
-            # A served phrase that is the fallback template tells the reader the
-            # meaning is a best guess (FEAT-004, FEAT-008).
-            notice = PHRASE_FALLBACK_NOTICE
         status = _word_status(request.consentModelProcessing, senses)
         lookup_id = _new_id()
         job_ids: tuple[str, ...] = ()
@@ -302,14 +287,13 @@ class LookupService:
         try:
             entry = await self._library.find(lemma, record.sense_label, record.part_of_speech)
         except LibraryUnavailableError:
-            return _SenseResolution(_miss_sense(record), False, None)
+            return _SenseResolution(_miss_sense(record), None)
         if entry is None:
-            return _SenseResolution(_miss_sense(record), False, None)
+            return _SenseResolution(_miss_sense(record), None)
         if entry.status is not LibraryEntryStatus.ACTIVE:
-            return _SenseResolution(_miss_sense(record), False, entry.id)
+            return _SenseResolution(_miss_sense(record), entry.id)
         return _SenseResolution(
             _served_sense(record.sense_label, record.part_of_speech, entry),
-            entry.gloss_phrase_is_fallback,
             None,
         )
 
@@ -343,25 +327,11 @@ class LookupService:
 
     async def _refresh_word(self, stored: StoredLookup) -> StoredLookup:
         lemma = stored.normalised_lemma or stored.raw_selection
-        refreshed = [await self._refresh_sense(lemma, sense) for sense in stored.senses]
-        senses = tuple(sense for sense, _ in refreshed)
-        # A phrase the library gained is marked as a best guess when it is the
-        # fallback template (FEAT-004); an already-served sense keeps the notice
-        # the lookup was first served with.
-        notice = (
-            PHRASE_FALLBACK_NOTICE
-            if any(is_fallback for _, is_fallback in refreshed)
-            else stored.notice
-        )
+        senses = tuple([await self._refresh_sense(lemma, sense) for sense in stored.senses])
         if all(sense.clip is not None for sense in senses):
-            unchanged = (
-                senses == stored.senses
-                and stored.status is LookupStatus.SERVED
-                and notice == stored.notice
-            )
-            if unchanged:
+            if senses == stored.senses and stored.status is LookupStatus.SERVED:
                 return stored
-            return replace(stored, senses=senses, status=LookupStatus.SERVED, notice=notice)
+            return replace(stored, senses=senses, status=LookupStatus.SERVED)
         if stored.status is LookupStatus.GENERATING and await self._generation_stopped(
             stored.generation_job_ids
         ):
@@ -371,9 +341,9 @@ class LookupService:
                 status=LookupStatus.FALLBACK,
                 notice=GENERATION_FAILED_NOTICE,
             )
-        if senses == stored.senses and notice == stored.notice:
+        if senses == stored.senses:
             return stored
-        return replace(stored, senses=senses, notice=notice)
+        return replace(stored, senses=senses)
 
     async def _refresh_phrase(self, stored: StoredLookup) -> StoredLookup:
         if stored.status is LookupStatus.GENERATING and await self._generation_stopped(
@@ -402,25 +372,22 @@ class LookupService:
                 return False
         return stopped
 
-    async def _refresh_sense(self, lemma: str, sense: Sense) -> tuple[Sense, bool]:
-        """Re-resolve one sense and whether a gained entry's phrase is fallback.
+    async def _refresh_sense(self, lemma: str, sense: Sense) -> Sense:
+        """Re-resolve one sense against the library.
 
-        An already-served sense is left as it is: its notice was fixed when it
-        was first served, so the origin is not re-derived here. A held or retired
-        entry and an unreachable library are both still a miss.
+        An already-served sense is left as it is. A held or retired entry and an
+        unreachable library are both still a miss.
         """
 
         if sense.clip is not None:
-            return sense, False
+            return sense
         try:
             entry = await self._library.find(lemma, sense.senseLabel, sense.partOfSpeech)
         except LibraryUnavailableError:
-            return sense, False
+            return sense
         if entry is None or entry.status is not LibraryEntryStatus.ACTIVE:
-            return sense, False
-        return _served_sense(sense.senseLabel, sense.partOfSpeech, entry), (
-            entry.gloss_phrase_is_fallback
-        )
+            return sense
+        return _served_sense(sense.senseLabel, sense.partOfSpeech, entry)
 
     def _empty_lookup(self, request: CreateLookupRequest, raw_selection: str) -> StoredLookup:
         return _stored(
@@ -499,10 +466,10 @@ def _word_status(consent: bool, senses: tuple[Sense, ...]) -> LookupStatus:
     return LookupStatus.DENIED
 
 
-def _best_guess_sense(token: str) -> SenseRecord:
+def _out_of_inventory_sense(token: str) -> SenseRecord:
     return SenseRecord(
         part_of_speech=PartOfSpeech.OTHER,
-        sense_label=BEST_GUESS_SENSE_LABEL,
+        sense_label=OUT_OF_INVENTORY_SENSE_LABEL,
         gloss_phrase=token[:60],
         rank=0,
     )

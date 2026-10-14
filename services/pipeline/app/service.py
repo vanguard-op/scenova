@@ -32,7 +32,7 @@ import asyncio
 import logging
 import time
 from collections.abc import Callable, Coroutine
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Any, Protocol
 from uuid import uuid4
@@ -92,19 +92,6 @@ COST_UNITS_PER_CLIP = 1.0
 
 # The monotonic clock used to measure a generation's latency for EVT-008.
 Clock = Callable[[], float]
-
-
-@dataclass(frozen=True)
-class ResolvedPhrase:
-    """The gloss phrase a clip is generated from, and how it was produced.
-
-    The origin travels with the phrase so the shared library entry records
-    whether the stored phrase is the fallback template, letting the view that
-    serves it mark the meaning as a best guess (FEAT-004).
-    """
-
-    phrase: str
-    is_fallback: bool
 
 
 class TaskSpawner(Protocol):
@@ -256,10 +243,8 @@ class GenerationService:
         )
 
         # A word job has no phrase yet, so the gloss phrase is generated first;
-        # the phrase step never fails the job (C-004). Its origin travels with it
-        # so the shared library entry records whether the phrase is the fallback.
-        resolved = await self._resolve_phrase(running)
-        phrase = resolved.phrase
+        # the phrase step never fails the job (C-004).
+        phrase = await self._resolve_phrase(running)
         running = replace(running, phrase=phrase)
 
         try:
@@ -291,7 +276,7 @@ class GenerationService:
             return await self._fail(running, JobStatus.FAILED, COST_UNITS_PER_CLIP, withheld)
 
         if running.kind is Kind.WORD:
-            await self._store_word_clip(running, clip, phrase, resolved.is_fallback)
+            await self._store_word_clip(running, clip, phrase)
         await self._notifier.clip_ready(lookup_id=running.lookup_id, job_id=running.id, clip=clip)
         return await self._succeed(running, clip, started_at)
 
@@ -316,20 +301,19 @@ class GenerationService:
             raise JobNotFoundError("No generation job exists for this id.")
         return JobStatusResponse(jobId=job.id, lookupId=job.lookup_id, status=job.status)
 
-    async def _resolve_phrase(self, job: GenerationJob) -> ResolvedPhrase:
+    async def _resolve_phrase(self, job: GenerationJob) -> str:
         """The phrase the clip is generated from: the job's own, or a C-004 gloss.
 
         A word job arrives without a phrase, so the pipeline asks the model layer
         for one. The model layer's own fallback is a normal result, so only
         unavailability leaves it as an error — and C-004 leaves the substitution
         to the caller, so the pipeline substitutes the fixed template rather than
-        dropping the reader to a lookup with no phrase. Either way the origin is
-        returned, so a fallback phrase is recorded as one (FEAT-004).
+        dropping the reader to a lookup with no phrase.
         """
 
         if job.phrase is not None:
-            # A phrase job carries the reader's own selection, never a fallback.
-            return ResolvedPhrase(job.phrase, False)
+            # A phrase job carries the reader's own selection.
+            return job.phrase
 
         try:
             result = await self._phrase_generator.generate(
@@ -340,15 +324,13 @@ class GenerationService:
             )
         except PhraseUnavailableError:
             logger.info("phrase model unavailable; substituting the fallback (job %s)", job.id)
-            return ResolvedPhrase(self._fallback_phrase(job), True)
+            return self._fallback_phrase(job)
 
         phrase = result.phrase.strip()
         if phrase == "":
             logger.info("phrase model returned no usable phrase (job %s)", job.id)
-            return ResolvedPhrase(self._fallback_phrase(job), True)
-        # C-004's source is the phrase's origin; the model layer's own fallback
-        # arrives as a normal result, so it must be recorded as one.
-        return ResolvedPhrase(phrase, result.source == "fallback")
+            return self._fallback_phrase(job)
+        return phrase
 
     def _fallback_phrase(self, job: GenerationJob) -> str:
         return fallback_phrase(
@@ -367,9 +349,7 @@ class GenerationService:
             self._cost_units += COST_UNITS_PER_CLIP
             return True
 
-    async def _store_word_clip(
-        self, job: GenerationJob, clip: ClipResult, phrase: str, is_fallback: bool
-    ) -> None:
+    async def _store_word_clip(self, job: GenerationJob, clip: ClipResult, phrase: str) -> None:
         """Write the finished word clip, retrying without ever failing the job.
 
         A library write that cannot be accepted must not cost the reader the clip
@@ -395,7 +375,6 @@ class GenerationService:
             part_of_speech=job.part_of_speech,
             sense_label=job.sense_label,
             gloss_phrase=phrase,
-            gloss_phrase_is_fallback=is_fallback,
             clip_asset_id=asset.id,
             status="active",
             source="generated",

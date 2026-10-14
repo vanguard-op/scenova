@@ -110,7 +110,6 @@ def _entry_payload(entry: LibraryEntry) -> dict[str, object]:
         "partOfSpeech": entry.part_of_speech.value,
         "senseLabel": entry.sense_label,
         "glossPhrase": entry.gloss_phrase,
-        "glossPhraseIsFallback": entry.gloss_phrase_is_fallback,
         "clipAssetId": entry.clip_asset_id,
         "status": entry.status,
         "source": entry.source,

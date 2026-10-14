@@ -42,10 +42,6 @@ class LibraryEntry:
     part_of_speech: PartOfSpeech
     sense_label: str
     gloss_phrase: str
-    # Whether the stored phrase is the fixed fallback template rather than a
-    # generated phrase, so the view that serves it can mark the meaning as a
-    # best guess (schema "LibraryEntry", FEAT-004).
-    gloss_phrase_is_fallback: bool
     clip_asset_id: str
     status: Literal["active", "held", "retired"]
     source: Literal["seeded", "generated"]

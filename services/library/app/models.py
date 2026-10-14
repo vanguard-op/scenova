@@ -72,7 +72,6 @@ class LibraryEntryBody(BaseModel):
     partOfSpeech: PartOfSpeech
     senseLabel: str
     glossPhrase: str = Field(max_length=60)
-    glossPhraseIsFallback: bool
     clipAssetId: str
     status: EntryStatus
     source: EntrySource
@@ -122,7 +121,6 @@ class ServedEntry(BaseModel):
     entryId: str
     status: EntryStatus
     glossPhrase: str
-    glossPhraseIsFallback: bool
     clip: ServedClip
 
 

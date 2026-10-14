@@ -99,7 +99,6 @@ def _served(stored: StoredEntry) -> ServedEntry:
         entryId=stored.entry.id,
         status=stored.entry.status,
         glossPhrase=stored.entry.glossPhrase,
-        glossPhraseIsFallback=stored.entry.glossPhraseIsFallback,
         clip=ServedClip(
             url=stored.asset.url,
             durationSeconds=stored.asset.durationSeconds,

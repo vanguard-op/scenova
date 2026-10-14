@@ -20,7 +20,6 @@ def _entry(**overrides: object) -> dict[str, object]:
         "entryId": "le_1",
         "status": "active",
         "glossPhrase": "to move toward a place",
-        "glossPhraseIsFallback": False,
         "clip": {
             "url": "https://cdn.example/le_1.mp4",
             "durationSeconds": 3.0,
@@ -50,7 +49,6 @@ async def test_an_active_entry_is_mapped_from_the_response() -> None:
     assert entry.id == "le_1"
     assert entry.status is LibraryEntryStatus.ACTIVE
     assert entry.gloss_phrase == "to move toward a place"
-    assert entry.gloss_phrase_is_fallback is False
     assert entry.clip.url == "https://cdn.example/le_1.mp4"
     assert entry.clip.duration_seconds == 3.0
     assert entry.clip.has_audio is False

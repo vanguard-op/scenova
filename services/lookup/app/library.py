@@ -53,10 +53,6 @@ class LibraryEntry:
 
     id: str
     gloss_phrase: str
-    # Whether the stored phrase is the fixed fallback template rather than a
-    # generated phrase, so the served result can mark the meaning as a best
-    # guess (schema "LibraryEntry", FEAT-004).
-    gloss_phrase_is_fallback: bool
     clip: LibraryClip
     # The entry's review state; only an active entry is served (FEAT-006).
     status: LibraryEntryStatus = LibraryEntryStatus.ACTIVE
@@ -158,7 +154,6 @@ def _entry(response: httpx2.Response) -> LibraryEntry | None:
         return LibraryEntry(
             id=raw["entryId"],
             gloss_phrase=raw["glossPhrase"],
-            gloss_phrase_is_fallback=bool(raw["glossPhraseIsFallback"]),
             status=LibraryEntryStatus(raw["status"]),
             clip=LibraryClip(
                 url=clip["url"],

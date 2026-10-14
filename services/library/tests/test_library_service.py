@@ -21,7 +21,6 @@ def _entry(entry_id: str = "le_1", *, lemma: str = "come") -> LibraryEntryBody:
         partOfSpeech=PartOfSpeech.VERB,
         senseLabel="arrive",
         glossPhrase="to move toward a place",
-        glossPhraseIsFallback=False,
         clipAssetId="clip_1",
         status=EntryStatus.ACTIVE,
         source=EntrySource.GENERATED,
