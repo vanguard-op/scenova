@@ -4,6 +4,12 @@ The gateway authenticates the caller, rate-limits lookups, events, push
 registrations, ratings, and reports, validates the request body, and passes the
 downstream service's response through unchanged, so the frozen contract's status
 codes and error codes reach the client as they are produced.
+
+The curator review routes (C-014 to C-016) are operator-only and carried here for
+the console: the gateway authenticates the operator session — curator role and
+multi-factor — before it forwards the call, and the review service enforces the
+same rule behind it. A caller without a session is refused with 401 and an
+authenticated caller without the role with 403, at the edge and again upstream.
 """
 
 from __future__ import annotations
@@ -31,6 +37,7 @@ from .models import (
     ReportRequest,
 )
 from .notification_client import HttpPushRegistrationClient, PushRegistrationClient
+from .operator import OperatorVerifier, build_operator_verifier
 from .ratelimit import InMemoryFixedWindowRateLimiter, RateLimiter
 
 
@@ -45,11 +52,13 @@ def create_app(
     event_limiter: RateLimiter | None = None,
     registration_limiter: RateLimiter | None = None,
     feedback_limiter: RateLimiter | None = None,
+    operator_verifier: OperatorVerifier | None = None,
 ) -> FastAPI:
     """Build the API gateway application."""
 
     resolved_settings = settings or Settings.from_env()
     resolved_verifier = verifier or build_token_verifier(resolved_settings)
+    resolved_operator = operator_verifier or build_operator_verifier(resolved_settings)
     resolved_limiter = limiter or InMemoryFixedWindowRateLimiter(
         limit=resolved_settings.rate_limit_per_minute,
         window_seconds=resolved_settings.rate_limit_window_seconds,
@@ -181,6 +190,48 @@ def create_app(
         correlation_id = _correlation_id(resolved_settings, request)
         upstream = await resolved_feedback.record_report(
             payload.model_dump(), authorization, correlation_id
+        )
+        return _passthrough(upstream, correlation_id, resolved_settings)
+
+    @app.get("/internal/review/queue")
+    async def review_queue(request: Request) -> Response:
+        await resolved_operator.verify(request.headers.get("authorization"))
+        correlation_id = _correlation_id(resolved_settings, request)
+        upstream = await resolved_feedback.review(
+            "GET",
+            "/internal/review/queue",
+            params=dict(request.query_params),
+            body=None,
+            authorization=request.headers.get("authorization"),
+            correlation_id=correlation_id,
+        )
+        return _passthrough(upstream, correlation_id, resolved_settings)
+
+    @app.get("/internal/review/entries/{entry_id}")
+    async def review_entry(entry_id: str, request: Request) -> Response:
+        await resolved_operator.verify(request.headers.get("authorization"))
+        correlation_id = _correlation_id(resolved_settings, request)
+        upstream = await resolved_feedback.review(
+            "GET",
+            f"/internal/review/entries/{entry_id}",
+            params=None,
+            body=None,
+            authorization=request.headers.get("authorization"),
+            correlation_id=correlation_id,
+        )
+        return _passthrough(upstream, correlation_id, resolved_settings)
+
+    @app.post("/internal/review/entries/{entry_id}/actions")
+    async def review_action(entry_id: str, request: Request) -> Response:
+        await resolved_operator.verify(request.headers.get("authorization"))
+        correlation_id = _correlation_id(resolved_settings, request)
+        upstream = await resolved_feedback.review(
+            "POST",
+            f"/internal/review/entries/{entry_id}/actions",
+            params=None,
+            body=await request.body(),
+            authorization=request.headers.get("authorization"),
+            correlation_id=correlation_id,
         )
         return _passthrough(upstream, correlation_id, resolved_settings)
 

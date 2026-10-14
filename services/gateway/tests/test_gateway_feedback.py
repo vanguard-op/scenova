@@ -62,6 +62,18 @@ class _FakeFeedbackClient:
     ) -> UpstreamResponse:
         return await self._record("/v1/reports", payload, authorization)
 
+    async def review(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: Mapping[str, str] | None,
+        body: bytes | None,
+        authorization: str | None,
+        correlation_id: str,
+    ) -> UpstreamResponse:
+        raise AssertionError("the review routes are not used in these tests")
+
     async def _record(
         self, path: str, payload: Mapping[str, Any], authorization: str | None
     ) -> UpstreamResponse:

@@ -6,8 +6,8 @@ field; the intake takes it from the authenticated token subject, so the client
 sends no identity and the recorded rating belongs to the caller.
 
 The records mirror the `schema.md` entities "Feedback" and "Report"; the review
-queue the two feed is internal and has no wire shape until the curator console
-(FEAT-015) gives it one.
+queue the two feed is the curator console's operator surface (FEAT-015), whose
+wire shapes are C-014 to C-016.
 """
 
 from __future__ import annotations
@@ -18,6 +18,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 # The contract's note bound (`C-013`, at most 300 characters).
 MAX_REPORT_NOTE_LENGTH = 300
+# The contract's curator-note bound (`C-016`, at most 500 characters).
+MAX_ACTION_NOTES_LENGTH = 500
 
 
 class Rating(StrEnum):
@@ -98,3 +100,137 @@ class ReportResponse(BaseModel):
 
     reportId: str
     status: ReportStatus
+
+
+class EntryStatus(StrEnum):
+    """Whether a library entry is served, held after a report, or retired."""
+
+    ACTIVE = "active"
+    HELD = "held"
+    RETIRED = "retired"
+
+
+class ReviewState(StrEnum):
+    """Where an entry sits in the curator's queue (C-014 `state`).
+
+    `queued` awaits a curator; `actioned` is a recorded decision (clear, hold,
+    retire, or replace); `reviewed` is a phrase edit that regenerates the entry
+    and leaves it under review for the curator to decide on.
+    """
+
+    QUEUED = "queued"
+    REVIEWED = "reviewed"
+    ACTIONED = "actioned"
+
+
+class ModerationActionName(StrEnum):
+    """What a curator did to an entry (schema "ModerationAction")."""
+
+    CLEAR = "clear"
+    HOLD = "hold"
+    RETIRE = "retire"
+    REPLACE = "replace"
+    EDIT_PHRASE = "edit_phrase"
+
+
+class QueueItem(BaseModel):
+    """One entry awaiting review, as the queue lists it (C-014 `items`)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    entryId: str
+    lemma: str
+    senseLabel: str
+    # The reason the entry was queued: the newest report's reason, or the
+    # feedback-threshold flag when repeated negative feedback queued it.
+    reason: str
+    queuedAt: str
+    state: ReviewState
+
+
+class QueueResponse(BaseModel):
+    """The C-014 200 response: a page of the queue and the open-item count."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[QueueItem]
+    openCount: int
+    page: int
+    pageCount: int
+
+
+class ReviewClip(BaseModel):
+    """The clip behind a queued entry (C-015 `entry.clip`)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    url: str
+    durationSeconds: float
+    resolution: str
+    hasAudio: bool
+
+
+class ReviewEntry(BaseModel):
+    """The library entry a curator reviews (C-015 `entry`)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    entryId: str
+    lemma: str
+    senseLabel: str
+    glossPhrase: str
+    status: EntryStatus
+    clip: ReviewClip
+
+
+class EntryReport(BaseModel):
+    """One reader report against a queued entry (C-015 `reports`)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    reportId: str
+    reason: str
+    note: str | None
+    createdAt: str
+
+
+class EntryFeedback(BaseModel):
+    """One negative rating against a queued entry (C-015 `feedback`)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    rating: Rating
+    createdAt: str
+
+
+class EntryDetailResponse(BaseModel):
+    """The C-015 200 response: the entry, its evidence, and its review state."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    entry: ReviewEntry
+    reports: list[EntryReport]
+    feedback: list[EntryFeedback]
+    state: ReviewState
+
+
+class ActionRequest(BaseModel):
+    """The C-016 request body."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    action: ModerationActionName
+    phrase: str | None = Field(default=None, max_length=60)
+    notes: str | None = Field(default=None, max_length=MAX_ACTION_NOTES_LENGTH)
+    expectedState: ReviewState
+
+
+class ActionResponse(BaseModel):
+    """The C-016 200 response: the recorded action and the entry's new state."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    actionId: str
+    entryId: str
+    status: EntryStatus
+    state: ReviewState

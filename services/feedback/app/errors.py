@@ -7,6 +7,12 @@ or one that belongs to another reader, `unauthorized` is the missing or invalid
 token, `rate_limited` is the intake throttle, the two `*_conflict` codes are a
 reused idempotency key or a second report of the same entry, and
 `feedback_store_unavailable` is a retryable outage.
+
+The curator review surface (C-014 to C-016) adds `forbidden` for an operator
+without the curator role, `review_entry_not_found` for an unknown entry or one
+with nothing queued, `review_conflict` for an action on an entry that has moved
+since the curator saw it, and `review_unavailable` when the library or the
+generation pipeline cannot be reached.
 """
 
 from __future__ import annotations
@@ -42,6 +48,34 @@ class UnauthorizedError(FeedbackError):
 
     status_code = 401
     code = "unauthorized"
+
+
+class ForbiddenError(FeedbackError):
+    """The caller is authenticated but does not hold the curator role."""
+
+    status_code = 403
+    code = "forbidden"
+
+
+class ReviewEntryNotFoundError(FeedbackError):
+    """No queued review exists for the entry id, or the entry no longer exists."""
+
+    status_code = 404
+    code = "review_entry_not_found"
+
+
+class ReviewConflictError(FeedbackError):
+    """The entry has moved since the curator saw it; another action stands."""
+
+    status_code = 409
+    code = "review_conflict"
+
+
+class ReviewUnavailableError(FeedbackError):
+    """The review service could not reach the library or the generation pipeline."""
+
+    status_code = 503
+    code = "review_unavailable"
 
 
 class LookupNotFoundError(FeedbackError):

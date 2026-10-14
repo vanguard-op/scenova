@@ -35,6 +35,13 @@ class UnauthorizedError(GatewayError):
     code = "unauthorized"
 
 
+class ForbiddenError(GatewayError):
+    """The caller is authenticated but does not hold the curator role."""
+
+    status_code = 403
+    code = "forbidden"
+
+
 class RateLimitedError(GatewayError):
     """The caller exceeded the lookup rate limit."""
 

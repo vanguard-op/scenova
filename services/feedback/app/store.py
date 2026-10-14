@@ -10,6 +10,10 @@ already there.
 
 The store is in memory for the reading phase; Cloud SQL replaces it behind the
 same port, holding the same entities, so no caller changes.
+
+The curator review surface (C-014 to C-016) reads the same store: the queue, the
+reports and negative feedback against an entry, and the moderation actions a
+curator records.
 """
 
 from __future__ import annotations
@@ -19,7 +23,7 @@ from datetime import UTC, datetime
 from typing import Protocol
 from uuid import uuid4
 
-from .models import Rating, ReportReason, ReportStatus
+from .models import ModerationActionName, Rating, ReportReason, ReportStatus, ReviewState
 
 _NEGATIVE_RATINGS = frozenset({Rating.NOT_HELPFUL, Rating.WRONG})
 
@@ -62,6 +66,10 @@ class ReviewItem:
     item. A flag from a single negative rating is a separate signal and does not
     by itself create an item, so the queue holds exactly the entries a report or
     the threshold queued.
+
+    `state` moves the item out of `queued` when a curator acts: `actioned` for a
+    recorded decision (clear, hold, retire, replace) and `reviewed` for a phrase
+    edit, which regenerates the entry and leaves it under review.
     """
 
     entry_id: str
@@ -69,6 +77,21 @@ class ReviewItem:
     report_ids: tuple[str, ...]
     created_at: str
     updated_at: str
+    state: ReviewState = ReviewState.QUEUED
+
+
+@dataclass(frozen=True)
+class ModerationActionRecord:
+    """One curator action on a library entry (schema "ModerationAction")."""
+
+    id: str
+    entry_id: str
+    report_id: str | None
+    action: ModerationActionName
+    actor_role: str
+    phrase: str | None
+    notes: str | None
+    created_at: str
 
 
 class FeedbackStore(Protocol):
@@ -102,6 +125,16 @@ class FeedbackStore(Protocol):
 
     async def queue_items(self) -> list[ReviewItem]: ...
 
+    async def reports_for_entry(self, entry_id: str) -> list[ReportRecord]: ...
+
+    async def feedback_for_entry(self, entry_id: str) -> list[FeedbackRecord]: ...
+
+    async def set_reports_status(self, entry_id: str, status: ReportStatus) -> None: ...
+
+    async def add_moderation_action(self, action: ModerationActionRecord) -> None: ...
+
+    async def moderation_actions(self) -> list[ModerationActionRecord]: ...
+
 
 class InMemoryFeedbackStore:
     """An in-memory feedback store, its idempotency keys, and its review queue."""
@@ -117,6 +150,7 @@ class InMemoryFeedbackStore:
         self._reported: set[tuple[str, str]] = set()
         self._flagged: set[str] = set()
         self._queue: dict[str, ReviewItem] = {}
+        self._actions: list[ModerationActionRecord] = []
 
     async def feedback_for_client(
         self, subject: str, client_feedback_id: str
@@ -165,6 +199,28 @@ class InMemoryFeedbackStore:
     async def queue_items(self) -> list[ReviewItem]:
         return list(self._queue.values())
 
+    async def reports_for_entry(self, entry_id: str) -> list[ReportRecord]:
+        return [
+            record for record in self._report_by_client.values() if entry_id in record.entry_ids
+        ]
+
+    async def feedback_for_entry(self, entry_id: str) -> list[FeedbackRecord]:
+        return [
+            record for record in self._feedback_by_client.values() if entry_id in record.entry_ids
+        ]
+
+    async def set_reports_status(self, entry_id: str, status: ReportStatus) -> None:
+        for key, record in list(self._report_by_client.items()):
+            if entry_id not in record.entry_ids:
+                continue
+            self._report_by_client[key] = replace(record, status=status)
+
+    async def add_moderation_action(self, action: ModerationActionRecord) -> None:
+        self._actions.append(action)
+
+    async def moderation_actions(self) -> list[ModerationActionRecord]:
+        return list(self._actions)
+
 
 def new_feedback_id() -> str:
     return f"fb_{uuid4().hex}"
@@ -172,6 +228,10 @@ def new_feedback_id() -> str:
 
 def new_report_id() -> str:
     return f"rp_{uuid4().hex}"
+
+
+def new_moderation_action_id() -> str:
+    return f"ma_{uuid4().hex}"
 
 
 def new_queue_item(entry_id: str, *, now: str | None = None) -> ReviewItem:

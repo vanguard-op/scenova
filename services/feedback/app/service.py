@@ -203,11 +203,13 @@ class FeedbackService:
         return existing if existing is not None else new_queue_item(entry_id)
 
 
-def build_default_service(settings: Settings) -> FeedbackService:
+def build_default_service(
+    settings: Settings, store: FeedbackStore | None = None
+) -> FeedbackService:
     """Build the service with its store, lookup reader, and library client."""
 
     return FeedbackService(
-        store=InMemoryFeedbackStore(),
+        store=store if store is not None else InMemoryFeedbackStore(),
         lookups=HttpLookupDirectory(
             base_url=settings.lookup_base_url,
             internal_audience=settings.internal_audience,

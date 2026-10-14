@@ -187,6 +187,40 @@ def test_a_malformed_entry_is_refused() -> None:
     assert response.json()["code"] == "invalid_request"
 
 
+def test_an_entry_is_readable_by_id_for_review() -> None:
+    # The content review service addresses an entry by id, so it reads the word,
+    # sense, phrase, and clip the sense-key lookup cannot return without the key.
+    with _client() as client:
+        _store(client)
+        response = client.get("/internal/library/entries/le_1", headers=_INTERNAL)
+
+    assert response.status_code == 200
+    entry = response.json()["entry"]
+    assert entry["entryId"] == "le_1"
+    assert entry["lemma"] == "come"
+    assert entry["senseLabel"] == "arrive"
+    assert entry["partOfSpeech"] == "verb"
+    assert entry["glossPhrase"] == "to move toward a place"
+    assert entry["status"] == "active"
+    assert entry["clip"]["url"] == "https://cdn.example/clip_1.mp4"
+
+
+def test_reading_an_unknown_entry_by_id_is_not_found() -> None:
+    with _client() as client:
+        response = client.get("/internal/library/entries/le_missing", headers=_INTERNAL)
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "entry_not_found"
+
+
+def test_reading_an_entry_by_id_rejects_a_missing_audience() -> None:
+    with _client() as client:
+        response = client.get("/internal/library/entries/le_1")
+
+    assert response.status_code == 401
+    assert response.json()["code"] == "unauthorized"
+
+
 def test_a_status_outside_the_review_states_is_refused() -> None:
     with _client() as client:
         _store(client)

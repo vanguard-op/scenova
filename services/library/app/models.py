@@ -132,6 +132,34 @@ class FindEntryResponse(BaseModel):
     entry: ServedEntry | None
 
 
+class EntryDetail(BaseModel):
+    """An entry addressed by id, with the word, sense, and clip it holds.
+
+    The content review service reads an entry by id to show a curator the word,
+    sense, generation phrase, and clip behind a queued report; the sense key it
+    was stored under is not known to the review queue, which holds only the entry
+    id.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    entryId: str
+    lemma: str
+    senseLabel: str
+    partOfSpeech: PartOfSpeech
+    glossPhrase: str
+    status: EntryStatus
+    clip: ServedClip
+
+
+class GetEntryResponse(BaseModel):
+    """An entry addressed by id."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    entry: EntryDetail
+
+
 class UpdateEntryRequest(BaseModel):
     """A review action on an entry: hold it, retire it, or restore it."""
 

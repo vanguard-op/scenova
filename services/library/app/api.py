@@ -17,7 +17,9 @@ from fastapi.responses import JSONResponse
 from .config import Settings
 from .errors import LibraryError, UnauthorizedError
 from .models import (
+    EntryDetail,
     FindEntryResponse,
+    GetEntryResponse,
     PartOfSpeech,
     ServedClip,
     ServedEntry,
@@ -81,6 +83,15 @@ def create_app(
         stored = await resolved_service.find(lemma, sense_label, part_of_speech)
         return FindEntryResponse(entry=None if stored is None else _served(stored))
 
+    @app.get("/internal/library/entries/{entry_id}")
+    async def get_entry(
+        entry_id: str,
+        x_internal_audience: Annotated[str | None, Header()] = None,
+    ) -> GetEntryResponse:
+        _require_internal(resolved_settings, x_internal_audience)
+        stored = await resolved_service.get(entry_id)
+        return GetEntryResponse(entry=_detail(stored))
+
     @app.patch("/internal/library/entries/{entry_id}")
     async def update_entry(
         entry_id: str,
@@ -99,12 +110,28 @@ def _served(stored: StoredEntry) -> ServedEntry:
         entryId=stored.entry.id,
         status=stored.entry.status,
         glossPhrase=stored.entry.glossPhrase,
-        clip=ServedClip(
-            url=stored.asset.url,
-            durationSeconds=stored.asset.durationSeconds,
-            resolution=stored.asset.resolution,
-            hasAudio=stored.asset.hasAudio,
-        ),
+        clip=_clip(stored),
+    )
+
+
+def _detail(stored: StoredEntry) -> EntryDetail:
+    return EntryDetail(
+        entryId=stored.entry.id,
+        lemma=stored.entry.lemma,
+        senseLabel=stored.entry.senseLabel,
+        partOfSpeech=stored.entry.partOfSpeech,
+        glossPhrase=stored.entry.glossPhrase,
+        status=stored.entry.status,
+        clip=_clip(stored),
+    )
+
+
+def _clip(stored: StoredEntry) -> ServedClip:
+    return ServedClip(
+        url=stored.asset.url,
+        durationSeconds=stored.asset.durationSeconds,
+        resolution=stored.asset.resolution,
+        hasAudio=stored.asset.hasAudio,
     )
 
 

@@ -29,6 +29,17 @@ class FeedbackClient(Protocol):
         self, payload: Mapping[str, Any], authorization: str | None, correlation_id: str
     ) -> UpstreamResponse: ...
 
+    async def review(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: Mapping[str, str] | None,
+        body: bytes | None,
+        authorization: str | None,
+        correlation_id: str,
+    ) -> UpstreamResponse: ...
+
     async def aclose(self) -> None: ...
 
 
@@ -57,6 +68,44 @@ class HttpFeedbackClient:
         self, payload: Mapping[str, Any], authorization: str | None, correlation_id: str
     ) -> UpstreamResponse:
         return await self._post("/v1/reports", payload, authorization, correlation_id)
+
+    async def review(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: Mapping[str, str] | None,
+        body: bytes | None,
+        authorization: str | None,
+        correlation_id: str,
+    ) -> UpstreamResponse:
+        """Forward a curator review call to the feedback service.
+
+        The operator's own token is forwarded unchanged, so the review service
+        resolves the same session the gateway authenticated; the gateway never
+        rewrites or records the identity.
+        """
+
+        headers = {"x-correlation-id": correlation_id}
+        if authorization is not None:
+            headers["authorization"] = authorization
+        if body is not None:
+            headers["content-type"] = "application/json"
+        try:
+            response = await self._client.request(
+                method,
+                path,
+                headers=headers,
+                params=dict(params) if params else None,
+                content=body,
+            )
+        except httpx2.HTTPError as exc:
+            raise UpstreamUnavailableError("The review service is unavailable.") from exc
+        return UpstreamResponse(
+            status_code=response.status_code,
+            body=response.content,
+            content_type=response.headers.get("content-type", "application/json"),
+        )
 
     async def aclose(self) -> None:
         await self._client.aclose()

@@ -17,6 +17,7 @@ DEFAULT_INTERNAL_AUDIENCE = "scenova-internal"
 DEFAULT_CORRELATION_ID_HEADER = "x-correlation-id"
 DEFAULT_LOOKUP_PORT = "8081"
 DEFAULT_LIBRARY_PORT = "8083"
+DEFAULT_PIPELINE_PORT = "8082"
 # The intake throttle the contract puts at the gateway (C-012, C-013, 429). The
 # service applies the same fixed window as its own defence when it is addressed
 # directly, so a flood is refused either way.
@@ -34,6 +35,13 @@ DEFAULT_LIBRARY_TIMEOUT_SECONDS = 3.0
 # is queued for review (FEAT-010). The docs leave the value to the build, so it
 # is a tunable here rather than a magic number in the service.
 DEFAULT_NEGATIVE_FEEDBACK_THRESHOLD = 3
+# A curator's replace or edit_phrase regenerates the entry through the generation
+# pipeline (C-016). The hand-off is off the curator's path, so the wait stays
+# short and the failure maps to the review service being unavailable.
+DEFAULT_PIPELINE_TIMEOUT_SECONDS = 5.0
+# The pinned video model the regeneration job names (C-003 `modelPin`), the same
+# pin the generation path uses.
+DEFAULT_CLIP_MODEL_PIN = "gemini-omni-1.1-flash"
 
 
 @dataclass(frozen=True)
@@ -48,6 +56,9 @@ class Settings:
     lookup_timeout_seconds: float = DEFAULT_LOOKUP_TIMEOUT_SECONDS
     library_base_url: str = f"http://127.0.0.1:{DEFAULT_LIBRARY_PORT}"
     library_timeout_seconds: float = DEFAULT_LIBRARY_TIMEOUT_SECONDS
+    pipeline_base_url: str = f"http://127.0.0.1:{DEFAULT_PIPELINE_PORT}"
+    pipeline_timeout_seconds: float = DEFAULT_PIPELINE_TIMEOUT_SECONDS
+    clip_model_pin: str = DEFAULT_CLIP_MODEL_PIN
     rate_limit_per_minute: int = DEFAULT_RATE_LIMIT_PER_MINUTE
     rate_limit_window_seconds: int = DEFAULT_RATE_LIMIT_WINDOW_SECONDS
     negative_feedback_threshold: int = DEFAULT_NEGATIVE_FEEDBACK_THRESHOLD
@@ -67,6 +78,11 @@ class Settings:
             "LIBRARY_BASE_URL",
             f"http://127.0.0.1:{_env_str(source, 'LIBRARY_PORT', DEFAULT_LIBRARY_PORT)}",
         )
+        pipeline_base_url = _env_str(
+            source,
+            "PIPELINE_BASE_URL",
+            f"http://127.0.0.1:{_env_str(source, 'PIPELINE_PORT', DEFAULT_PIPELINE_PORT)}",
+        )
         return cls(
             auth_mode=_env_str(source, "AUTH_MODE", default_auth_mode),
             firebase_project_id=_env_opt(source, "FIREBASE_PROJECT_ID"),
@@ -82,6 +98,11 @@ class Settings:
             library_timeout_seconds=_env_float(
                 source, "FEEDBACK_LIBRARY_TIMEOUT_SECONDS", DEFAULT_LIBRARY_TIMEOUT_SECONDS
             ),
+            pipeline_base_url=pipeline_base_url,
+            pipeline_timeout_seconds=_env_float(
+                source, "FEEDBACK_PIPELINE_TIMEOUT_SECONDS", DEFAULT_PIPELINE_TIMEOUT_SECONDS
+            ),
+            clip_model_pin=_env_str(source, "CLIP_MODEL_PIN", DEFAULT_CLIP_MODEL_PIN),
             rate_limit_per_minute=_env_int(
                 source, "FEEDBACK_RATE_LIMIT_PER_MINUTE", DEFAULT_RATE_LIMIT_PER_MINUTE
             ),

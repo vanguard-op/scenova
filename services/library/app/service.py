@@ -29,6 +29,18 @@ class LibraryService:
 
         return await self._store.find(lemma, sense_label, part_of_speech)
 
+    async def get(self, entry_id: str) -> StoredEntry:
+        """The entry with this id, or fail when the id is unknown.
+
+        The content review service addresses an entry by id, so an unknown id is
+        a 404 rather than a miss.
+        """
+
+        stored = await self._store.get(entry_id)
+        if stored is None:
+            raise EntryNotFoundError("No library entry exists for this id.")
+        return stored
+
     async def store(self, entry: LibraryEntryBody, asset: ClipAssetBody) -> StoredEntry:
         """Write a word clip, replacing whatever the sense key held before."""
 

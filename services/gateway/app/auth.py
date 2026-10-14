@@ -109,12 +109,18 @@ def _dev_subject(token: str) -> str | None:
 
 def _decoder_for(project_id: str) -> Decoder:
     async def decode(token: str) -> Mapping[str, Any]:
-        return await _decode_firebase_token(project_id, token)
+        return await decode_firebase_id_token(project_id, token)
 
     return decode
 
 
-async def _decode_firebase_token(project_id: str, token: str) -> Mapping[str, Any]:
+async def decode_firebase_id_token(project_id: str, token: str) -> Mapping[str, Any]:
+    """Verify a Firebase ID token against the project and return its claims.
+
+    Shared by the reader verifier and the operator gate, so the signing-key
+    handling lives in one place.
+    """
+
     header = jwt.get_unverified_header(token)
     key_id = header.get("kid")
     if not isinstance(key_id, str) or not key_id:
