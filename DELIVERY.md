@@ -9,7 +9,7 @@
 | infra-engineer | `infra/**`, `ci/**`, `.github/**`, `.devcontainer/**`, `Makefile`, root workspace config |
 | backend-engineer | `services/**` |
 | ai-engineer | `ai/**`, `qa/golden/**` |
-| frontend-engineer | `apps/mobile/**`, `apps/console/**` |
+| frontend-engineer | `apps/mobile/**`, `apps/console/**`, `packages/scenova_design/**` |
 | visual-artist | `assets/**` |
 | qa-engineer | `tests/**`, `qa/**` |
 | lead | `DELIVERY.md`, `CONTRACTS.md`, `ASSETS.md`, `.delivery/**`, `contracts/**` |
@@ -40,6 +40,7 @@ services/       FastAPI services: gateway, lookup, pipeline, library, entitlemen
 ai/             model serving, prompts, eval harness, golden sets
 contracts/      frozen interface specs (lead)
 infra/          IaC, CI/CD, environments, secrets
+packages/scenova_design/  the shared design system both apps import
 assets/         brand mark, icons, motion assets
 tests/          integration + acceptance (qa)
 qa/             quality-bar harness and golden-set evaluation (qa)
@@ -100,7 +101,9 @@ docs/           BPRD (product-shaper)
 | T-090 | FEAT-015 | frontend-engineer | Done | C-014 |
 | T-091 | FEAT-015 | frontend-engineer | Backlog | C-015, C-016 |
 | T-092 | FEAT-009 | frontend-engineer | Backlog | — |
-| T-093 | FEAT-001, FEAT-002, FEAT-009, FEAT-015 | frontend-engineer | Backlog | — |
+| T-093 | FEAT-001, FEAT-002, FEAT-009, FEAT-015 | frontend-engineer | In Progress | — |
+| T-094 | FEAT-001, FEAT-002, FEAT-009, FEAT-015 | frontend-engineer | Backlog | — |
+| T-095 | — | infra-engineer | Backlog | — |
 
 ## Decisions Log
 | # | Decision | Rationale | By |
@@ -132,6 +135,7 @@ docs/           BPRD (product-shaper)
 | D-025 | The curator review console is a second Flutter app in the monorepo (`apps/console`), built with Flutter Web and owned by `frontend-engineer` | It reuses the design system's tokens and shared states and the toolchain the repo already pins; the console is operator-only, so its bundle weight matters less than a second stack would cost | user |
 | D-026 | The Free tier's 50-entry history limit applies to every reader until the paid tier ships | Matches the Free row in `monetization.md` and the History screen's edge case; the tiers are introduced with the account feature | user |
 | D-027 | The review component is carried by the feedback service, with the gateway exposing the console's routes | No standalone review service exists in the stack, and the feedback store already holds the queue, the reports, and the negative feedback; the console's hosting rewrites `/internal/review/**` to the gateway | lead |
+| D-028 | The design system is extracted into a shared package both apps import, rather than mirrored copies | The console carried a byte copy of the palette and its own copies of the shared widgets; every token change and the mark audit would otherwise be made twice, and the token map pointed at one location while two existed | user |
 
 ## Definition of Done
 - **Task:** the acceptance criteria in the cited feature doc are met; the frozen contract is conformed; unit tests pass; format, lint, analyze, and build are clean; work is committed to the dev branch and confined to `Own`.
