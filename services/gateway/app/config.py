@@ -15,9 +15,11 @@ DEFAULT_CORRELATION_ID_HEADER = "x-correlation-id"
 DEFAULT_LOOKUP_PORT = "8081"
 DEFAULT_ANALYTICS_PORT = "8086"
 DEFAULT_NOTIFICATION_PORT = "8087"
+DEFAULT_FEEDBACK_PORT = "8085"
 DEFAULT_RATE_LIMIT_PER_MINUTE = 120
 DEFAULT_EVENTS_RATE_LIMIT_PER_MINUTE = 120
 DEFAULT_REGISTRATIONS_RATE_LIMIT_PER_MINUTE = 120
+DEFAULT_FEEDBACK_RATE_LIMIT_PER_MINUTE = 120
 DEFAULT_RATE_LIMIT_WINDOW_SECONDS = 60
 DEFAULT_UPSTREAM_TIMEOUT_SECONDS = 10.0
 
@@ -29,12 +31,14 @@ class Settings:
     lookup_base_url: str = f"http://127.0.0.1:{DEFAULT_LOOKUP_PORT}"
     analytics_base_url: str = f"http://127.0.0.1:{DEFAULT_ANALYTICS_PORT}"
     notification_base_url: str = f"http://127.0.0.1:{DEFAULT_NOTIFICATION_PORT}"
+    feedback_base_url: str = f"http://127.0.0.1:{DEFAULT_FEEDBACK_PORT}"
     internal_audience: str = DEFAULT_INTERNAL_AUDIENCE
     auth_mode: str = "dev"
     firebase_project_id: str | None = None
     rate_limit_per_minute: int = DEFAULT_RATE_LIMIT_PER_MINUTE
     events_rate_limit_per_minute: int = DEFAULT_EVENTS_RATE_LIMIT_PER_MINUTE
     registrations_rate_limit_per_minute: int = DEFAULT_REGISTRATIONS_RATE_LIMIT_PER_MINUTE
+    feedback_rate_limit_per_minute: int = DEFAULT_FEEDBACK_RATE_LIMIT_PER_MINUTE
     rate_limit_window_seconds: int = DEFAULT_RATE_LIMIT_WINDOW_SECONDS
     upstream_timeout_seconds: float = DEFAULT_UPSTREAM_TIMEOUT_SECONDS
     correlation_id_header: str = DEFAULT_CORRELATION_ID_HEADER
@@ -59,10 +63,16 @@ class Settings:
             "NOTIFICATION_BASE_URL",
             f"http://127.0.0.1:{_env_str(source, 'NOTIFICATION_PORT', DEFAULT_NOTIFICATION_PORT)}",
         )
+        feedback_base_url = _env_str(
+            source,
+            "FEEDBACK_BASE_URL",
+            f"http://127.0.0.1:{_env_str(source, 'FEEDBACK_PORT', DEFAULT_FEEDBACK_PORT)}",
+        )
         return cls(
             lookup_base_url=lookup_base_url,
             analytics_base_url=analytics_base_url,
             notification_base_url=notification_base_url,
+            feedback_base_url=feedback_base_url,
             internal_audience=_env_str(source, "INTERNAL_AUDIENCE", DEFAULT_INTERNAL_AUDIENCE),
             auth_mode=_env_str(source, "AUTH_MODE", default_auth_mode),
             firebase_project_id=_env_opt(source, "FIREBASE_PROJECT_ID"),
@@ -76,6 +86,11 @@ class Settings:
                 source,
                 "RATE_LIMIT_REGISTRATIONS_PER_MINUTE",
                 DEFAULT_REGISTRATIONS_RATE_LIMIT_PER_MINUTE,
+            ),
+            feedback_rate_limit_per_minute=_env_int(
+                source,
+                "RATE_LIMIT_FEEDBACK_PER_MINUTE",
+                DEFAULT_FEEDBACK_RATE_LIMIT_PER_MINUTE,
             ),
             rate_limit_window_seconds=_env_int(
                 source, "RATE_LIMIT_WINDOW_SECONDS", DEFAULT_RATE_LIMIT_WINDOW_SECONDS

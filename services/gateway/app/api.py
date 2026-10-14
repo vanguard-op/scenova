@@ -1,9 +1,9 @@
-"""Client HTTP API for the gateway (C-001, C-002, C-007, C-008).
+"""Client HTTP API for the gateway (C-001, C-002, C-007, C-008, C-012, C-013).
 
-The gateway authenticates the caller, rate-limits lookups, events, and push
-registrations, validates the request body, and passes the downstream service's
-response through unchanged, so the frozen contract's status codes and error codes
-reach the client as they are produced.
+The gateway authenticates the caller, rate-limits lookups, events, push
+registrations, ratings, and reports, validates the request body, and passes the
+downstream service's response through unchanged, so the frozen contract's status
+codes and error codes reach the client as they are produced.
 """
 
 from __future__ import annotations
@@ -21,8 +21,15 @@ from .analytics_client import AnalyticsClient, HttpAnalyticsClient
 from .auth import TokenVerifier, build_token_verifier
 from .config import Settings
 from .errors import EmptySelectionError, GatewayError, RateLimitedError
+from .feedback_client import FeedbackClient, HttpFeedbackClient
 from .lookup_client import HttpLookupClient, LookupClient, UpstreamResponse
-from .models import CreateLookupRequest, IngestEventsRequest, RegisterPushRequest
+from .models import (
+    CreateLookupRequest,
+    FeedbackRequest,
+    IngestEventsRequest,
+    RegisterPushRequest,
+    ReportRequest,
+)
 from .notification_client import HttpPushRegistrationClient, PushRegistrationClient
 from .ratelimit import InMemoryFixedWindowRateLimiter, RateLimiter
 
@@ -34,8 +41,10 @@ def create_app(
     lookup_client: LookupClient | None = None,
     analytics_client: AnalyticsClient | None = None,
     notification_client: PushRegistrationClient | None = None,
+    feedback_client: FeedbackClient | None = None,
     event_limiter: RateLimiter | None = None,
     registration_limiter: RateLimiter | None = None,
+    feedback_limiter: RateLimiter | None = None,
 ) -> FastAPI:
     """Build the API gateway application."""
 
@@ -53,6 +62,10 @@ def create_app(
         limit=resolved_settings.registrations_rate_limit_per_minute,
         window_seconds=resolved_settings.rate_limit_window_seconds,
     )
+    resolved_feedback_limiter = feedback_limiter or InMemoryFixedWindowRateLimiter(
+        limit=resolved_settings.feedback_rate_limit_per_minute,
+        window_seconds=resolved_settings.rate_limit_window_seconds,
+    )
     resolved_client = lookup_client or HttpLookupClient(
         base_url=resolved_settings.lookup_base_url,
         internal_audience=resolved_settings.internal_audience,
@@ -66,6 +79,10 @@ def create_app(
         base_url=resolved_settings.notification_base_url,
         timeout_seconds=resolved_settings.upstream_timeout_seconds,
     )
+    resolved_feedback = feedback_client or HttpFeedbackClient(
+        base_url=resolved_settings.feedback_base_url,
+        timeout_seconds=resolved_settings.upstream_timeout_seconds,
+    )
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -75,6 +92,7 @@ def create_app(
             await resolved_client.aclose()
             await resolved_analytics.aclose()
             await resolved_notification.aclose()
+            await resolved_feedback.aclose()
 
     app = FastAPI(title="Scenova API Gateway", version="1.0.0", lifespan=lifespan)
 
@@ -138,6 +156,30 @@ def create_app(
             raise RateLimitedError("Too many registrations. Please try again in a moment.")
         correlation_id = _correlation_id(resolved_settings, request)
         upstream = await resolved_notification.register(
+            payload.model_dump(), authorization, correlation_id
+        )
+        return _passthrough(upstream, correlation_id, resolved_settings)
+
+    @app.post("/v1/feedback", status_code=202)
+    async def record_feedback(payload: FeedbackRequest, request: Request) -> Response:
+        authorization = request.headers.get("authorization")
+        subject = await resolved_verifier.verify(authorization)
+        if not await resolved_feedback_limiter.allow(subject.id):
+            raise RateLimitedError("Too many ratings. Please try again in a moment.")
+        correlation_id = _correlation_id(resolved_settings, request)
+        upstream = await resolved_feedback.record_feedback(
+            payload.model_dump(), authorization, correlation_id
+        )
+        return _passthrough(upstream, correlation_id, resolved_settings)
+
+    @app.post("/v1/reports", status_code=202)
+    async def record_report(payload: ReportRequest, request: Request) -> Response:
+        authorization = request.headers.get("authorization")
+        subject = await resolved_verifier.verify(authorization)
+        if not await resolved_feedback_limiter.allow(subject.id):
+            raise RateLimitedError("Too many reports. Please try again in a moment.")
+        correlation_id = _correlation_id(resolved_settings, request)
+        upstream = await resolved_feedback.record_report(
             payload.model_dump(), authorization, correlation_id
         )
         return _passthrough(upstream, correlation_id, resolved_settings)

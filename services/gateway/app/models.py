@@ -1,10 +1,12 @@
-"""Client request models for the gateway (C-001, C-002, C-007, C-008).
+"""Client request models for the gateway (C-001, C-002, C-007, C-008, C-012, C-013).
 
 The gateway validates the request shape it routes, so a malformed body is a 400
 before a service is called. For events it validates the envelope only: the
 taxonomy and the personal-data scan stay with the analytics intake, which is
 their single owner. For a push registration it validates the shape only: whether
 the lookup exists and belongs to the caller stays with the notification service.
+For a rating or a report it validates the shape only: the lookup's ownership, the
+served clip, and the review queue stay with the feedback service.
 """
 
 from __future__ import annotations
@@ -15,6 +17,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 # The contract's batch cap (`C-007`, at most fifty).
 MAX_EVENT_BATCH_SIZE = 50
+# The contract's note bound (`C-013`, at most 300 characters).
+MAX_REPORT_NOTE_LENGTH = 300
 
 
 class CreateLookupRequest(BaseModel):
@@ -65,3 +69,24 @@ class RegisterPushRequest(BaseModel):
     token: str
     platform: Literal["android", "ios"]
     lookupId: str
+
+
+class FeedbackRequest(BaseModel):
+    """The C-012 request body."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    lookupId: str
+    rating: Literal["helpful", "not_helpful", "wrong"]
+    clientFeedbackId: str
+
+
+class ReportRequest(BaseModel):
+    """The C-013 request body."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    lookupId: str
+    reason: Literal["wrong_meaning", "offensive", "low_quality", "other"]
+    note: str | None = Field(default=None, max_length=MAX_REPORT_NOTE_LENGTH)
+    clientReportId: str
