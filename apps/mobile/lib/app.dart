@@ -5,10 +5,12 @@ import 'package:flutter/material.dart';
 import 'app_router.dart';
 import 'models/analytics_event.dart';
 import 'models/lookup.dart';
+import 'screens/clip_action_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/placeholder_screen.dart';
 import 'services/app_services.dart';
+import 'services/capture_channel.dart';
 import 'theme/app_theme.dart';
 import 'theme/tokens.dart';
 
@@ -17,11 +19,21 @@ import 'theme/tokens.dart';
 /// The theme is rebuilt when the device class changes (the 600px breakpoint) or
 /// the platform brightness changes, and the platform reduce-motion setting is
 /// pushed into the reader's settings so the clip view can hold on a still
-/// frame. The landing surface is Onboarding until setup is stored, then Home.
+/// frame. The landing surface is the in-place clip view when the Android
+/// selection action launched the process; otherwise Onboarding until setup is
+/// stored, then Home.
 class ScenovaApp extends StatefulWidget {
-  const ScenovaApp({super.key, required this.services});
+  const ScenovaApp({
+    super.key,
+    required this.services,
+    this.entryPoint = CaptureEntryPoint.app,
+  });
 
   final ScenovaServices services;
+
+  /// Where the process was entered from. The action entry shows only the clip,
+  /// over the reading app; every other entry shows the app.
+  final CaptureEntryPoint entryPoint;
 
   @override
   State<ScenovaApp> createState() => _ScenovaAppState();
@@ -70,6 +82,9 @@ class _ScenovaAppState extends State<ScenovaApp> with WidgetsBindingObserver {
   }
 
   void _listenForCaptures() {
+    // The in-place action surface owns the selection stream: there is no Home
+    // behind it to route from and the clip is the whole surface.
+    if (widget.entryPoint == CaptureEntryPoint.selectionAction) return;
     widget.services.captureChannel.selections.listen((selection) {
       _router.openSelection(selection, source: _captureSource());
     });
@@ -102,10 +117,18 @@ class _ScenovaAppState extends State<ScenovaApp> with WidgetsBindingObserver {
     setState(() {});
   }
 
-  /// First launch opens on Onboarding; Home takes over once setup is stored.
-  Widget get _landing => widget.services.settings.onboardingComplete
-      ? HomeScreen(router: _router)
-      : OnboardingScreen(onComplete: _finishOnboarding);
+  /// The process launched from the Android selection action opens the clip in
+  /// place over the reading app; every other launch opens the app, on Onboarding
+  /// until setup is stored and Home after
+  /// (`docs/Scenova/screens.md` → Navigation Map).
+  Widget get _landing {
+    if (widget.entryPoint == CaptureEntryPoint.selectionAction) {
+      return ClipActionScreen(services: widget.services);
+    }
+    return widget.services.settings.onboardingComplete
+        ? HomeScreen(router: _router)
+        : OnboardingScreen(onComplete: _finishOnboarding);
+  }
 
   DeviceClass _resolveDeviceClass() {
     final view = WidgetsBinding.instance.platformDispatcher.views.first;

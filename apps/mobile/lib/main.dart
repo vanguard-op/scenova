@@ -25,7 +25,10 @@ Future<void> main() async {
   // so the first frame never waits on the network for a kill switch.
   await services.settings.load();
   unawaited(services.featureFlags.refresh());
-  runApp(ScenovaApp(services: services));
+  // The entry point is read before the first frame too, so a launch from the
+  // Android selection action opens the clip in place rather than flashing Home.
+  final entryPoint = await services.captureChannel.entryPoint();
+  runApp(ScenovaApp(services: services, entryPoint: entryPoint));
 }
 
 /// The iOS share extension's entrypoint (`FEAT-002`).

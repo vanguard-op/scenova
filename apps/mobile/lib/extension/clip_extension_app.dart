@@ -134,7 +134,7 @@ class _ClipExtensionAppState extends State<ClipExtensionApp>
     return ClipViewScreen(
       key: ValueKey<ClipViewController>(controller),
       controller: controller,
-      presentation: ClipPresentation.extension,
+      presentation: ClipPresentation.inPlace,
       onDismiss: _dismiss,
     );
   }

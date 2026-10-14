@@ -241,12 +241,12 @@ List<(String, Widget)> _frames() {
       _clip('the quick brown fox jumps over the lazy dog'),
     ),
     (
-      'Extension — serving from library (card over the page)',
-      _extensionClip('come'),
+      'In place — serving from library (card over the page)',
+      _inPlaceClip('come'),
     ),
-    ('Extension — generating', _extensionClip('xylograph')),
-    ('Extension — empty selection', _extensionClip('   ')),
-    ('Extension — offline', _extensionClip('quixotic', online: false)),
+    ('In place — generating', _inPlaceClip('xylograph')),
+    ('In place — empty selection', _inPlaceClip('   ')),
+    ('In place — offline', _inPlaceClip('quixotic', online: false)),
   ];
 }
 
@@ -306,22 +306,19 @@ Widget _clip(
   );
 }
 
-/// The clip view as the iOS share extension presents it: the compact card over
-/// a reading page, with the page visible around and behind it.
-Widget _extensionClip(String selection, {bool online = true}) {
+/// The clip view as the in-place hosts present it — the iOS share extension's
+/// sheet and the Android selection action: the compact card over a reading page,
+/// with the page visible around and behind it.
+Widget _inPlaceClip(String selection, {bool online = true}) {
   return Stack(
     children: <Widget>[
       const _ReadingPage(),
-      _clip(
-        selection,
-        online: online,
-        presentation: ClipPresentation.extension,
-      ),
+      _clip(selection, online: online, presentation: ClipPresentation.inPlace),
     ],
   );
 }
 
-/// A stand-in for the reading app behind the extension sheet. Tooling only.
+/// A stand-in for the reading app behind the sheet. Tooling only.
 class _ReadingPage extends StatelessWidget {
   const _ReadingPage();
 
@@ -453,14 +450,14 @@ class _PreviewClipState extends State<_PreviewClip> {
 
   @override
   Widget build(BuildContext context) {
-    final isExtension = widget.presentation == ClipPresentation.extension;
+    final inPlace = widget.presentation == ClipPresentation.inPlace;
     return ClipViewScreen(
       controller: _controller,
       presentation: widget.presentation,
       // The app wires these to the router; the preview only needs the controls
       // to render, so they are inert here.
       onDismiss: () {},
-      onOpenHistory: isExtension ? null : () {},
+      onOpenHistory: inPlace ? null : () {},
     );
   }
 }

@@ -25,10 +25,12 @@ enum ClipPresentation {
   /// A full page inside the app, reached from Home or History.
   page,
 
-  /// A card inside the iOS share extension, over the reading app. The backdrop
-  /// is transparent so the reading page stays visible behind the card, and the
-  /// copy speaks to closing the extension rather than returning to Home.
-  extension,
+  /// A compact card shown in place over the reading app — the Android
+  /// selection action's own surface, or the iOS share extension's sheet. The
+  /// backdrop is transparent so the reading page stays visible behind the card,
+  /// the copy speaks to closing rather than returning to Home, and there is no
+  /// History destination to open.
+  inPlace,
 }
 
 /// Screen 3: Clip View (`docs/Scenova/screens/03-clip-view.md`).
@@ -52,8 +54,8 @@ class ClipViewScreen extends StatefulWidget {
 
   final ClipViewController controller;
 
-  /// Where the view is being shown; the extension presentation drops the
-  /// opaque backdrop and adapts the copy.
+  /// Where the view is being shown; an in-place presentation drops the opaque
+  /// backdrop and adapts the copy to the reading app being one tap away.
   final ClipPresentation presentation;
   final VoidCallback? onDismiss;
   final VoidCallback? onOpenHistory;
@@ -197,14 +199,14 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
     final colors = ScenovaColors.of(context);
     final tokens = ScenovaTokens.of(context);
     final centered = tokens.deviceClass.isTablet;
-    final inExtension = widget.presentation == ClipPresentation.extension;
+    final inPlace = widget.presentation == ClipPresentation.inPlace;
 
     return ScaffoldMessenger(
       key: _messengerKey,
       child: Scaffold(
-        // The extension sits over the reading app, so only the card is painted;
-        // the page shows through everywhere else.
-        backgroundColor: inExtension ? ScenovaPalette.transparent : null,
+        // An in-place view sits over the reading app, so only the card is
+        // painted; the page shows through everywhere else.
+        backgroundColor: inPlace ? ScenovaPalette.transparent : null,
         body: SafeArea(
           child: Align(
             alignment: centered ? Alignment.center : Alignment.topCenter,
@@ -234,7 +236,7 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
 
   Widget _content(BuildContext context) {
     final tokens = ScenovaTokens.of(context);
-    final inExtension = widget.presentation == ClipPresentation.extension;
+    final inPlace = widget.presentation == ClipPresentation.inPlace;
     final isPhrase = _controller.isPhrase;
     switch (_controller.phase) {
       case ClipPhase.loading:
@@ -256,10 +258,10 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
         return EmptyState(
           icon: AppIcons.search,
           headline: 'Nothing to look up',
-          body: inExtension
+          body: inPlace
               ? 'Select a word in a reading app and choose Scenova.'
               : 'Select a word in a reading app, or type one on Home.',
-          actionLabel: inExtension ? 'Close' : 'Back to Home',
+          actionLabel: inPlace ? 'Close' : 'Back to Home',
           onAction: widget.onDismiss,
         );
 
@@ -274,7 +276,7 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
               'words. Your selection was '
               '${_controller.selection.truncatedFrom} words. Select up to six '
               'and open Scenova again.',
-          actionLabel: inExtension ? 'Close' : 'Back to Home',
+          actionLabel: inPlace ? 'Close' : 'Back to Home',
           onAction: widget.onDismiss,
         );
 
@@ -296,12 +298,12 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
               body: isPhrase
                   ? 'A phrase clip needs a connection to be made. Look it up '
                         'again when you are back online.'
-                  : inExtension
+                  : inPlace
                   ? 'Look it up again when you are back online.'
                   : 'Look it up again when you are back online, or browse the '
                         'lookups you have saved.',
-              actionLabel: inExtension ? 'Close' : 'Open History',
-              onAction: inExtension ? widget.onDismiss : widget.onOpenHistory,
+              actionLabel: inPlace ? 'Close' : 'Open History',
+              onAction: inPlace ? widget.onDismiss : widget.onOpenHistory,
             ),
           ],
         );
@@ -567,9 +569,9 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
                     'marking the clip not helpful still records your view.',
               ),
             ),
-            // History is an app destination; the extension presentation has
-            // nowhere to open it, so the action is left out there.
-            if (widget.presentation != ClipPresentation.extension)
+            // History is an app destination; an in-place view has nowhere to
+            // open it, so the action is left out there.
+            if (widget.presentation != ClipPresentation.inPlace)
               ScenovaButton(
                 label: 'History',
                 variant: ScenovaButtonVariant.ghost,

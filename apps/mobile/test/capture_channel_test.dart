@@ -104,4 +104,70 @@ void main() {
     await capture.start();
     await tester.pump();
   });
+
+  testWidgets('reads the selection action as the entry point', (tester) async {
+    mockPlatform((call) async {
+      if (call.method == CaptureChannel.methodEntryPoint) {
+        return CaptureEntryPoint.selectionAction.wire;
+      }
+      return null;
+    });
+
+    final capture = CaptureChannel();
+    addTearDown(capture.dispose);
+
+    expect(await capture.entryPoint(), CaptureEntryPoint.selectionAction);
+  });
+
+  testWidgets('reads an ordinary launch as the app entry point', (
+    tester,
+  ) async {
+    mockPlatform((call) async {
+      if (call.method == CaptureChannel.methodEntryPoint) {
+        return CaptureEntryPoint.app.wire;
+      }
+      return null;
+    });
+
+    final capture = CaptureChannel();
+    addTearDown(capture.dispose);
+
+    expect(await capture.entryPoint(), CaptureEntryPoint.app);
+  });
+
+  testWidgets('an absent entry point reads as the app', (tester) async {
+    // The iOS extension's own process, web, and desktop have no host to ask, so
+    // the shell opens the app rather than the in-place surface.
+    mockPlatform((call) async => throw MissingPluginException());
+
+    final capture = CaptureChannel();
+    addTearDown(capture.dispose);
+
+    expect(await capture.entryPoint(), CaptureEntryPoint.app);
+  });
+
+  testWidgets('closing the in-place view asks the platform to finish', (
+    tester,
+  ) async {
+    final calls = <String>[];
+    mockPlatform((call) async {
+      calls.add(call.method);
+      return null;
+    });
+
+    final capture = CaptureChannel();
+    addTearDown(capture.dispose);
+
+    await capture.finish();
+    expect(calls, <String>[CaptureChannel.methodDismiss]);
+  });
+
+  testWidgets('closing without a host is a no-op', (tester) async {
+    mockPlatform((call) async => throw MissingPluginException());
+
+    final capture = CaptureChannel();
+    addTearDown(capture.dispose);
+
+    await capture.finish();
+  });
 }
