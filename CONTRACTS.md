@@ -20,9 +20,9 @@ Errors: 401 (missing or invalid token), 404 (unknown lookup, or not owned by the
 Body: error responses are `{"code": string, "message": string}`. `notice` carries a clip-availability advisory; `senseLabel` is a plain human label and is not a signal.
 
 ### C-003: POST /internal/generation-jobs
-Status: Frozen
+Status: Frozen (revision 1)
 Auth: internal service identity (service account); never reachable from the client
-Request: jobId: string, lookupId: string, kind: word|phrase, lemma: string|null, phrase: string|null (the selection for a phrase job; null for a word job, where the pipeline generates the phrase via C-004), senseLabel: string, partOfSpeech: string, targetDurationSeconds: number (at most 4), modelPin: string ("gemini-omni-1.1-flash"), attempt: integer
+Request: jobId: string, lookupId: string, kind: word|phrase, lemma: string|null, phrase: string|null (the selection for a phrase job; null for a word job, where the pipeline generates the phrase via C-004, unless a curator supplied a replacement phrase through C-016, in which case the pipeline generates the clip from that phrase), senseLabel: string, partOfSpeech: string, targetDurationSeconds: number (at most 4), modelPin: string ("gemini-omni-1.1-flash"), attempt: integer
 Response 202: jobId: string, status: queued|running
 Errors: 400 (a phrase job without a phrase, or target duration over four seconds), 401 (not an internal caller), 409 (jobId already enqueued), 503 (queue unavailable)
 
@@ -111,8 +111,8 @@ Response 200: entry: { entryId: string, lemma: string, senseLabel: string, gloss
 Errors: 401 (no operator session), 403 (an operator without the curator role), 404 (unknown entry, or an entry with nothing queued), 503 (review service unavailable).
 
 ### C-016: POST /internal/review/entries/{entryId}/actions
-Status: Frozen
+Status: Frozen (revision 1)
 Auth: operator identity carrying the curator role, multi-factor authenticated; never reachable from the reader client.
 Request: action: clear|hold|retire|replace|edit_phrase, phrase: string|null (the new generation phrase, for edit_phrase), notes: string|null (at most 500), expectedState: queued|reviewed|actioned (the state the curator acted on)
-Response 200: actionId: string, entryId: string, status: active|held|retired, state: reviewed|actioned
+Response 200: actionId: string, entryId: string, status: active|held|retired, state: reviewed|actioned (edit_phrase resolves the queue item as `reviewed`; every other action resolves it as `actioned`)
 Errors: 400 (unknown action; edit_phrase without a phrase; notes over 500 characters), 401 (no operator session), 403 (an operator without the curator role), 404 (unknown entry), 409 (the entry has already moved since the curator saw it), 503 (review service unavailable). Every action records a ModerationAction; `clear` returns the entry to serving, `hold` withholds it, `retire` stops serving it and the next lookup generates a replacement, `replace` retires it and regenerates, and `edit_phrase` records the new phrase and regenerates from it.

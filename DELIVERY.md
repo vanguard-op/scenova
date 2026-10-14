@@ -1,7 +1,7 @@
 # DELIVERY — Scenova
 
 ## Source of Truth
-`docs/Scenova/` (BPRD), a git submodule of `vanguard-op/scenova-docs`, pinned at `65913941da007fc8deb96c7a46736b9faf548478` (`65913941da00`). Read-only for the squad; `product-shaper` is the only writer. The roadmap owns the build order. The lead is the only agent who runs git against the submodule: commit and push `product-shaper`'s changes to the docs repo, then stage the pointer bump in the same commit as the code built against it, and never leave the parent pointing at an unpushed docs commit.
+`docs/Scenova/` (BPRD), a git submodule of `vanguard-op/scenova-docs`, pinned at `e97ecc8c03152ae9231347a3b32a4f31be056174` (`e97ecc8c0315`). Read-only for the squad; `product-shaper` is the only writer. The roadmap owns the build order. The lead is the only agent who runs git against the submodule: commit and push `product-shaper`'s changes to the docs repo, then stage the pointer bump in the same commit as the code built against it, and never leave the parent pointing at an unpushed docs commit.
 
 ## Team & File Ownership
 | Owner | Owns |
@@ -92,13 +92,14 @@ docs/           BPRD (product-shaper)
 |---|---|---|---|---|
 | T-083 | FEAT-010, FEAT-011 | backend-engineer | Done | C-011, C-012, C-013 |
 | T-084 | FEAT-009 | frontend-engineer | Done | — |
-| T-085 | FEAT-008, FEAT-009 | frontend-engineer | In Progress | C-002 |
-| T-086 | FEAT-010 | frontend-engineer | Backlog | C-012 |
+| T-085 | FEAT-008, FEAT-009 | frontend-engineer | Done | C-002 |
+| T-086 | FEAT-010 | frontend-engineer | In Progress | C-012 |
 | T-087 | FEAT-011 | frontend-engineer | Backlog | C-013 |
-| T-088 | FEAT-015 | backend-engineer | In Progress | C-011, C-014, C-015, C-016 |
+| T-088 | FEAT-015 | backend-engineer | Done | C-011, C-014, C-015, C-016 |
 | T-089 | FEAT-015 | infra-engineer | Done | — |
 | T-090 | FEAT-015 | frontend-engineer | Backlog | C-014 |
 | T-091 | FEAT-015 | frontend-engineer | Backlog | C-015, C-016 |
+| T-092 | FEAT-009 | frontend-engineer | Backlog | — |
 
 ## Decisions Log
 | # | Decision | Rationale | By |
@@ -128,6 +129,8 @@ docs/           BPRD (product-shaper)
 | D-023 | Phase 2 closes conditionally: its integration, acceptance, and regression pass is gated, but the judged model bars are held | The phase's phrase-clip bar (NFR-053) and the carried-over word-clip bar (NFR-051) are judged generation runs; the spend is held rather than committed. The generation path's release stays flagged | user |
 | D-024 | Store release signing is deferred to the release workstream; no feature phase cuts a store-signed build | The feature phases build and test the app, and nothing they deliver is submitted to a store; the signing material and its handling belong with release, which the specification does not yet cover | user |
 | D-025 | The curator review console is a second Flutter app in the monorepo (`apps/console`), built with Flutter Web and owned by `frontend-engineer` | It reuses the design system's tokens and shared states and the toolchain the repo already pins; the console is operator-only, so its bundle weight matters less than a second stack would cost | user |
+| D-026 | The Free tier's 50-entry history limit applies to every reader until the paid tier ships | Matches the Free row in `monetization.md` and the History screen's edge case; the tiers are introduced with the account feature | user |
+| D-027 | The review component is carried by the feedback service, with the gateway exposing the console's routes | No standalone review service exists in the stack, and the feedback store already holds the queue, the reports, and the negative feedback; the console's hosting rewrites `/internal/review/**` to the gateway | lead |
 
 ## Definition of Done
 - **Task:** the acceptance criteria in the cited feature doc are met; the frozen contract is conformed; unit tests pass; format, lint, analyze, and build are clean; work is committed to the dev branch and confined to `Own`.
