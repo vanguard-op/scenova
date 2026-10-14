@@ -16,6 +16,8 @@ from typing import Any, Protocol
 
 import httpx2
 import jwt
+from cryptography import x509
+from cryptography.hazmat.primitives import serialization
 
 from .config import Settings
 from .errors import UnauthorizedError
@@ -117,10 +119,10 @@ async def _decode_firebase_token(project_id: str, token: str) -> Mapping[str, An
     key_id = header.get("kid")
     if not isinstance(key_id, str) or not key_id:
         raise jwt.InvalidTokenError("The token header has no key id.")
-    certificate = await _certificate_for(key_id)
+    signing_key = await _signing_key_for(key_id)
     claims: dict[str, Any] = jwt.decode(
         token,
-        key=certificate,
+        key=signing_key,
         algorithms=["RS256"],
         audience=project_id,
         issuer=f"https://securetoken.google.com/{project_id}",
@@ -128,27 +130,58 @@ async def _decode_firebase_token(project_id: str, token: str) -> Mapping[str, An
     return claims
 
 
-_certificates: dict[str, str] = {}
-_certificates_expire_at = 0.0
+def _public_key_pem(certificate_pem: str) -> str:
+    """Extract the public key from a Firebase signing certificate.
+
+    The provider publishes X.509 certificates, but PyJWT's RSA algorithm expects
+    a bare public key, so the certificate is parsed and its key re-encoded.
+    """
+
+    certificate = x509.load_pem_x509_certificate(certificate_pem.encode("utf-8"))
+    return (
+        certificate.public_key()
+        .public_bytes(
+            serialization.Encoding.PEM,
+            serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        .decode("utf-8")
+    )
 
 
-async def _certificate_for(key_id: str) -> str:
-    global _certificates_expire_at
+_signing_keys: dict[str, str] = {}
+_signing_keys_expire_at = 0.0
+
+
+async def _signing_key_for(key_id: str) -> str:
+    global _signing_keys_expire_at
 
     now = time.monotonic()
-    if key_id in _certificates and now < _certificates_expire_at:
-        return _certificates[key_id]
+    if key_id in _signing_keys and now < _signing_keys_expire_at:
+        return _signing_keys[key_id]
+    certificates = await _fetch_certificates()
+    _signing_keys.clear()
+    for kid, certificate in certificates.items():
+        try:
+            _signing_keys[kid] = _public_key_pem(certificate)
+        except ValueError:
+            # A certificate that cannot be parsed contributes no key; the
+            # remaining certificates are still cached.
+            continue
+    _signing_keys_expire_at = now + _CERT_CACHE_TTL_SECONDS
+    if key_id not in _signing_keys:
+        raise jwt.InvalidTokenError("The token was signed with an unknown key.")
+    return _signing_keys[key_id]
+
+
+async def _fetch_certificates() -> Mapping[str, str]:
     async with httpx2.AsyncClient(timeout=10.0) as client:
         response = await client.get(_FIREBASE_CERTS_URL)
         response.raise_for_status()
         payload = response.json()
     if not isinstance(payload, dict):
         raise jwt.InvalidTokenError("The provider returned no certificates.")
-    _certificates.clear()
-    for key, value in payload.items():
-        if isinstance(key, str) and isinstance(value, str):
-            _certificates[key] = value
-    _certificates_expire_at = now + _CERT_CACHE_TTL_SECONDS
-    if key_id not in _certificates:
-        raise jwt.InvalidTokenError("The token was signed with an unknown key.")
-    return _certificates[key_id]
+    return {
+        key: value
+        for key, value in payload.items()
+        if isinstance(key, str) and isinstance(value, str)
+    }

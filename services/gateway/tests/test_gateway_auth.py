@@ -2,15 +2,24 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+import time
+from collections.abc import Iterator, Mapping
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import jwt
 import pytest
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.x509.oid import NameOID
 
+from gateway.app import auth
 from gateway.app.auth import (
     DevTokenVerifier,
     FirebaseTokenVerifier,
     Subject,
+    _public_key_pem,
     build_token_verifier,
 )
 from gateway.app.config import Settings
@@ -73,3 +82,81 @@ def test_build_token_verifier_defaults_to_dev() -> None:
 def test_build_token_verifier_requires_a_project_for_firebase() -> None:
     with pytest.raises(ValueError):
         build_token_verifier(Settings(auth_mode="firebase", firebase_project_id=None))
+
+
+def _signing_certificate() -> tuple[str, rsa.RSAPrivateKey]:
+    """A self-signed RSA certificate, shaped like a Firebase signing certificate."""
+
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "securetoken.test")])
+    now = datetime.now(UTC)
+    certificate = (
+        x509.CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(name)
+        .public_key(private_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - timedelta(days=1))
+        .not_valid_after(now + timedelta(days=30))
+        .sign(private_key, hashes.SHA256())
+    )
+    return certificate.public_bytes(serialization.Encoding.PEM).decode("utf-8"), private_key
+
+
+def _private_key_pem(private_key: rsa.RSAPrivateKey) -> str:
+    return private_key.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption(),
+    ).decode("utf-8")
+
+
+@pytest.fixture(autouse=True)
+def _reset_signing_key_cache() -> Iterator[None]:
+    auth._signing_keys.clear()
+    auth._signing_keys_expire_at = 0.0
+    yield
+    auth._signing_keys.clear()
+    auth._signing_keys_expire_at = 0.0
+
+
+def test_public_key_pem_extracts_the_key_from_a_certificate() -> None:
+    certificate_pem, private_key = _signing_certificate()
+
+    extracted = _public_key_pem(certificate_pem)
+
+    assert extracted.encode("utf-8") == private_key.public_key().public_bytes(
+        serialization.Encoding.PEM,
+        serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+
+
+@pytest.mark.asyncio
+async def test_firebase_verifier_verifies_a_token_signed_by_a_certificate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    certificate_pem, private_key = _signing_certificate()
+    key_id = "test-kid"
+
+    async def fetch_certificates() -> Mapping[str, str]:
+        return {key_id: certificate_pem}
+
+    monkeypatch.setattr(auth, "_fetch_certificates", fetch_certificates)
+
+    issued_at = int(time.time())
+    token = jwt.encode(
+        {
+            "sub": "anonymous-uid",
+            "aud": "scenova-hq",
+            "iss": "https://securetoken.google.com/scenova-hq",
+            "iat": issued_at,
+            "exp": issued_at + 3600,
+        },
+        _private_key_pem(private_key),
+        algorithm="RS256",
+        headers={"kid": key_id},
+    )
+
+    subject = await FirebaseTokenVerifier("scenova-hq").verify(f"Bearer {token}")
+
+    assert subject.id == "anonymous-uid"
