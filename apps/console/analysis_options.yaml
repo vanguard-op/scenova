@@ -1,0 +1,13 @@
+# Static analysis for the review console.
+#
+# The same lint set the reader app uses, so the two Flutter workspaces read the
+# same way.
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - build/**
+    - web/**
+
+linter:
+  rules:

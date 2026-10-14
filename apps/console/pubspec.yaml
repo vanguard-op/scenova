@@ -1,0 +1,71 @@
+name: scenova_console
+description: "Scenova — the operator-only review console for the shared word-clip library."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # The console is a web app; the path URL strategy keeps its screens on the
+  # routes the docs declare (`/review`, `/review/entry/:entryId`).
+  flutter_web_plugins:
+    sdk: flutter
+
+  # The platform's own icon font, so the Material icons the console's chrome
+  # uses resolve at build time.
+  cupertino_icons: ^1.0.8
+
+  # Talks to the gateway's review endpoints (C-014), which carry the queue.
+  http: ^1.2.0
+
+  # Renders the brand mark and the custom icon set from the delivered assets.
+  flutter_svg: ^2.3.0
+
+  # Authenticates the operator session (C-014 auth): an operator's Firebase ID
+  # token carrying the `curator` claim and a multi-factor session.
+  firebase_core: ^4.15.0
+  firebase_auth: ^6.7.0
+
+  # Formats the queue's relative ages through the locale's own plural rules
+  # rather than a hardcoded English string (`branding.md` → "Formats").
+  intl: ^0.20.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  # The brand mark (A-001) and the icon set (A-008) are shared with the reader
+  # app through the repository's `assets/` directory, which this workspace links
+  # the same way the reader app does. The mark ships as the master it was
+  # delivered as; the icon set's active state uses the filled form and the
+  # default and disabled states share the outlined form, since the disabled
+  # treatment is a tone change, not a different shape.
+  assets:
+    - assets/icons/outlined/
+    - assets/icons/filled/
+    - assets/brand/scenova-mark.svg
+    - assets/brand/scenova-app-icon.png
+
+  # The brand's type (A-011): Lora for display and headings, Inter for body.
+  # Both ship as variable fonts, so one file carries the whole weight axis and a
+  # `fontWeight` on a text style selects the instance.
+  fonts:
+    - family: Lora
+      fonts:
+        - asset: assets/fonts/Lora[wght].ttf
+        - asset: assets/fonts/Lora-Italic[wght].ttf
+          style: italic
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter[opsz,wght].ttf
+        - asset: assets/fonts/Inter-Italic[opsz,wght].ttf
+          style: italic

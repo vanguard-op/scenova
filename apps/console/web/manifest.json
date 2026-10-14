@@ -1,0 +1,11 @@
+{
+    "name": "Scenova review console",
+    "short_name": "Scenova review",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#F7F6F9",
+    "theme_color": "#5C4BC4",
+    "description": "Work the queue of reported and flagged clips.",
+    "orientation": "landscape-primary",
+    "prefer_related_applications": false
+}

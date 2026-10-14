@@ -1,0 +1,122 @@
+import 'package:flutter/material.dart';
+
+import 'colors.dart';
+import 'tokens.dart';
+import 'typography.dart';
+
+/// Builds the console's [ThemeData] from the token files.
+///
+/// Every screen consumes the theme and the token extensions; nothing in the
+/// presentation layer names a colour, size, radius, or duration directly.
+abstract final class AppTheme {
+  static ThemeData build({required Brightness brightness}) {
+    final colors = ScenovaColors.resolve(brightness);
+    final textStyles = ScenovaTextStyles.resolve();
+    final tokens = ScenovaTokens.resolve(brightness: brightness);
+    final scheme = colors.toColorScheme(brightness);
+
+    return ThemeData(
+      useMaterial3: true,
+      brightness: brightness,
+      colorScheme: scheme,
+      scaffoldBackgroundColor: colors.surface,
+      canvasColor: colors.surface,
+      splashFactory: InkSparkle.splashFactory,
+      extensions: <ThemeExtension<dynamic>>[colors, textStyles, tokens],
+      textTheme: textStyles.toTextTheme(),
+      iconTheme: IconThemeData(color: colors.iconDefault),
+      dividerTheme: DividerThemeData(
+        color: colors.border,
+        thickness: 1,
+        space: tokens.spacing.lg,
+      ),
+      // Focus is carried by the brand's own ring (a 2px `primary-500` outline
+      // with a 2px offset), drawn by the console's controls. The theme's own
+      // focus fill stays at its default subtle tint for stock widgets — a
+      // dropdown menu's rows, say — rather than the full element colour, which
+      // would wash out the text it lands on.
+      appBarTheme: AppBarTheme(
+        backgroundColor: colors.surface,
+        foregroundColor: colors.textPrimary,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        centerTitle: false,
+        titleTextStyle: textStyles.h2.copyWith(color: colors.textPrimary),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: colors.surfaceSecondary,
+        isDense: true,
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: tokens.spacing.md,
+          vertical: tokens.spacing.sm,
+        ),
+        hintStyle: textStyles.body.copyWith(color: colors.placeholder),
+        errorStyle: textStyles.caption.copyWith(color: colors.error.element),
+        helperStyle: textStyles.caption.copyWith(color: colors.textSecondary),
+        border: _inputBorder(colors.border, 1),
+        enabledBorder: _inputBorder(colors.border, 1),
+        focusedBorder: _inputBorder(colors.focusRing, 2),
+        errorBorder: _inputBorder(colors.error.element, 1),
+        focusedErrorBorder: _inputBorder(colors.error.element, 2),
+        disabledBorder: _inputBorder(colors.border, 1),
+      ),
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: colors.primary,
+        linearTrackColor: colors.primaryTint,
+        circularTrackColor: colors.primaryTint,
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: colors.textPrimary,
+        contentTextStyle: textStyles.bodySmall.copyWith(color: colors.surface),
+        actionTextColor: colors.primaryTint,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(ScenovaRadius.md),
+        ),
+        elevation: 0,
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: colors.surface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(ScenovaRadius.lg),
+        ),
+        titleTextStyle: textStyles.h3.copyWith(color: colors.textPrimary),
+        contentTextStyle: textStyles.body.copyWith(color: colors.textSecondary),
+      ),
+      tooltipTheme: TooltipThemeData(
+        decoration: BoxDecoration(
+          color: colors.textPrimary,
+          borderRadius: BorderRadius.circular(ScenovaRadius.sm),
+        ),
+        textStyle: textStyles.caption.copyWith(color: colors.surface),
+        padding: EdgeInsets.symmetric(
+          horizontal: tokens.spacing.sm,
+          vertical: tokens.spacing.xs,
+        ),
+      ),
+      dropdownMenuTheme: DropdownMenuThemeData(
+        menuStyle: MenuStyle(
+          backgroundColor: WidgetStatePropertyAll<Color>(colors.surface),
+          surfaceTintColor: const WidgetStatePropertyAll<Color>(
+            Colors.transparent,
+          ),
+          shape: WidgetStatePropertyAll<OutlinedBorder>(
+            RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(ScenovaRadius.md),
+              side: BorderSide(color: colors.border),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  static OutlineInputBorder _inputBorder(Color color, double width) {
+    return OutlineInputBorder(
+      borderRadius: BorderRadius.circular(ScenovaRadius.md),
+      borderSide: BorderSide(color: color, width: width),
+    );
+  }
+}
