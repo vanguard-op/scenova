@@ -96,7 +96,7 @@ docs/           BPRD (product-shaper)
 | T-086 | FEAT-010 | frontend-engineer | Backlog | C-012 |
 | T-087 | FEAT-011 | frontend-engineer | Backlog | C-013 |
 | T-088 | FEAT-015 | backend-engineer | Backlog | C-011, C-014, C-015, C-016 |
-| T-089 | FEAT-015 | infra-engineer | Backlog | — |
+| T-089 | FEAT-015 | infra-engineer | In Progress | — |
 | T-090 | FEAT-015 | frontend-engineer | Backlog | C-014 |
 | T-091 | FEAT-015 | frontend-engineer | Backlog | C-015, C-016 |
 
