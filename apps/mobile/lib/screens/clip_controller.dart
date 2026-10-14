@@ -9,6 +9,7 @@ import '../models/entitlement.dart';
 import '../models/feedback.dart';
 import '../models/history_entry.dart';
 import '../models/lookup.dart';
+import '../models/report.dart';
 import '../services/app_services.dart';
 import '../services/capture_intake.dart';
 import '../services/lookup_api.dart';
@@ -370,7 +371,7 @@ class ClipViewController extends ChangeNotifier {
   }
 
   Future<void> _sendFeedback(ClipRating rating) async {
-    final lookupId = _feedbackLookupId;
+    final lookupId = _serviceLookupId;
     if (lookupId == null) {
       // The clip was replayed from the device and no service lookup stands
       // behind it, so there is nothing to record the rating against (`C-012`
@@ -390,12 +391,40 @@ class ClipViewController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Reports the clip on screen for review (`FEAT-011`).
+  ///
+  /// The report is delivered by the outbox, which holds it on the device until
+  /// a connection returns (`FEAT-011`, Edge Cases). A phrase clip is kept only
+  /// on the device, so its report is recorded against the lookup and has no
+  /// shared effect (`C-013`).
+  Future<ReportDelivery> submitReport(
+    ReportReason reason, {
+    String? note,
+  }) async {
+    final lookupId = _serviceLookupId;
+    if (lookupId == null) {
+      // The clip was replayed from the device with no service lookup behind it,
+      // so there is nothing to report it against (`C-013` answers 404).
+      return ReportDelivery.failed;
+    }
+    services.analytics.clipReported(
+      reason: reason.wire,
+      clipSource: _clipSource,
+    );
+    return services.reportOutbox.submit(
+      lookupId: lookupId,
+      reason: reason,
+      note: note,
+    );
+  }
+
   /// The service's lookup for the clip on screen, when there is one.
   ///
   /// A lookup this view started carries its own id; a lookup replayed from the
   /// device carries the one its saved entry was kept with, so a clip seen
-  /// earlier can still be rated — offline included (`FEAT-010`, Edge Cases).
-  String? get _feedbackLookupId =>
+  /// earlier can still be rated or reported — offline included (`FEAT-010`,
+  /// `FEAT-011`, Edge Cases).
+  String? get _serviceLookupId =>
       _fromHistory ? _savedEntry?.lookupId : _result?.lookupId;
 
   /// Records that the generating notice has been raised, so it is shown once.

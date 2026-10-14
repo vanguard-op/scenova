@@ -21,6 +21,9 @@ import 'lookup_api.dart';
 import 'push_registration_api.dart';
 import 'push_registrar.dart';
 import 'push_tokens.dart';
+import 'report_api.dart';
+import 'report_outbox.dart';
+import 'report_store.dart';
 import 'settings_controller.dart';
 import 'settings_store.dart';
 
@@ -43,6 +46,7 @@ class ScenovaServices {
     required this.notificationPermission,
     required this.featureFlags,
     required this.feedbackOutbox,
+    required this.reportOutbox,
     this.locale = 'en',
   });
 
@@ -79,6 +83,10 @@ class ScenovaServices {
   /// connection returns (`C-012`, `FEAT-010`).
   final FeedbackOutbox feedbackOutbox;
 
+  /// Delivers the reader's clip reports, holding them on the device until a
+  /// connection returns (`C-013`, `FEAT-011`).
+  final ReportOutbox reportOutbox;
+
   /// The reader's locale, sent with a lookup.
   final String locale;
 
@@ -92,6 +100,7 @@ class ScenovaServices {
     SettingsStore? settingsStore,
     FeatureFlags? featureFlags,
     PendingFeedbackStore? feedbackStore,
+    PendingReportStore? reportStore,
   }) {
     // The live intakes carry reader input over the network, so the gateway must
     // be reached over TLS (`NFR-022`). A build that points at a plaintext remote
@@ -100,7 +109,8 @@ class ScenovaServices {
         !AppConfig.useMockLookupApi ||
         !AppConfig.useMockAnalyticsApi ||
         !AppConfig.useMockPushApi ||
-        !AppConfig.useMockFeedbackApi;
+        !AppConfig.useMockFeedbackApi ||
+        !AppConfig.useMockReportApi;
     if (useLiveGateway) AppConfig.ensureSecureGateway(AppConfig.apiBaseUrl);
 
     // The identity the lookup path presents: an anonymous Firebase ID token in
@@ -188,6 +198,16 @@ class ScenovaServices {
         store: feedbackStore ?? SharedPreferencesPendingFeedbackStore(),
         connectivity: connectivity,
       ),
+      reportOutbox: ReportOutbox(
+        api: AppConfig.useMockReportApi
+            ? MockReportApi(latency: AppConfig.mockLatency)
+            : HttpReportApi(
+                baseUrl: AppConfig.apiBaseUrl,
+                idTokenProvider: identity.idToken,
+              ),
+        store: reportStore ?? SharedPreferencesPendingReportStore(),
+        connectivity: connectivity,
+      ),
       locale: locale,
     );
   }
@@ -200,6 +220,7 @@ class ScenovaServices {
     pushRegistrar.dispose();
     clipNotices.dispose();
     feedbackOutbox.dispose();
+    reportOutbox.dispose();
   }
 }
 

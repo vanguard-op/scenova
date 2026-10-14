@@ -30,6 +30,9 @@ import 'package:scenova/services/lookup_api.dart';
 import 'package:scenova/services/push_registration_api.dart';
 import 'package:scenova/services/push_registrar.dart';
 import 'package:scenova/services/push_tokens.dart';
+import 'package:scenova/services/report_api.dart';
+import 'package:scenova/services/report_outbox.dart';
+import 'package:scenova/services/report_store.dart';
 import 'package:scenova/services/settings_controller.dart';
 import 'package:scenova/theme/app_theme.dart';
 import 'package:scenova/theme/tokens.dart';
@@ -51,6 +54,8 @@ ScenovaServices buildServices({
   FeatureFlags? featureFlags,
   FeedbackApi? feedbackApi,
   PendingFeedbackStore? feedbackStore,
+  ReportApi? reportApi,
+  PendingReportStore? reportStore,
   String locale = 'en',
 }) {
   final connectivity = ManualConnectivity(online: online);
@@ -88,6 +93,11 @@ ScenovaServices buildServices({
       store: feedbackStore ?? InMemoryPendingFeedbackStore(),
       connectivity: connectivity,
     ),
+    reportOutbox: ReportOutbox(
+      api: reportApi ?? MockReportApi(),
+      store: reportStore ?? InMemoryPendingReportStore(),
+      connectivity: connectivity,
+    ),
     locale: locale,
   );
 }
@@ -112,6 +122,8 @@ Future<Harness> pumpHarness(
   ClipNoticeSource? clipNoticeSource,
   FeedbackApi? feedbackApi,
   PendingFeedbackStore? feedbackStore,
+  ReportApi? reportApi,
+  PendingReportStore? reportStore,
 }) async {
   final services = buildServices(
     api: api,
@@ -123,6 +135,8 @@ Future<Harness> pumpHarness(
     clipNoticeSource: clipNoticeSource,
     feedbackApi: feedbackApi,
     feedbackStore: feedbackStore,
+    reportApi: reportApi,
+    reportStore: reportStore,
   );
   final router = AppRouter(services: services);
   await tester.pumpWidget(

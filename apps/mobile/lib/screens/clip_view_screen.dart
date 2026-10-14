@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../models/analytics_event.dart';
 import '../models/feedback.dart';
 import '../models/lookup.dart';
+import '../models/report.dart';
 import '../services/app_services.dart';
 import '../services/push_registrar.dart';
 import '../services/settings_controller.dart';
@@ -15,6 +16,7 @@ import '../widgets/app_icons.dart';
 import '../widgets/clip_player.dart';
 import '../widgets/coming_later_sheet.dart';
 import '../widgets/offline_banner.dart';
+import '../widgets/report_sheet.dart';
 import '../widgets/scenova_button.dart';
 import '../widgets/skeleton.dart';
 import '../widgets/states.dart';
@@ -594,17 +596,15 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
           runSpacing: tokens.spacing.sm,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: <Widget>[
-            ScenovaButton(
-              label: 'Report',
-              variant: ScenovaButtonVariant.ghost,
-              onPressed: () => showComingLaterSheet(
-                context,
-                title: 'Report this clip',
-                message:
-                    'Reporting arrives with the review phase. Until then, '
-                    'marking the clip not helpful still records your view.',
+            // Reporting names the clip the reader saw, so it is offered while
+            // one is playing (`FEAT-011`).
+            if (canPlay)
+              ScenovaButton(
+                label: 'Report',
+                variant: ScenovaButtonVariant.ghost,
+                icon: AppIcons.report,
+                onPressed: () => unawaited(_openReportSheet()),
               ),
-            ),
             // History is an app destination; an in-place view has nowhere to
             // open it, so the action is left out there.
             if (widget.presentation != ClipPresentation.inPlace)
@@ -617,6 +617,40 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
         ),
       ],
     );
+  }
+
+  /// Opens the Report sheet over the clip and tells the reader what came of it
+  /// (`docs/Scenova/screens/05-report-sheet.md`; `FEAT-011`).
+  Future<void> _openReportSheet() async {
+    final services = ScenovaScope.of(context);
+    final isPhrase = _controller.isPhrase;
+    final outcome = await showReportSheet(
+      context,
+      word: _controller.word,
+      // A phrase clip is kept only on the device, so its report has no shared
+      // effect and the reader is told so (`FEAT-011`).
+      privateToDevice: isPhrase,
+      offline: !services.connectivity.isOnline,
+      onSubmit: (reason, note) => _controller.submitReport(reason, note: note),
+    );
+    if (!mounted || outcome == null) return;
+    _showMessage(_reportConfirmation(outcome, isPhrase: isPhrase));
+  }
+
+  /// What the reader is told once their report has been taken.
+  String _reportConfirmation(ReportDelivery outcome, {required bool isPhrase}) {
+    return switch (outcome) {
+      ReportDelivery.sent =>
+        isPhrase
+            ? 'Thanks. This clip lives only on your device, so nothing else '
+                  'changes.'
+            : "Thanks — we'll check this clip before it's shown again.",
+      ReportDelivery.queued =>
+        "Saved. Your report will go out when you're back online.",
+      ReportDelivery.duplicate => "You've already reported this clip. Thanks.",
+      ReportDelivery.sending ||
+      ReportDelivery.failed => "We couldn't send that just now.",
+    };
   }
 
   /// What came of the reader's rating: the wait while it is sent, the

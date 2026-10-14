@@ -36,11 +36,15 @@ import 'package:scenova/services/lookup_api.dart';
 import 'package:scenova/services/push_registration_api.dart';
 import 'package:scenova/services/push_registrar.dart';
 import 'package:scenova/services/push_tokens.dart';
+import 'package:scenova/services/report_api.dart';
+import 'package:scenova/services/report_outbox.dart';
+import 'package:scenova/services/report_store.dart';
 import 'package:scenova/services/settings_controller.dart';
 import 'package:scenova/theme/app_theme.dart';
 import 'package:scenova/theme/colors.dart';
 import 'package:scenova/theme/tokens.dart';
 import 'package:scenova/theme/typography.dart';
+import 'package:scenova/widgets/report_sheet.dart';
 
 void main() => runApp(const PreviewApp());
 
@@ -274,6 +278,36 @@ List<(String, Widget)> _frames() {
       'Clip — over-limit selection',
       _clip('the quick brown fox jumps over the lazy dog'),
     ),
+    ('Report — default', _clip('come', openReport: true)),
+    (
+      'Report — phrase (private to the device)',
+      _clip('once in a while', noticeClip: _phraseClipNotice, openReport: true),
+    ),
+    (
+      'Report — offline (held for the connection)',
+      _clip(
+        'come',
+        online: false,
+        history: <HistoryEntry>[_savedLibraryHit()],
+        openReport: true,
+      ),
+    ),
+    (
+      'Report — submitting',
+      _clip(
+        'come',
+        openReport: true,
+        reportApi: MockReportApi(latency: const Duration(seconds: 30)),
+      ),
+    ),
+    (
+      'Report — could not be sent',
+      _clip(
+        'come',
+        openReport: true,
+        reportApi: MockReportApi()..failStatus = 404,
+      ),
+    ),
     (
       'In place — serving from library (card over the page)',
       _inPlaceClip('come'),
@@ -281,6 +315,9 @@ List<(String, Widget)> _frames() {
     ('In place — generating', _inPlaceClip('xylograph')),
     ('In place — empty selection', _inPlaceClip('   ')),
     ('In place — offline', _inPlaceClip('quixotic', online: false)),
+    // No auto-open: the reader's own path is driven here so the confirmation
+    // that follows a submitted report can be looked at. Tooling only.
+    ('Report — submitted (confirmation)', _clip('come')),
   ];
 }
 
@@ -322,6 +359,8 @@ Widget _clip(
   Clip? noticeClip,
   FeedbackApi? feedbackApi,
   ClipRating? rating,
+  ReportApi? reportApi,
+  bool openReport = false,
 }) {
   final noticeSource = ScriptedClipNoticeSource();
   final services = _services(
@@ -333,6 +372,7 @@ Widget _clip(
     featureFlags: featureFlags,
     clipNoticeSource: noticeSource,
     feedbackApi: feedbackApi,
+    reportApi: reportApi,
   );
   return ScenovaScope(
     services: services,
@@ -345,6 +385,7 @@ Widget _clip(
       noticeSource: noticeSource,
       noticeClip: noticeClip,
       rating: rating,
+      openReport: openReport,
     ),
   );
 }
@@ -432,6 +473,8 @@ ScenovaServices _services({
       const PlatformNotificationPermission(),
   FeedbackApi? feedbackApi,
   PendingFeedbackStore? feedbackStore,
+  ReportApi? reportApi,
+  PendingReportStore? reportStore,
 }) {
   final connectivity = ManualConnectivity(online: online);
   final settingsController = settings ?? SettingsController();
@@ -464,6 +507,11 @@ ScenovaServices _services({
     feedbackOutbox: FeedbackOutbox(
       api: feedbackApi ?? MockFeedbackApi(),
       store: feedbackStore ?? InMemoryPendingFeedbackStore(),
+      connectivity: connectivity,
+    ),
+    reportOutbox: ReportOutbox(
+      api: reportApi ?? MockReportApi(),
+      store: reportStore ?? InMemoryPendingReportStore(),
       connectivity: connectivity,
     ),
     locale: 'en-GB',
@@ -502,6 +550,7 @@ class _PreviewClip extends StatefulWidget {
     this.noticeSource,
     this.noticeClip,
     this.rating,
+    this.openReport = false,
   });
 
   final ScenovaServices services;
@@ -521,6 +570,10 @@ class _PreviewClip extends StatefulWidget {
   /// is visible without a tap. Tooling only.
   final ClipRating? rating;
 
+  /// Whether this frame opens the Report sheet over the clip once it plays, so
+  /// the sheet's states can be looked at. Tooling only.
+  final bool openReport;
+
   @override
   State<_PreviewClip> createState() => _PreviewClipState();
 }
@@ -535,6 +588,7 @@ class _PreviewClipState extends State<_PreviewClip> {
 
   bool _noticeDelivered = false;
   bool _rated = false;
+  bool _reportOpened = false;
 
   @override
   void initState() {
@@ -552,6 +606,7 @@ class _PreviewClipState extends State<_PreviewClip> {
   void _onControllerChanged() {
     _deliverNoticeOnce();
     _rateOnce();
+    _openReportOnce();
   }
 
   /// Delivers the clip-ready notice for the lookup once the view is waiting on
@@ -585,6 +640,27 @@ class _PreviewClipState extends State<_PreviewClip> {
     if (_controller.phase != ClipPhase.playing) return;
     _rated = true;
     unawaited(_controller.markFeedback(rating));
+  }
+
+  /// Opens the Report sheet once the clip plays, so its states can be looked at
+  /// without a tap. Tooling only.
+  void _openReportOnce() {
+    if (_reportOpened || !widget.openReport) return;
+    if (_controller.phase != ClipPhase.playing) return;
+    _reportOpened = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(
+        showReportSheet(
+          context,
+          word: _controller.word,
+          privateToDevice: _controller.isPhrase,
+          offline: !widget.services.connectivity.isOnline,
+          onSubmit: (reason, note) =>
+              _controller.submitReport(reason, note: note),
+        ),
+      );
+    });
   }
 
   @override

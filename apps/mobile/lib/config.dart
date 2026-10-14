@@ -60,6 +60,13 @@ abstract final class AppConfig {
     defaultValue: false,
   );
 
+  /// The report intake (`C-013`). Live by default; opt into the recording intake
+  /// with `--dart-define=SCENOVA_USE_MOCK_REPORT=true`.
+  static const bool useMockReportApi = bool.fromEnvironment(
+    'SCENOVA_USE_MOCK_REPORT',
+    defaultValue: false,
+  );
+
   /// The hosts that resolve to the developer's own machine, where the local
   /// stack runs over plaintext. `10.0.2.2` is the Android emulator's alias for
   /// the host's loopback interface, so it reaches the same machine as
@@ -125,6 +132,15 @@ abstract final class AppConfig {
   /// rating of a clip is the one that counts, so the bound costs nothing the
   /// reader would miss (`C-012`).
   static const int feedbackQueueLimit = 100;
+
+  /// A bound on the reports the device holds for the report intake, so a long
+  /// offline stretch cannot grow the queue without limit. One reader reports a
+  /// given clip once, so the bound costs nothing the reader would miss
+  /// (`C-013`).
+  static const int reportQueueLimit = 100;
+
+  /// The contract's cap on a report's note (`C-013`, at most 300 characters).
+  static const int reportNoteMaxLength = 300;
 
   /// How the lookup path authenticates (`C-001`/`C-002` auth).
   ///
