@@ -37,6 +37,12 @@ class _FakePermission implements NotificationPermissionGate {
   }
 
   @override
+  Future<NotificationPermission> current() async {
+    calls.add('current');
+    return answer;
+  }
+
+  @override
   Future<bool> openSettings() async => true;
 }
 
@@ -142,6 +148,41 @@ void main() {
       // The failure reads as no token rather than reaching the registrar.
       expect(await provider.request(), isA<PushTokenUnavailable>());
     });
+
+    test('takes the token for a phrase without raising the prompt', () async {
+      // A phrase clip has no delivery path but the notice, so the device is
+      // registered as soon as the phrase generates; the reader is not asked
+      // again when they have already allowed notifications.
+      final permission = _FakePermission(NotificationPermission.granted);
+      final messaging = _FakeMessaging(value: 'fcm-token');
+      final provider = FirebaseMessagingPushTokenProvider(
+        permission: permission,
+        messagingOverride: messaging,
+      );
+
+      final outcome = await provider.current();
+
+      expect((outcome as PushTokenIssued).token, 'fcm-token');
+      expect(permission.calls, <String>['current']);
+      expect(messaging.calls, <String>['token']);
+    });
+
+    test(
+      'reports an unanswered permission as a refusal, not a token',
+      () async {
+        final messaging = _FakeMessaging(value: 'fcm-token');
+        final provider = FirebaseMessagingPushTokenProvider(
+          permission: _FakePermission(NotificationPermission.denied),
+          messagingOverride: messaging,
+        );
+
+        final outcome = await provider.current();
+
+        expect(outcome, isA<PushTokenRefused>());
+        // The offer is where the prompt is raised, so nothing is taken here.
+        expect(messaging.calls, isEmpty);
+      },
+    );
   });
 
   group('PlatformNotificationPermission', () {
@@ -202,6 +243,27 @@ void main() {
         isTrue,
       );
       expect(platform.settingsOpened, isTrue);
+    });
+
+    test('reads the standing answer without raising the prompt', () async {
+      // The phrase path asks what the reader has already answered, so the
+      // prompt is never raised behind their back.
+      PermissionHandlerPlatform.instance = _FakePermissionPlatform(
+        PermissionStatus.granted,
+      );
+
+      expect(
+        await const PlatformNotificationPermission().current(),
+        NotificationPermission.granted,
+      );
+
+      PermissionHandlerPlatform.instance = _FakePermissionPlatform(
+        PermissionStatus.denied,
+      );
+      expect(
+        await const PlatformNotificationPermission().current(),
+        NotificationPermission.denied,
+      );
     });
   });
 

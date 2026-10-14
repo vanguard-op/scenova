@@ -210,6 +210,12 @@ class MockLookupApi implements LookupApi {
     }
     if (current.status != LookupStatus.generating) return current;
 
+    // A phrase lookup never resolves to served: its clip reaches the client by
+    // the clip-ready notice and is never served on the read path (`C-001`,
+    // `C-002`, `FEAT-007`). The mock keeps it generating, as the lookup service
+    // does, so the client's notice path is what is exercised.
+    if (current.kind == LookupKind.phrase) return current;
+
     final polls = (_polls[lookupId] ?? 0) + 1;
     _polls[lookupId] = polls;
     if (polls < pollsUntilReady) return current;
@@ -241,7 +247,9 @@ class MockLookupApi implements LookupApi {
   }
 
   /// A short phrase generates its clip on demand and keeps it only on the
-  /// device, so the phrase never carries a library entry (`FEAT-007`).
+  /// device, so the phrase never carries a library entry (`FEAT-007`). It stays
+  /// generating: its clip is delivered by the clip-ready notice, never on this
+  /// read path.
   LookupResult _phraseClip(String selection) {
     return LookupResult(
       lookupId: _nextId(),

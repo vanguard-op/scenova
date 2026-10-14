@@ -6,6 +6,7 @@
 // shipped.
 import 'package:flutter/material.dart';
 import 'package:scenova/app_router.dart';
+import 'package:scenova/models/clip_notice.dart';
 import 'package:scenova/models/entitlement.dart';
 import 'package:scenova/models/history_entry.dart';
 import 'package:scenova/models/lookup.dart';
@@ -18,6 +19,8 @@ import 'package:scenova/services/analytics_api.dart';
 import 'package:scenova/services/app_services.dart';
 import 'package:scenova/services/capture_channel.dart';
 import 'package:scenova/services/capture_intake.dart';
+import 'package:scenova/services/clip_notice_inbox.dart';
+import 'package:scenova/services/clip_notice_source.dart';
 import 'package:scenova/services/connectivity.dart';
 import 'package:scenova/services/entitlement_provider.dart';
 import 'package:scenova/services/feature_flags.dart';
@@ -189,8 +192,15 @@ List<(String, Widget)> _frames() {
     ),
     ('Clip — offline', _clip('quixotic', online: false)),
     (
-      'Clip — phrase clip (generated, kept on the device)',
-      _clip('once in a while'),
+      'Clip — phrase clip (arrives by the clip-ready notice)',
+      _clip('once in a while', noticeClip: _phraseClipNotice),
+    ),
+    (
+      'Clip — phrase with no clip (the notice could not come)',
+      _clip(
+        'tough it out',
+        api: MockLookupApi(script: <LookupResult>[_phraseFallback()]),
+      ),
     ),
     (
       'Clip — phrase replayed from the device',
@@ -285,7 +295,9 @@ Widget _clip(
   Duration? noticeThreshold,
   List<HistoryEntry> history = const <HistoryEntry>[],
   FeatureFlags featureFlags = const FixedFeatureFlags(),
+  Clip? noticeClip,
 }) {
+  final noticeSource = ScriptedClipNoticeSource();
   final services = _services(
     api: api,
     online: online,
@@ -293,6 +305,7 @@ Widget _clip(
     settings: settings,
     history: history,
     featureFlags: featureFlags,
+    clipNoticeSource: noticeSource,
   );
   return ScenovaScope(
     services: services,
@@ -302,9 +315,20 @@ Widget _clip(
       presentation: presentation,
       pollInterval: pollInterval,
       noticeThreshold: noticeThreshold,
+      noticeSource: noticeSource,
+      noticeClip: noticeClip,
     ),
   );
 }
+
+/// The clip a clip-ready notice carries in the preview. It is not a stream, so
+/// the player keeps its poster; the state is what the frame shows.
+const Clip _phraseClipNotice = Clip(
+  url: 'mock://clip/generated',
+  durationSeconds: 4,
+  resolution: '360p',
+  hasAudio: false,
+);
 
 /// The clip view as the in-place hosts present it — the iOS share extension's
 /// sheet and the Android selection action: the compact card over a reading page,
@@ -361,6 +385,7 @@ ScenovaServices _services({
   Entitlement entitlement = Entitlement.unmeteredGuest,
   SettingsController? settings,
   FeatureFlags featureFlags = const FixedFeatureFlags(),
+  ClipNoticeSource? clipNoticeSource,
   NotificationPermissionGate notificationPermission =
       const PlatformNotificationPermission(),
 }) {
@@ -386,6 +411,9 @@ ScenovaServices _services({
       api: MockPushRegistrationApi(),
       tokens: DevelopmentPushTokenProvider(token: 'preview-push'),
       connectivity: connectivity,
+    ),
+    clipNotices: ClipNoticeInbox(
+      source: clipNoticeSource ?? ScriptedClipNoticeSource(),
     ),
     notificationPermission: notificationPermission,
     featureFlags: featureFlags,
@@ -422,6 +450,8 @@ class _PreviewClip extends StatefulWidget {
     this.presentation = ClipPresentation.page,
     this.pollInterval,
     this.noticeThreshold,
+    this.noticeSource,
+    this.noticeClip,
   });
 
   final ScenovaServices services;
@@ -429,6 +459,13 @@ class _PreviewClip extends StatefulWidget {
   final ClipPresentation presentation;
   final Duration? pollInterval;
   final Duration? noticeThreshold;
+
+  /// The scripted notice intake, when this frame shows a clip that arrives by
+  /// the clip-ready notice.
+  final ScriptedClipNoticeSource? noticeSource;
+
+  /// The clip the notice carries, when the frame shows that path.
+  final Clip? noticeClip;
 
   @override
   State<_PreviewClip> createState() => _PreviewClipState();
@@ -443,9 +480,35 @@ class _PreviewClipState extends State<_PreviewClip> {
   );
 
   @override
+  void initState() {
+    super.initState();
+    _controller.addListener(_deliverNoticeOnce);
+  }
+
+  @override
   void dispose() {
+    _controller.removeListener(_deliverNoticeOnce);
     _controller.dispose();
     super.dispose();
+  }
+
+  /// Delivers the clip-ready notice for the lookup once the view is waiting on
+  /// it, as the notification service would. Tooling only.
+  void _deliverNoticeOnce() {
+    final clip = widget.noticeClip;
+    final source = widget.noticeSource;
+    final lookupId = _controller.result?.lookupId;
+    if (clip == null || source == null || lookupId == null) return;
+    _controller.removeListener(_deliverNoticeOnce);
+    source.deliver(
+      ClipNotice(
+        lookupId: lookupId,
+        clipUrl: clip.url,
+        durationSeconds: clip.durationSeconds,
+        resolution: clip.resolution,
+        hasAudio: clip.hasAudio,
+      ),
+    );
   }
 
   @override
@@ -481,6 +544,21 @@ LookupResult _denied() => const LookupResult(
   normalisedLemma: 'come',
   status: LookupStatus.denied,
   senses: <Sense>[],
+  notice: null,
+  correlationId: 'preview',
+);
+
+/// A phrase the provider declined: the phrase shows with the clip unavailable
+/// and a retry, and nothing is stored (`FEAT-007`).
+LookupResult _phraseFallback() => const LookupResult(
+  lookupId: 'phrase-fallback',
+  kind: LookupKind.phrase,
+  rawSelection: 'tough it out',
+  normalisedLemma: null,
+  status: LookupStatus.fallback,
+  senses: <Sense>[
+    Sense(senseLabel: '1', partOfSpeech: '', glossPhrase: 'tough it out'),
+  ],
   notice: null,
   correlationId: 'preview',
 );

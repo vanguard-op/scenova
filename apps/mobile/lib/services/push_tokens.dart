@@ -33,6 +33,13 @@ abstract interface class NotificationPermissionGate {
   /// so the prompt arrives with the reader's own intent behind it.
   Future<NotificationPermission> request();
 
+  /// The reader's answer as it stands, read without raising the prompt.
+  ///
+  /// A phrase clip has no delivery path but the notice, so the device is
+  /// registered for it as soon as the phrase starts generating; this is how the
+  /// client knows a notice can be shown without asking again.
+  Future<NotificationPermission> current();
+
   /// Opens the app's page in the device settings, where a refused permission is
   /// changed. Reports whether the settings surface was opened.
   Future<bool> openSettings();
@@ -45,6 +52,15 @@ class PlatformNotificationPermission implements NotificationPermissionGate {
   @override
   Future<NotificationPermission> request() async {
     final status = await permissions.Permission.notification.request();
+    return _read(status);
+  }
+
+  @override
+  Future<NotificationPermission> current() async =>
+      _read(await permissions.Permission.notification.status);
+
+  /// Reads the platform's answer in the app's own terms.
+  NotificationPermission _read(permissions.PermissionStatus status) {
     // `provisional` and `limited` are quieter grants: the reader allows
     // notifications, so a notice can still be shown.
     if (status.isGranted || status.isProvisional || status.isLimited) {
@@ -126,6 +142,14 @@ abstract interface class PushTokenProvider {
   /// Asks the platform for a token, raising the notification prompt when the
   /// reader has not answered it yet.
   Future<PushTokenOutcome> request();
+
+  /// The device's token when the reader has already allowed notifications.
+  ///
+  /// The prompt is not raised: this is how a phrase lookup, whose clip reaches
+  /// the device only by the notice, is registered for it without asking the
+  /// reader again. A reader who has not answered is reported as the refusal it
+  /// is, and the notify offer raises the prompt when they take it.
+  Future<PushTokenOutcome> current();
 }
 
 /// The production push token, issued by Firebase Cloud Messaging (`C-008`).
@@ -161,15 +185,36 @@ class FirebaseMessagingPushTokenProvider implements PushTokenProvider {
         case NotificationPermission.permanentlyDenied:
           return const PushTokenRefused(permanently: true);
       }
-      final messaging = await _messagingInstance();
-      final token = await messaging.currentToken();
-      if (token == null || token.isEmpty) return const PushTokenUnavailable();
-      return PushTokenIssued(token);
+      return await _token();
     } on Object {
       // No messaging service on the build, or the platform refused the request.
       // The reader loses nothing but the offer.
       return const PushTokenUnavailable();
     }
+  }
+
+  @override
+  Future<PushTokenOutcome> current() async {
+    try {
+      switch (await _permission.current()) {
+        case NotificationPermission.granted:
+          break;
+        case NotificationPermission.denied:
+          return const PushTokenRefused(permanently: false);
+        case NotificationPermission.permanentlyDenied:
+          return const PushTokenRefused(permanently: true);
+      }
+      return await _token();
+    } on Object {
+      return const PushTokenUnavailable();
+    }
+  }
+
+  Future<PushTokenOutcome> _token() async {
+    final messaging = await _messagingInstance();
+    final token = await messaging.currentToken();
+    if (token == null || token.isEmpty) return const PushTokenUnavailable();
+    return PushTokenIssued(token);
   }
 
   Future<PushMessaging> _messagingInstance() async {
@@ -192,6 +237,9 @@ class DevelopmentPushTokenProvider implements PushTokenProvider {
 
   @override
   Future<PushTokenOutcome> request() async => PushTokenIssued(_token);
+
+  @override
+  Future<PushTokenOutcome> current() async => PushTokenIssued(_token);
 
   static String _newToken() {
     final random = Random.secure();

@@ -15,6 +15,8 @@ import 'package:scenova/services/analytics.dart';
 import 'package:scenova/services/analytics_api.dart';
 import 'package:scenova/services/app_services.dart';
 import 'package:scenova/services/capture_channel.dart';
+import 'package:scenova/services/clip_notice_inbox.dart';
+import 'package:scenova/services/clip_notice_source.dart';
 import 'package:scenova/services/connectivity.dart';
 import 'package:scenova/services/entitlement_provider.dart';
 import 'package:scenova/services/feature_flags.dart';
@@ -41,6 +43,7 @@ ScenovaServices buildServices({
   PushRegistrationApi? pushApi,
   PushTokenProvider? pushTokens,
   NotificationPermissionGate? notificationPermission,
+  ClipNoticeSource? clipNoticeSource,
   FeatureFlags? featureFlags,
   String locale = 'en',
 }) {
@@ -67,6 +70,9 @@ ScenovaServices buildServices({
       tokens:
           pushTokens ?? DevelopmentPushTokenProvider(token: 'test-push-token'),
       connectivity: connectivity,
+    ),
+    clipNotices: ClipNoticeInbox(
+      source: clipNoticeSource ?? ScriptedClipNoticeSource(),
     ),
     notificationPermission:
         notificationPermission ?? ScriptedNotificationPermission(),
@@ -211,9 +217,14 @@ Future<void> deliverCapture(WidgetTester tester, String? text) async {
 class ScriptedNotificationPermission implements NotificationPermissionGate {
   ScriptedNotificationPermission({
     this.answer = NotificationPermission.granted,
-  });
+    NotificationPermission? quietAnswer,
+  }) : _currentAnswer = quietAnswer;
 
   NotificationPermission answer;
+
+  /// The answer a query reads while the prompt is not raised, when it differs
+  /// from what the prompt would say. Defaults to [answer].
+  NotificationPermission? _currentAnswer;
 
   /// How many times the prompt was raised.
   int requests = 0;
@@ -221,11 +232,19 @@ class ScriptedNotificationPermission implements NotificationPermissionGate {
   /// How many times the device settings were opened.
   int settingsOpened = 0;
 
+  /// The answer a query reads while the prompt is not raised.
+  NotificationPermission get currentAnswer => _currentAnswer ?? answer;
+
+  set currentAnswer(NotificationPermission value) => _currentAnswer = value;
+
   @override
   Future<NotificationPermission> request() async {
     requests++;
     return answer;
   }
+
+  @override
+  Future<NotificationPermission> current() async => currentAnswer;
 
   @override
   Future<bool> openSettings() async {
@@ -237,12 +256,31 @@ class ScriptedNotificationPermission implements NotificationPermissionGate {
 /// A token source whose outcome is scripted, so the registrar and the screen can
 /// be driven through a refusal without a messaging service.
 class ScriptedPushTokenProvider implements PushTokenProvider {
-  ScriptedPushTokenProvider(this.outcome);
+  ScriptedPushTokenProvider(this.outcome, {PushTokenOutcome? quietOutcome})
+    : _currentOutcome = quietOutcome;
 
   PushTokenOutcome outcome;
 
+  /// The outcome a query reads while the prompt is not raised, when it differs
+  /// from [outcome].
+  PushTokenOutcome? _currentOutcome;
+
+  /// How many times the prompt was raised.
+  int requests = 0;
+
+  /// The outcome a query reads while the prompt is not raised.
+  PushTokenOutcome get currentOutcome => _currentOutcome ?? outcome;
+
+  set currentOutcome(PushTokenOutcome value) => _currentOutcome = value;
+
   @override
-  Future<PushTokenOutcome> request() async => outcome;
+  Future<PushTokenOutcome> request() async {
+    requests++;
+    return outcome;
+  }
+
+  @override
+  Future<PushTokenOutcome> current() async => currentOutcome;
 }
 
 /// A history whose read resolves only when the test completes it.

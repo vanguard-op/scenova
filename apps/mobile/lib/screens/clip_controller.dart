@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../config.dart';
 import '../models/analytics_event.dart';
+import '../models/clip_notice.dart';
 import '../models/entitlement.dart';
 import '../models/lookup.dart';
 import '../services/app_services.dart';
@@ -58,6 +59,9 @@ class ClipViewController extends ChangeNotifier {
            noticeThreshold ?? AppConfig.generatingNoticeThreshold,
        _pollTimeout = pollTimeout ?? AppConfig.lookupPollTimeout {
     _selection = selection;
+    // The clip-ready notice is listened for from the moment the view opens, so
+    // a notice that arrives while the reader waits reaches this view (`C-008`).
+    _noticeSub = services.clipNotices.notices.listen(_onNotice);
   }
 
   final ScenovaServices services;
@@ -77,6 +81,7 @@ class ClipViewController extends ChangeNotifier {
   Timer? _pollTimer;
   Timer? _noticeTimer;
   Timer? _timeoutTimer;
+  StreamSubscription<ClipNotice>? _noticeSub;
   bool _disposed = false;
 
   bool _playing = false;
@@ -107,10 +112,16 @@ class ClipViewController extends ChangeNotifier {
   bool get isPhrase => _selection.kind == LookupKind.phrase;
 
   /// The gloss phrase to show, from the chosen sense or the first sense.
+  ///
+  /// A phrase is its own gloss — there is no separate meaning to set beneath it
+  /// — so it is left out of the header rather than repeated under the clip
+  /// (`FEAT-007`).
   String? get phrase {
     final sense = _chosenSense ?? _firstSense;
     final value = sense?.glossPhrase;
-    return (value == null || value.isEmpty) ? null : value;
+    if (value == null || value.isEmpty) return null;
+    if (isPhrase && value.toLowerCase() == word.toLowerCase()) return null;
+    return value;
   }
 
   /// The clip that would play.
@@ -128,6 +139,16 @@ class ClipViewController extends ChangeNotifier {
 
   Sense? get _firstSense =>
       (_result?.senses.isEmpty ?? true) ? null : _result!.senses.first;
+
+  /// The first sense still waiting on its clip, so a notice settles the sense
+  /// that has none rather than one that already plays.
+  Sense? get _firstSenseWithoutClip {
+    final senses = _result?.senses ?? const <Sense>[];
+    for (final sense in senses) {
+      if (!sense.hasClip) return sense;
+    }
+    return null;
+  }
 
   /// Whether the notice SnackBar should be raised for this change.
   ///
@@ -285,7 +306,20 @@ class ClipViewController extends ChangeNotifier {
     // Only a lookup the service knows about can be watched; a result built
     // from the device's own store has none.
     if (lookupId == null) return PushNoticeResult.notRegistered;
-    return services.pushRegistrar.requestClipReadyNotice(lookupId: lookupId);
+    final outcome = await services.pushRegistrar.requestClipReadyNotice(
+      lookupId: lookupId,
+    );
+    if (_disposed) return outcome;
+    // A phrase has no delivery path but the notice, so a reader who cannot be
+    // reached is shown the clip as unavailable with a retry rather than left
+    // waiting on one that will never come (`FEAT-007`, Edge Cases).
+    if (isPhrase &&
+        (outcome == PushNoticeResult.notificationsDenied ||
+            outcome == PushNoticeResult.notificationsPermanentlyDenied)) {
+      _cancelPoll();
+      _setPhase(ClipPhase.fallback);
+    }
+    return outcome;
   }
 
   Future<void> _requestLookup() async {
@@ -313,6 +347,15 @@ class ClipViewController extends ChangeNotifier {
 
   void _applyResult(LookupResult result) {
     _result = result;
+
+    // A notice may have reached the device before the lookup did — the reader
+    // opened it from their notification, say. It is taken up rather than
+    // dropped, so the clip is played and kept (`C-008`).
+    final waiting = services.clipNotices.takeFor(result.lookupId);
+    if (waiting != null && _clipViewEnabled) {
+      _applyNotice(waiting);
+      return;
+    }
 
     // With the in-context view switched off (`enable_clip_view`) the reader
     // still gets the word and its phrase, but no clip is played and no
@@ -357,6 +400,13 @@ class ClipViewController extends ChangeNotifier {
       case LookupStatus.generating:
         _setPhase(ClipPhase.generating);
         _startPoll();
+        // A phrase clip reaches the device only by the clip-ready notice, so
+        // the device is registered for it as soon as the phrase is generating
+        // rather than waiting for the offer, which a clip that finishes quickly
+        // would outrun (`FEAT-007`).
+        if (result.kind == LookupKind.phrase) {
+          unawaited(_watchForPhraseClip(result.lookupId));
+        }
       case LookupStatus.fallback:
         _setPhase(ClipPhase.fallback);
       case LookupStatus.denied:
@@ -411,8 +461,102 @@ class ClipViewController extends ChangeNotifier {
   void _timeout() {
     if (_disposed || _phase != ClipPhase.generating) return;
     _cancelPoll();
+    // A phrase clip has no delivery path but the notice, so a wait that has run
+    // out leaves the phrase with the clip unavailable and a retry rather than a
+    // lookup failure (`FEAT-007`, Edge Cases).
+    if (isPhrase) {
+      _setPhase(ClipPhase.fallback);
+      return;
+    }
     _errorMessage = 'The clip is taking longer than usual.';
     _setPhase(ClipPhase.error);
+  }
+
+  /// A clip-ready notice reached the device (`C-008`).
+  void _onNotice(ClipNotice notice) {
+    if (_disposed) return;
+    if (_result?.lookupId != notice.lookupId) return;
+    services.clipNotices.takeFor(notice.lookupId);
+    // With the in-context view switched off no clip is played, so the notice
+    // is consumed and nothing else happens.
+    if (!_clipViewEnabled) return;
+    _applyNotice(notice);
+  }
+
+  /// Applies the clip the notice carried: it plays, and it is saved to the
+  /// device's own history (`FEAT-007`, `FEAT-008`).
+  ///
+  /// The clip arrives outside the lookup read path — for a phrase it is the
+  /// only way it ever arrives — so the lookup is settled here rather than by a
+  /// poll.
+  void _applyNotice(ClipNotice notice) {
+    final result = _result;
+    if (result == null) return;
+    _cancelPoll();
+    final current = _chosenSense ?? _firstSenseWithoutClip ?? _firstSense;
+    final sense = Sense(
+      senseLabel: current?.senseLabel ?? '1',
+      partOfSpeech: current?.partOfSpeech ?? '',
+      glossPhrase: current?.glossPhrase ?? result.rawSelection,
+      entryId: current?.entryId,
+      clip: notice.clip,
+    );
+    _result = _withSense(result, sense);
+    _chosenSense = sense;
+    _fromHistory = false;
+    _pastThreshold = false;
+    _noticeDismissed = true;
+    _setPhase(ClipPhase.playing);
+    _autoplayOrHold();
+    unawaited(_saveToHistory());
+  }
+
+  /// The lookup with [sense] in place of the sense it settles, so the clip the
+  /// notice carried is what the view plays.
+  LookupResult _withSense(LookupResult result, Sense sense) {
+    final senses = List<Sense>.of(result.senses);
+    final index = senses.indexWhere(
+      (existing) =>
+          existing.senseLabel == sense.senseLabel &&
+          existing.partOfSpeech == sense.partOfSpeech,
+    );
+    if (index >= 0) {
+      senses[index] = sense;
+    } else {
+      senses.add(sense);
+    }
+    return LookupResult(
+      lookupId: result.lookupId,
+      kind: result.kind,
+      rawSelection: result.rawSelection,
+      normalisedLemma: result.normalisedLemma,
+      status: result.status,
+      senses: senses,
+      notice: result.notice,
+      correlationId: result.correlationId,
+    );
+  }
+
+  /// Registers the device for a phrase's clip-ready notice without raising the
+  /// notification prompt.
+  ///
+  /// A phrase clip is never served on the lookup read path, so the notice is
+  /// the only way it reaches the device; registering as the phrase starts
+  /// generating means a clip that finishes quickly is still delivered. The
+  /// reader who has not answered the prompt is left for the notify offer, where
+  /// their own intent is behind it; a reader who refused it for good can never
+  /// be reached, so the phrase settles on the clip being unavailable
+  /// (`FEAT-007`, Edge Cases).
+  Future<void> _watchForPhraseClip(String lookupId) async {
+    final outcome = await services.pushRegistrar.requestClipReadyNotice(
+      lookupId: lookupId,
+      prompt: false,
+    );
+    if (_disposed) return;
+    if (outcome == PushNoticeResult.notificationsPermanentlyDenied) {
+      _cancelPoll();
+      _setPhase(ClipPhase.fallback);
+    }
   }
 
   Future<void> _poll() async {
@@ -493,11 +637,14 @@ class ClipViewController extends ChangeNotifier {
   Future<void> _saveToHistory() async {
     final result = _result;
     if (result == null) return;
-    // Only a lookup that resolved is saved; a fallback or a denied lookup has
-    // no clip to replay.
-    if (result.status != LookupStatus.served) return;
+    final sense = _chosenSense ?? _firstSense;
+    // A lookup that resolved is saved; a fallback or a denied lookup has no
+    // clip to replay. A clip the notice carried is saved too: a phrase lookup
+    // never resolves to served, and its clip is the reader's to keep
+    // (`FEAT-007`).
+    if (result.status != LookupStatus.served && (sense?.clip == null)) return;
     await services.historyStore.save(
-      historyEntryFrom(result, savedAt: DateTime.now(), sense: _chosenSense),
+      historyEntryFrom(result, savedAt: DateTime.now(), sense: sense),
     );
   }
 
@@ -545,6 +692,7 @@ class ClipViewController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _cancelPoll();
+    unawaited(_noticeSub?.cancel());
     super.dispose();
   }
 }

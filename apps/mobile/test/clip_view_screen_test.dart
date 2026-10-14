@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:scenova/models/clip_notice.dart';
 import 'package:scenova/models/entitlement.dart';
 import 'package:scenova/models/history_entry.dart';
 import 'package:scenova/models/lookup.dart';
@@ -9,6 +10,7 @@ import 'package:scenova/screens/clip_controller.dart';
 import 'package:scenova/screens/clip_view_screen.dart';
 import 'package:scenova/services/app_services.dart';
 import 'package:scenova/services/capture_intake.dart';
+import 'package:scenova/services/clip_notice_source.dart';
 import 'package:scenova/services/feature_flags.dart';
 import 'package:scenova/services/history_store.dart';
 import 'package:scenova/services/lookup_api.dart';
@@ -703,21 +705,39 @@ void main() {
     await teardown(tester);
   });
 
-  testWidgets('a phrase clip is saved to the device and replayed from it', (
+  testWidgets('a phrase clip arrives by the clip-ready notice and is kept', (
     tester,
   ) async {
-    final api = RecordingLookupApi(MockLookupApi(pollsUntilReady: 1));
-    final services = buildServices(api: api);
+    final source = ScriptedClipNoticeSource();
+    final api = RecordingLookupApi(MockLookupApi());
+    final services = buildServices(api: api, clipNoticeSource: source);
     final controller = controllerFor(services, 'once in a while');
     addTearDown(controller.dispose);
 
     await pumpClipView(tester, services, controller);
     await tester.pump();
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 150));
+
+    // The phrase shows with no clip: a phrase clip is never served on the
+    // lookup read path (`C-001`/`C-002`, `FEAT-007`).
+    expect(controller.phase, ClipPhase.generating);
+    expect(controller.clip, isNull);
+
+    // The clip-ready notice reaches the device, carrying the clip.
+    source.deliver(
+      ClipNotice(
+        lookupId: controller.result!.lookupId,
+        clipUrl: 'https://cdn.scenova.test/phrase.mp4',
+        durationSeconds: 4,
+        resolution: '360p',
+        hasAudio: false,
+      ),
+    );
+    await tester.pump();
     await tester.pump();
 
     expect(controller.phase, ClipPhase.playing);
+    expect(controller.clip!.url, 'https://cdn.scenova.test/phrase.mp4');
     final saved = await services.historyStore.all();
     expect(saved.single.kind, LookupKind.phrase);
     expect(saved.single.hasClip, isTrue);
@@ -738,6 +758,69 @@ void main() {
     expect(api.createCalls, 1);
     await teardown(tester);
   });
+
+  testWidgets('a notice for another lookup leaves the open view alone', (
+    tester,
+  ) async {
+    final source = ScriptedClipNoticeSource();
+    final services = buildServices(
+      api: MockLookupApi(pollsUntilReady: 100000),
+      clipNoticeSource: source,
+    );
+    final controller = controllerFor(services, 'xylograph');
+
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+    await tester.pump();
+    expect(controller.phase, ClipPhase.generating);
+
+    // A notice for a lookup this view is not waiting on is not its clip.
+    source.deliver(
+      const ClipNotice(
+        lookupId: 'some-other-lookup',
+        clipUrl: 'https://cdn.scenova.test/other.mp4',
+        durationSeconds: 4,
+        resolution: '360p',
+        hasAudio: false,
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(controller.phase, ClipPhase.generating);
+    expect(controller.clip, isNull);
+
+    controller.dispose();
+    await teardown(tester);
+  });
+
+  testWidgets(
+    'a phrase whose notice can never come shows the clip unavailable',
+    (tester) async {
+      // The reader refused notifications for good, so no notice can reach the
+      // device; a phrase has no other delivery path, so the clip is unavailable
+      // with a retry rather than a lookup that waits on nothing (`FEAT-007`).
+      final services = buildServices(
+        api: MockLookupApi(),
+        pushTokens: ScriptedPushTokenProvider(
+          const PushTokenIssued('test-push-token'),
+          quietOutcome: const PushTokenRefused(permanently: true),
+        ),
+      );
+      final controller = controllerFor(services, 'once in a while');
+      addTearDown(controller.dispose);
+
+      await pumpClipView(tester, services, controller);
+      await tester.pump();
+      await tester.pump();
+
+      expect(controller.phase, ClipPhase.fallback);
+      expect(find.text('No clip for this phrase yet.'), findsOneWidget);
+      expect(find.text('Try again'), findsOneWidget);
+      expect(await services.historyStore.all(), isEmpty);
+      await teardown(tester);
+    },
+  );
 
   testWidgets('a saved phrase plays from the device when offline', (
     tester,

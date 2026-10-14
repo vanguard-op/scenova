@@ -7,6 +7,8 @@ import '../models/lookup.dart';
 import 'analytics.dart';
 import 'analytics_api.dart';
 import 'capture_channel.dart';
+import 'clip_notice_inbox.dart';
+import 'clip_notice_source.dart';
 import 'connectivity.dart';
 import 'entitlement_provider.dart';
 import 'feature_flags.dart';
@@ -34,6 +36,7 @@ class ScenovaServices {
     required this.captureChannel,
     required this.analytics,
     required this.pushRegistrar,
+    required this.clipNotices,
     required this.notificationPermission,
     required this.featureFlags,
     this.locale = 'en',
@@ -55,6 +58,10 @@ class ScenovaServices {
 
   /// Registers the device for a clip-ready notice (`C-008`).
   final PushRegistrar pushRegistrar;
+
+  /// The clip-ready notices that reach the device (`C-008`). The clip is
+  /// obtained from the notice, played, and saved to device history.
+  final ClipNoticeInbox clipNotices;
 
   /// The platform notification prompt (`FEAT-008`): raised when the reader takes
   /// the notify offer, and the route back to the device settings when they have
@@ -150,6 +157,14 @@ class ScenovaServices {
             : DevelopmentPushTokenProvider(),
         connectivity: connectivity,
       ),
+      // The clip-ready notice arrives through the platform's messaging service
+      // in production; a laptop run drives the same intake by hand, so the
+      // phrase path is exercisable without a push provider.
+      clipNotices: ClipNoticeInbox(
+        source: AppConfig.useFirebaseMessaging
+            ? FirebaseClipNoticeSource()
+            : ScriptedClipNoticeSource(),
+      ),
       notificationPermission: notificationPermission,
       featureFlags: featureFlags ?? RemoteConfigFeatureFlags(),
       locale: locale,
@@ -162,6 +177,7 @@ class ScenovaServices {
     captureChannel.dispose();
     analytics.dispose();
     pushRegistrar.dispose();
+    clipNotices.dispose();
   }
 }
 

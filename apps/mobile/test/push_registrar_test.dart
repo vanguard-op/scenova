@@ -6,12 +6,17 @@ import 'package:scenova/services/push_registrar.dart';
 import 'package:scenova/services/push_tokens.dart';
 
 class _FixedTokens implements PushTokenProvider {
-  _FixedTokens(this.outcome);
+  _FixedTokens(this.outcome, {PushTokenOutcome? quietOutcome})
+    : _currentOutcome = quietOutcome;
 
   final PushTokenOutcome outcome;
+  final PushTokenOutcome? _currentOutcome;
 
   @override
   Future<PushTokenOutcome> request() async => outcome;
+
+  @override
+  Future<PushTokenOutcome> current() async => _currentOutcome ?? outcome;
 }
 
 const _deviceToken = PushTokenIssued('device-token');
@@ -111,6 +116,53 @@ void main() {
     // Nothing is held: a lookup that has finished has no later event to watch.
     expect(registrar.pendingRegistration, isFalse);
   });
+
+  test('registers a phrase without raising the prompt', () async {
+    // A phrase clip reaches the device only by the notice, so the registration
+    // goes out without asking: the offer is where the reader's intent is.
+    final api = MockPushRegistrationApi();
+    final registrar = PushRegistrar(
+      api: api,
+      tokens: _FixedTokens(
+        const PushTokenIssued('asked-token'),
+        quietOutcome: const PushTokenIssued('quiet-token'),
+      ),
+      connectivity: ManualConnectivity(),
+    );
+    addTearDown(registrar.dispose);
+
+    expect(
+      await registrar.requestClipReadyNotice(lookupId: 'lk_1', prompt: false),
+      PushNoticeResult.registered,
+    );
+    expect(api.tokens, <String>['quiet-token']);
+    expect(api.lookupIds, <String>['lk_1']);
+  });
+
+  test(
+    'an unanswered permission reads as a refusal on the quiet path',
+    () async {
+      final api = MockPushRegistrationApi();
+      final registrar = PushRegistrar(
+        api: api,
+        tokens: _FixedTokens(
+          const PushTokenIssued('asked-token'),
+          quietOutcome: const PushTokenRefused(permanently: false),
+        ),
+        connectivity: ManualConnectivity(),
+      );
+      addTearDown(registrar.dispose);
+
+      expect(
+        await registrar.requestClipReadyNotice(lookupId: 'lk_1', prompt: false),
+        PushNoticeResult.notificationsDenied,
+      );
+      expect(api.tokens, isEmpty);
+      // Nothing is held: the reader has not refused, only not answered yet, and
+      // the offer still has the prompt to raise.
+      expect(registrar.pendingRegistration, isFalse);
+    },
+  );
 
   test('holds an offline registration and sends it, lookup and all, when back online', () async {
     final api = MockPushRegistrationApi();
