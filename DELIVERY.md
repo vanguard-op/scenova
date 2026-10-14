@@ -1,7 +1,7 @@
 # DELIVERY — Scenova
 
 ## Source of Truth
-`docs/Scenova/` (BPRD), a git submodule of `vanguard-op/scenova-docs`. Content revision `b4859110fe5a`; submodule pinned at `45896c8410cb`. Read-only for the squad; `product-shaper` is the only writer. The roadmap owns the build order. The lead is the only agent who runs git against the submodule: commit and push `product-shaper`'s changes to the docs repo, then stage the pointer bump in the same commit as the code built against it, and never leave the parent pointing at an unpushed docs commit.
+`docs/Scenova/` (BPRD), a git submodule of `vanguard-op/scenova-docs`, pinned at `96fdd51e72b08b4cd533224850cfecd8c5b16b04` (`96fdd51e72b0`). Read-only for the squad; `product-shaper` is the only writer. The roadmap owns the build order. The lead is the only agent who runs git against the submodule: commit and push `product-shaper`'s changes to the docs repo, then stage the pointer bump in the same commit as the code built against it, and never leave the parent pointing at an unpushed docs commit.
 
 ## Team & File Ownership
 | Owner | Owns |
@@ -122,7 +122,10 @@ docs/           BPRD (product-shaper)
 | T-074 | FEAT-001, FEAT-002 | frontend-engineer | Done | — |
 | T-075 | FEAT-001, FEAT-002 | frontend-engineer | Done | — |
 | T-076 | FEAT-001, FEAT-002 | frontend-engineer | Done | — |
-| T-077 | FEAT-001, FEAT-002 | frontend-engineer | In Progress | — |
+| T-077 | FEAT-001, FEAT-002 | frontend-engineer | Done | — |
+| T-078 | FEAT-001, FEAT-008 | frontend-engineer | Done | — |
+| T-079 | FEAT-001, FEAT-008 | frontend-engineer | Done | C-007 |
+| T-080 | FEAT-001, FEAT-008 | frontend-engineer | In Progress | C-007 |
 
 ## Decisions Log
 | # | Decision | Rationale | By |
@@ -148,6 +151,7 @@ docs/           BPRD (product-shaper)
 | D-019 | The gloss-phrase bound is seven words or fewer; the judged bar is a single trained rater with adjudication; the cost ceiling is verified from the cost signal; the quality gate asserts only the bars the phase's capabilities deliver | The earlier bound and two-rater panel were not achievable and cost a measured miss; NFR-051 is judged in this phase because the clip is generated here, while NFR-053 belongs to the next phase | user |
 | D-020 | Phase 1 closed conditionally: regression and NFR-050 green, but NFR-051 (word-clip quality) unmeasured and NFR-052 (reader-helpful) unavailable | NFR-051 needs a judged video run; NFR-052 is live rolling-30-day feedback. The generation path's release stays flagged until NFR-051 is measured | user |
 | D-021 | Library seeding is deferred: the shared library starts empty and fills only from real reader lookups; seeding is enabled later at the user's direction | The seed set is the project's largest one-time generation cost; the spend is held rather than committed. The roadmap's seeded-library outcome is deferred, not withdrawn | user |
+| D-022 | The setup panel keeps a slice of its setup content at the position it takes when dragged down, instead of reducing to its handle | A handle-only panel does not tell the reader there is setup they must attend to; the panel's resting and expanded positions are unchanged | user |
 
 ## Definition of Done
 - **Task:** the acceptance criteria in the cited feature doc are met; the frozen contract is conformed; unit tests pass; format, lint, analyze, and build are clean; work is committed to the dev branch and confined to `Own`.
