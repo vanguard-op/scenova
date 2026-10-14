@@ -95,3 +95,24 @@ Auth: Firebase ID token in `Authorization` (anonymous before sign-in); rate-limi
 Request: lookupId: string, reason: wrong_meaning|offensive|low_quality|other, note: string|null (at most 300), clientReportId: string (idempotency key)
 Response 202: reportId: string, status: queued
 Errors: 400 (unknown reason; a note over 300 characters; a lookup with no clip served to the reader), 401 (missing or invalid token), 404 (unknown lookup, or not owned by the caller), 409 (clientReportId reused with a different report; the same reader has already reported this entry), 429 (rate limited), 503 (feedback store unavailable). A report queues the entry for review and holds it from new readers until it is reviewed; a report on an entry already under review joins the existing queue item; a report on a phrase lookup is recorded against the lookup and has no shared effect.
+
+### C-014: GET /internal/review/queue
+Status: Frozen
+Auth: operator identity carrying the curator role, multi-factor authenticated; never reachable from the reader client. A caller without the role is refused and the attempt is logged.
+Request: reason: wrong_meaning|offensive|low_quality|other|null, state: queued|reviewed|actioned|null, word: string|null, page: integer (query)
+Response 200: items: [{ entryId: string, lemma: string, senseLabel: string, reason: string, queuedAt: string, state: queued|reviewed|actioned }], openCount: integer, page: integer, pageCount: integer
+Errors: 401 (no operator session), 403 (an operator without the curator role), 503 (review service unavailable). Newest report first, one item per entry however many reports it holds.
+
+### C-015: GET /internal/review/entries/{entryId}
+Status: Frozen
+Auth: operator identity carrying the curator role, multi-factor authenticated; never reachable from the reader client.
+Request: entryId: string (path)
+Response 200: entry: { entryId: string, lemma: string, senseLabel: string, glossPhrase: string, status: active|held|retired, clip: { url: string, durationSeconds: number, resolution: "360p", hasAudio: boolean } }, reports: [{ reportId: string, reason: string, note: string|null, createdAt: string }], feedback: [{ rating: helpful|not_helpful|wrong, createdAt: string }], state: queued|reviewed|actioned
+Errors: 401 (no operator session), 403 (an operator without the curator role), 404 (unknown entry, or an entry with nothing queued), 503 (review service unavailable).
+
+### C-016: POST /internal/review/entries/{entryId}/actions
+Status: Frozen
+Auth: operator identity carrying the curator role, multi-factor authenticated; never reachable from the reader client.
+Request: action: clear|hold|retire|replace|edit_phrase, phrase: string|null (the new generation phrase, for edit_phrase), notes: string|null (at most 500), expectedState: queued|reviewed|actioned (the state the curator acted on)
+Response 200: actionId: string, entryId: string, status: active|held|retired, state: reviewed|actioned
+Errors: 400 (unknown action; edit_phrase without a phrase; notes over 500 characters), 401 (no operator session), 403 (an operator without the curator role), 404 (unknown entry), 409 (the entry has already moved since the curator saw it), 503 (review service unavailable). Every action records a ModerationAction; `clear` returns the entry to serving, `hold` withholds it, `retire` stops serving it and the next lookup generates a replacement, `replace` retires it and regenerates, and `edit_phrase` records the new phrase and regenerates from it.

@@ -9,7 +9,7 @@
 | infra-engineer | `infra/**`, `ci/**`, `.devcontainer/**`, `Makefile`, root workspace config |
 | backend-engineer | `services/**` |
 | ai-engineer | `ai/**`, `qa/golden/**` |
-| frontend-engineer | `apps/mobile/**` |
+| frontend-engineer | `apps/mobile/**`, `apps/console/**` |
 | visual-artist | `assets/**` |
 | qa-engineer | `tests/**`, `qa/**` |
 | lead | `DELIVERY.md`, `CONTRACTS.md`, `ASSETS.md`, `.delivery/**`, `contracts/**` |
@@ -21,6 +21,7 @@ Private scratch: `.scratch/<role>/**` (gitignored). No two engineers share a fil
 | Layer | Choice |
 |---|---|
 | Client | Flutter (Dart), iOS + Android |
+| Operator console | Flutter Web (Dart), web |
 | Services | Python 3 + FastAPI |
 | Primary database | Cloud SQL for PostgreSQL |
 | Cache & queue | Memorystore (Redis) + Cloud Tasks |
@@ -34,6 +35,7 @@ Private scratch: `.scratch/<role>/**` (gitignored). No two engineers share a fil
 ## Structure
 ```
 apps/mobile/    Flutter app (iOS + Android)
+apps/console/   Flutter Web app (curator review console)
 services/       FastAPI services: gateway, lookup, pipeline, library, entitlement, feedback
 ai/             model serving, prompts, eval harness, golden sets
 contracts/      frozen interface specs (lead)
@@ -93,6 +95,10 @@ docs/           BPRD (product-shaper)
 | T-085 | FEAT-008, FEAT-009 | frontend-engineer | Backlog | C-002 |
 | T-086 | FEAT-010 | frontend-engineer | Backlog | C-012 |
 | T-087 | FEAT-011 | frontend-engineer | Backlog | C-013 |
+| T-088 | FEAT-015 | backend-engineer | Backlog | C-011, C-014, C-015, C-016 |
+| T-089 | FEAT-015 | infra-engineer | Backlog | — |
+| T-090 | FEAT-015 | frontend-engineer | Backlog | C-014 |
+| T-091 | FEAT-015 | frontend-engineer | Backlog | C-015, C-016 |
 
 ## Decisions Log
 | # | Decision | Rationale | By |
@@ -121,6 +127,7 @@ docs/           BPRD (product-shaper)
 | D-022 | The setup panel keeps a slice of its setup content at the position it takes when dragged down, instead of reducing to its handle | A handle-only panel does not tell the reader there is setup they must attend to; the panel's resting and expanded positions are unchanged | user |
 | D-023 | Phase 2 closes conditionally: its integration, acceptance, and regression pass is gated, but the judged model bars are held | The phase's phrase-clip bar (NFR-053) and the carried-over word-clip bar (NFR-051) are judged generation runs; the spend is held rather than committed. The generation path's release stays flagged | user |
 | D-024 | Store release signing is deferred to the release workstream; no feature phase cuts a store-signed build | The feature phases build and test the app, and nothing they deliver is submitted to a store; the signing material and its handling belong with release, which the specification does not yet cover | user |
+| D-025 | The curator review console is a second Flutter app in the monorepo (`apps/console`), built with Flutter Web and owned by `frontend-engineer` | It reuses the design system's tokens and shared states and the toolchain the repo already pins; the console is operator-only, so its bundle weight matters less than a second stack would cost | user |
 
 ## Definition of Done
 - **Task:** the acceptance criteria in the cited feature doc are met; the frozen contract is conformed; unit tests pass; format, lint, analyze, and build are clean; work is committed to the dev branch and confined to `Own`.
