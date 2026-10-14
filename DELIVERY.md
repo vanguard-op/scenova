@@ -6,7 +6,7 @@
 ## Team & File Ownership
 | Owner | Owns |
 |---|---|
-| infra-engineer | `infra/**`, `ci/**`, `.devcontainer/**`, `Makefile`, root workspace config |
+| infra-engineer | `infra/**`, `ci/**`, `.github/**`, `.devcontainer/**`, `Makefile`, root workspace config |
 | backend-engineer | `services/**` |
 | ai-engineer | `ai/**`, `qa/golden/**` |
 | frontend-engineer | `apps/mobile/**`, `apps/console/**` |
@@ -90,13 +90,13 @@ docs/           BPRD (product-shaper)
 ### Active Phase: Phase 3: Trust and Continuity
 | Task | Feature | Owner | Status | Contract |
 |---|---|---|---|---|
-| T-083 | FEAT-010, FEAT-011 | backend-engineer | In Progress | C-011, C-012, C-013 |
-| T-084 | FEAT-009 | frontend-engineer | In Progress | — |
-| T-085 | FEAT-008, FEAT-009 | frontend-engineer | Backlog | C-002 |
+| T-083 | FEAT-010, FEAT-011 | backend-engineer | Done | C-011, C-012, C-013 |
+| T-084 | FEAT-009 | frontend-engineer | Done | — |
+| T-085 | FEAT-008, FEAT-009 | frontend-engineer | In Progress | C-002 |
 | T-086 | FEAT-010 | frontend-engineer | Backlog | C-012 |
 | T-087 | FEAT-011 | frontend-engineer | Backlog | C-013 |
-| T-088 | FEAT-015 | backend-engineer | Backlog | C-011, C-014, C-015, C-016 |
-| T-089 | FEAT-015 | infra-engineer | In Progress | — |
+| T-088 | FEAT-015 | backend-engineer | In Progress | C-011, C-014, C-015, C-016 |
+| T-089 | FEAT-015 | infra-engineer | Done | — |
 | T-090 | FEAT-015 | frontend-engineer | Backlog | C-014 |
 | T-091 | FEAT-015 | frontend-engineer | Backlog | C-015, C-016 |
 
