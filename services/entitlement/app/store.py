@@ -13,6 +13,11 @@ twice.
 
 The store is in memory for this phase; Cloud SQL replaces it behind the same
 port, holding the same entities, so no caller changes.
+
+Deleting an account marks the account record and drops its entitlement, so the
+token subject has no account from then on and no further lookup can spend
+against it. The record is the tombstone the deletion needs, and its personal
+data is hard-deleted with it once the retention window closes.
 """
 
 from __future__ import annotations
@@ -97,6 +102,10 @@ class EntitlementStore(Protocol):
         """Replace an account with the given record."""
         ...
 
+    async def delete_account(self, account: AccountRecord) -> None:
+        """Mark an account deleted and drop its entitlement."""
+        ...
+
     async def entitlement(self, account_id: str) -> EntitlementRecord | None:
         """The account's entitlement, or None."""
         ...
@@ -163,6 +172,13 @@ class InMemoryEntitlementStore:
     async def save_account(self, account: AccountRecord) -> AccountRecord:
         self._accounts[account.id] = account
         return account
+
+    async def delete_account(self, account: AccountRecord) -> None:
+        # The account is kept as the tombstone the contract's "the token's
+        # subject has no account" needs; its personal data is hard-deleted with
+        # the record once the retention window closes. The entitlement goes now.
+        self._accounts[account.id] = account
+        self._entitlements.pop(account.id, None)
 
     async def entitlement(self, account_id: str) -> EntitlementRecord | None:
         return self._entitlements.get(account_id)

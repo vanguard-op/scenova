@@ -1,4 +1,4 @@
-"""Domain errors for the account and entitlement service (C-018 to C-020).
+"""Domain errors for the account and entitlement service (C-018 to C-021).
 
 Each error carries the HTTP status and machine-readable code the client maps.
 `unauthorized` is a missing or invalid token, `no_account` is a valid token with
@@ -46,7 +46,8 @@ class UnauthorizedError(EntitlementError):
 
 
 class NoAccountError(EntitlementError):
-    """The token is valid but has no account: the reader has not signed in."""
+    """The token is valid but has no account: the reader has not signed in, or
+    their account has been deleted."""
 
     status_code = 401
     code = "no_account"

@@ -9,6 +9,12 @@ reader is metered on the device and carries no allowance here.
 the choice follows them to a new device (C-020). Before sign-in the client holds
 both on the device alone and never reaches this service.
 
+`delete_account` removes the reader's account and its entitlement (C-021): the
+account is marked deleted and the entitlement dropped, so the token's subject has
+no account from then on and the reader is a new reader with no account. The
+shared library is untouched; the personal data is hard-deleted within the
+documented window.
+
 `sync` applies one signed store billing event (C-019): a subscription sets the
 plan and the allowance period, a top-up adds its lookups to the current period
 and does not carry over, a refund removes the entitlement, and a cancellation or
@@ -44,6 +50,7 @@ from .models import (
     AccountResponse,
     AccountUpdateRequest,
     BillingEvent,
+    DeleteAccountResponse,
     EntitlementResponse,
     EntitlementStatus,
     EntitlementSyncRequest,
@@ -132,6 +139,30 @@ class EntitlementService:
             locale=updated.locale,
         )
 
+    async def delete_account(self, subject: Subject) -> DeleteAccountResponse:
+        """Delete the reader's account and its entitlement (C-021).
+
+        The account is marked deleted and the entitlement dropped in one store
+        step, so from that moment the token's subject has no account and no
+        further lookup can meter against it. The reader's personal data is
+        hard-deleted with the record once the retention window closes (nfr.md
+        "Data lifecycle"); the shared library is untouched. The store's step is
+        serialised with metering, so a lookup cannot spend against an account
+        that is being deleted.
+
+        A token with no account — anonymous before sign-in, or one whose account
+        is already gone — is the contract's 401; deletion never creates one.
+        """
+
+        if subject.is_anonymous:
+            raise NoAccountError("Sign in to delete your account.")
+        async with self._write_lock:
+            account = await self._store.account(subject.id)
+            if account is None or account.deleted_at is not None:
+                raise NoAccountError("This account no longer exists.")
+            await self._store.delete_account(replace(account, deleted_at=_iso(self._clock())))
+        return DeleteAccountResponse(deleted=True)
+
     async def sync(self, request: EntitlementSyncRequest) -> SyncResponse:
         """Apply one signed store billing event (C-019).
 
@@ -199,6 +230,10 @@ class EntitlementService:
             raise NoAccountError("Sign in to see your plan and allowance.")
 
         account = await self._store.account(subject.id)
+        if account is not None and account.deleted_at is not None:
+            # A deleted account is a tombstone: the reader is signed out and has
+            # no account, and one is never recreated behind the deletion.
+            raise NoAccountError("This account no longer exists.")
         if account is None:
             now = _iso(self._clock())
             account = await self._store.create_account(

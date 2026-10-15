@@ -1,4 +1,5 @@
-"""Gateway tests for the entitlement read and the account update (C-018, C-020).
+"""Gateway tests for the entitlement read, the account update, and the account
+deletion (C-018, C-020, C-021).
 
 The gateway authenticates the reader's token before it forwards the call to the
 entitlement service and passes the service's status and body back unchanged, so a
@@ -58,6 +59,14 @@ class _FakeEntitlementClient:
         self.last_authorization = authorization
         return self._respond()
 
+    async def delete_account(
+        self, authorization: str | None, correlation_id: str
+    ) -> UpstreamResponse:
+        self.last_method = "DELETE"
+        self.last_path = "/v1/account"
+        self.last_authorization = authorization
+        return self._respond()
+
     async def aclose(self) -> None:
         return None
 
@@ -111,17 +120,45 @@ def test_the_account_update_passes_through_with_its_body() -> None:
     assert entitlement.last_payload == {"consentModelProcessing": True, "locale": "en"}
 
 
+def test_the_account_deletion_passes_through_with_the_reader_token() -> None:
+    entitlement = _FakeEntitlementClient(status_code=202, body=b'{"deleted":true}')
+
+    with _client(entitlement) as client:
+        response = client.delete("/v1/account", headers={**_READER, "x-correlation-id": "corr-2"})
+
+    assert response.status_code == 202
+    assert response.json() == {"deleted": True}
+    assert response.headers["x-correlation-id"] == "corr-2"
+    assert entitlement.last_method == "DELETE"
+    assert entitlement.last_path == "/v1/account"
+    assert entitlement.last_authorization == _READER["Authorization"]
+
+
 def test_a_missing_token_is_unauthorized_before_the_service_is_called() -> None:
     entitlement = _FakeEntitlementClient()
 
     with _client(entitlement) as client:
         read = client.get("/v1/entitlement")
         update = client.patch("/v1/account", json={"locale": "en"})
+        delete = client.delete("/v1/account")
 
     assert read.status_code == 401
     assert update.status_code == 401
+    assert delete.status_code == 401
     assert read.json()["code"] == "unauthorized"
     assert entitlement.last_path is None
+
+
+def test_a_deleted_account_error_passes_through() -> None:
+    entitlement = _FakeEntitlementClient(
+        status_code=401, body=b'{"code":"no_account","message":"This account no longer exists."}'
+    )
+
+    with _client(entitlement) as client:
+        response = client.delete("/v1/account", headers=_READER)
+
+    assert response.status_code == 401
+    assert response.json()["code"] == "no_account"
 
 
 def test_a_service_error_passes_through() -> None:

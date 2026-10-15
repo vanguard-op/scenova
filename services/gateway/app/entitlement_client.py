@@ -1,10 +1,10 @@
-"""Internal client for the account and entitlement service (C-018, C-020).
+"""Internal client for the account and entitlement service (C-018, C-020, C-021).
 
-The gateway routes a reader's entitlement read and their account update to the
-entitlement service, which owns the account and the allowance. The caller's
-Authorization header is forwarded unchanged, so the service resolves the same
-token subject the gateway authenticated and scopes the answer to that reader; the
-gateway never rewrites or records the identity.
+The gateway routes a reader's entitlement read, their account update, and their
+account deletion to the entitlement service, which owns the account and the
+allowance. The caller's Authorization header is forwarded unchanged, so the
+service resolves the same token subject the gateway authenticated and scopes the
+answer to that reader; the gateway never rewrites or records the identity.
 """
 
 from __future__ import annotations
@@ -27,6 +27,10 @@ class EntitlementClient(Protocol):
 
     async def update_account(
         self, payload: Mapping[str, Any], authorization: str | None, correlation_id: str
+    ) -> UpstreamResponse: ...
+
+    async def delete_account(
+        self, authorization: str | None, correlation_id: str
     ) -> UpstreamResponse: ...
 
     async def aclose(self) -> None: ...
@@ -59,6 +63,11 @@ class HttpEntitlementClient:
         return await self._request(
             "PATCH", "/v1/account", dict(payload), authorization, correlation_id
         )
+
+    async def delete_account(
+        self, authorization: str | None, correlation_id: str
+    ) -> UpstreamResponse:
+        return await self._request("DELETE", "/v1/account", None, authorization, correlation_id)
 
     async def aclose(self) -> None:
         await self._client.aclose()

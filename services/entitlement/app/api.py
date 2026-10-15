@@ -1,4 +1,4 @@
-"""HTTP API for the account and entitlement service (C-018 to C-020).
+"""HTTP API for the account and entitlement service (C-018 to C-021).
 
 `GET /v1/entitlement` returns a signed-in reader's plan and allowance for the
 current period (C-018) and `PATCH /v1/account` stores their consent choice and
@@ -7,6 +7,10 @@ token, so the entitlement is always the token subject's own and a token with no
 account is refused. The gateway authenticates the same token first in the
 deployed topology; enforcing it here keeps the service correct when it is
 addressed directly.
+
+`DELETE /v1/account` removes the reader's account and its entitlement (C-021) and
+returns the 202 the client signs out on. The reader's personal data is deleted
+within the documented window and the shared library is unchanged.
 
 `POST /internal/entitlements/sync` applies one signed store billing event
 (C-019). It takes the payment processor's signed webhook or an internal service
@@ -34,6 +38,7 @@ from .errors import EntitlementError, UnauthorizedError
 from .models import (
     AccountResponse,
     AccountUpdateRequest,
+    DeleteAccountResponse,
     EntitlementResponse,
     EntitlementSyncRequest,
     SpendRequest,
@@ -97,6 +102,13 @@ def create_app(
     ) -> AccountResponse:
         subject = await resolved_verifier.verify(authorization)
         return await resolved_service.update_account(subject, payload)
+
+    @app.delete("/v1/account", status_code=202)
+    async def delete_account(
+        authorization: Annotated[str | None, Header()] = None,
+    ) -> DeleteAccountResponse:
+        subject = await resolved_verifier.verify(authorization)
+        return await resolved_service.delete_account(subject)
 
     @app.post("/internal/entitlements/sync", status_code=202)
     async def sync_entitlement(

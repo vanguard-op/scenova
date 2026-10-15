@@ -1,11 +1,12 @@
-"""Client HTTP API for the gateway (C-001, C-002, C-007, C-008, C-012, C-013, C-018, C-020).
+"""Client HTTP API for the gateway (C-001, C-002, C-007, C-008, C-012, C-013, C-018, C-020, C-021).
 
 The gateway authenticates the caller, rate-limits lookups, events, push
 registrations, ratings, and reports, validates the request body, and passes the
 downstream service's response through unchanged, so the frozen contract's status
-codes and error codes reach the client as they are produced. The entitlement read
-and the account update carry no rate limit of their own; the account screen reads
-the plan and writes the consent choice, neither of which is a flood surface.
+codes and error codes reach the client as they are produced. The entitlement
+read, the account update, and the account deletion carry no rate limit of their
+own; the account screen reads the plan, writes the consent choice, and deletes
+the account, none of which is a flood surface.
 
 The curator review routes (C-014 to C-016) are operator-only and carried here for
 the console: the gateway authenticates the operator session — curator role and
@@ -219,6 +220,14 @@ def create_app(
         upstream = await resolved_entitlement.update_account(
             payload.model_dump(), authorization, correlation_id
         )
+        return _passthrough(upstream, correlation_id, resolved_settings)
+
+    @app.delete("/v1/account", status_code=202)
+    async def delete_account(request: Request) -> Response:
+        authorization = request.headers.get("authorization")
+        await resolved_verifier.verify(authorization)
+        correlation_id = _correlation_id(resolved_settings, request)
+        upstream = await resolved_entitlement.delete_account(authorization, correlation_id)
         return _passthrough(upstream, correlation_id, resolved_settings)
 
     @app.get("/internal/review/queue")

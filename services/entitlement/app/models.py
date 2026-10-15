@@ -1,4 +1,4 @@
-"""Wire models for the account and entitlement service (C-018 to C-020).
+"""Wire models for the account and entitlement service (C-018 to C-021).
 
 The stored records are the `schema.md` entities "Account", "Entitlement", and
 "Purchase". The entitlement carries two fields the schema does not name: the
@@ -106,6 +106,14 @@ class AccountResponse(BaseModel):
 
     consentModelProcessing: bool
     locale: str
+
+
+class DeleteAccountResponse(BaseModel):
+    """The C-021 response: the account was deleted."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    deleted: bool
 
 
 class EntitlementSyncRequest(BaseModel):
