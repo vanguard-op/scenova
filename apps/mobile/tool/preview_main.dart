@@ -44,6 +44,9 @@ import 'package:scenova/services/push_tokens.dart';
 import 'package:scenova/services/report_api.dart';
 import 'package:scenova/services/report_outbox.dart';
 import 'package:scenova/services/report_store.dart';
+import 'package:scenova/services/reported_clip_store.dart';
+import 'package:scenova/services/reported_clip_watch.dart';
+import 'package:scenova/services/saved_clip_keeper.dart';
 import 'package:scenova/services/settings_controller.dart';
 import 'package:scenova/theme/app_theme.dart';
 import 'package:scenova/widgets/report_sheet.dart';
@@ -580,15 +583,32 @@ ScenovaServices _services({
   PendingFeedbackStore? feedbackStore,
   ReportApi? reportApi,
   PendingReportStore? reportStore,
+  ReportedClipStore? reportedClipStore,
   PosterFrameStore? posterFrames,
   ClipStore? clips,
 }) {
   final connectivity = ManualConnectivity(online: online);
   final settingsController = settings ?? SettingsController();
+  final resolvedHistory = InMemoryHistoryStore(seed: history);
+  final resolvedClips = clips ?? InMemoryClipStore();
+  final resolvedPosters = posterFrames ?? InMemoryPosterFrameStore();
+  final pushRegistrar = PushRegistrar(
+    api: MockPushRegistrationApi(),
+    tokens: DevelopmentPushTokenProvider(token: 'preview-push'),
+    connectivity: connectivity,
+  );
+  final clipNotices = ClipNoticeInbox(
+    source: clipNoticeSource ?? ScriptedClipNoticeSource(),
+  );
+  final savedClips = SavedClipKeeper(
+    history: resolvedHistory,
+    clips: resolvedClips,
+    posters: resolvedPosters,
+  );
   return ScenovaServices(
     lookupApi: api ?? MockLookupApi(),
     identity: AnonymousIdentity(subject: 'preview'),
-    historyStore: InMemoryHistoryStore(seed: history),
+    historyStore: resolvedHistory,
     connectivity: connectivity,
     settings: settingsController,
     entitlements: FixedEntitlementProvider(entitlement),
@@ -601,14 +621,8 @@ ScenovaServices _services({
       appVersion: 'preview',
       locale: 'en-GB',
     ),
-    pushRegistrar: PushRegistrar(
-      api: MockPushRegistrationApi(),
-      tokens: DevelopmentPushTokenProvider(token: 'preview-push'),
-      connectivity: connectivity,
-    ),
-    clipNotices: ClipNoticeInbox(
-      source: clipNoticeSource ?? ScriptedClipNoticeSource(),
-    ),
+    pushRegistrar: pushRegistrar,
+    clipNotices: clipNotices,
     notificationPermission: notificationPermission,
     featureFlags: featureFlags,
     feedbackOutbox: FeedbackOutbox(
@@ -621,8 +635,16 @@ ScenovaServices _services({
       store: reportStore ?? InMemoryPendingReportStore(),
       connectivity: connectivity,
     ),
-    posterFrames: posterFrames ?? InMemoryPosterFrameStore(),
-    clips: clips ?? InMemoryClipStore(),
+    reportedClips: ReportedClipWatch(
+      history: resolvedHistory,
+      savedClips: savedClips,
+      store: reportedClipStore ?? InMemoryReportedClipStore(),
+      push: pushRegistrar,
+      notices: clipNotices,
+    ),
+    savedClips: savedClips,
+    posterFrames: resolvedPosters,
+    clips: resolvedClips,
     locale: 'en-GB',
   );
 }

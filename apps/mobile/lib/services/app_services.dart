@@ -26,6 +26,9 @@ import 'push_tokens.dart';
 import 'report_api.dart';
 import 'report_outbox.dart';
 import 'report_store.dart';
+import 'reported_clip_store.dart';
+import 'reported_clip_watch.dart';
+import 'saved_clip_keeper.dart';
 import 'settings_controller.dart';
 import 'settings_store.dart';
 
@@ -49,6 +52,8 @@ class ScenovaServices {
     required this.featureFlags,
     required this.feedbackOutbox,
     required this.reportOutbox,
+    required this.reportedClips,
+    required this.savedClips,
     required this.posterFrames,
     required this.clips,
     this.locale = 'en',
@@ -91,6 +96,15 @@ class ScenovaServices {
   /// connection returns (`C-013`, `FEAT-011`).
   final ReportOutbox reportOutbox;
 
+  /// Registers the device for a reported clip's regenerated notice and replaces
+  /// the reported clip with the one the notice delivers (`FEAT-009`,
+  /// `FEAT-011`).
+  final ReportedClipWatch reportedClips;
+
+  /// Fetches a saved lookup's clip and derives its poster frame, keeping both on
+  /// the device beside the entry (`FEAT-009`).
+  final SavedClipKeeper savedClips;
+
   /// The poster frames kept beside the device history, one per saved lookup
   /// (`FEAT-009`). The History row draws its thumbnail from here.
   final PosterFrameStore posterFrames;
@@ -113,6 +127,7 @@ class ScenovaServices {
     FeatureFlags? featureFlags,
     PendingFeedbackStore? feedbackStore,
     PendingReportStore? reportStore,
+    ReportedClipStore? reportedClipStore,
     PosterFrameStore? posterFrames,
     ClipStore? clips,
   }) {
@@ -148,6 +163,40 @@ class ScenovaServices {
     // the notify offer, so the app never prompts at launch.
     const notificationPermission = PlatformNotificationPermission();
 
+    final resolvedHistory = historyStore ?? InMemoryHistoryStore(seed: history);
+    final resolvedClips = clips ?? DeviceClipStore();
+    final resolvedPosters = posterFrames ?? DevicePosterFrameStore();
+    final savedClips = SavedClipKeeper(
+      history: resolvedHistory,
+      clips: resolvedClips,
+      posters: resolvedPosters,
+    );
+    // The clip-ready notice arrives through the platform's messaging service
+    // in production; a laptop run drives the same intake by hand, so the
+    // phrase path is exercisable without a push provider.
+    final clipNotices = ClipNoticeInbox(
+      source: AppConfig.useFirebaseMessaging
+          ? FirebaseClipNoticeSource()
+          : ScriptedClipNoticeSource(),
+    );
+    final pushRegistrar = PushRegistrar(
+      api: AppConfig.useMockPushApi
+          ? MockPushRegistrationApi()
+          : HttpPushRegistrationApi(
+              baseUrl: AppConfig.apiBaseUrl,
+              idTokenProvider: identity.idToken,
+            ),
+      // The device token the notification service addresses (`C-008`): the
+      // real Firebase Cloud Messaging token in production, and a pseudonymous
+      // development token on a laptop, mirroring the identity above.
+      tokens: AppConfig.useFirebaseMessaging
+          ? FirebaseMessagingPushTokenProvider(
+              permission: notificationPermission,
+            )
+          : DevelopmentPushTokenProvider(),
+      connectivity: connectivity,
+    );
+
     return ScenovaServices(
       lookupApi: AppConfig.useMockLookupApi
           ? MockLookupApi(latency: AppConfig.mockLatency)
@@ -157,7 +206,7 @@ class ScenovaServices {
               localeProvider: () => locale,
             ),
       identity: identity,
-      historyStore: historyStore ?? InMemoryHistoryStore(seed: history),
+      historyStore: resolvedHistory,
       connectivity: connectivity,
       settings: settings,
       entitlements: FixedEntitlementProvider(entitlement),
@@ -175,31 +224,8 @@ class ScenovaServices {
         appVersion: AppConfig.appVersion,
         locale: locale,
       ),
-      pushRegistrar: PushRegistrar(
-        api: AppConfig.useMockPushApi
-            ? MockPushRegistrationApi()
-            : HttpPushRegistrationApi(
-                baseUrl: AppConfig.apiBaseUrl,
-                idTokenProvider: identity.idToken,
-              ),
-        // The device token the notification service addresses (`C-008`): the
-        // real Firebase Cloud Messaging token in production, and a pseudonymous
-        // development token on a laptop, mirroring the identity above.
-        tokens: AppConfig.useFirebaseMessaging
-            ? FirebaseMessagingPushTokenProvider(
-                permission: notificationPermission,
-              )
-            : DevelopmentPushTokenProvider(),
-        connectivity: connectivity,
-      ),
-      // The clip-ready notice arrives through the platform's messaging service
-      // in production; a laptop run drives the same intake by hand, so the
-      // phrase path is exercisable without a push provider.
-      clipNotices: ClipNoticeInbox(
-        source: AppConfig.useFirebaseMessaging
-            ? FirebaseClipNoticeSource()
-            : ScriptedClipNoticeSource(),
-      ),
+      pushRegistrar: pushRegistrar,
+      clipNotices: clipNotices,
       notificationPermission: notificationPermission,
       featureFlags: featureFlags ?? RemoteConfigFeatureFlags(),
       feedbackOutbox: FeedbackOutbox(
@@ -222,8 +248,16 @@ class ScenovaServices {
         store: reportStore ?? SharedPreferencesPendingReportStore(),
         connectivity: connectivity,
       ),
-      posterFrames: posterFrames ?? DevicePosterFrameStore(),
-      clips: clips ?? DeviceClipStore(),
+      reportedClips: ReportedClipWatch(
+        history: resolvedHistory,
+        savedClips: savedClips,
+        store: reportedClipStore ?? SharedPreferencesReportedClipStore(),
+        push: pushRegistrar,
+        notices: clipNotices,
+      ),
+      savedClips: savedClips,
+      posterFrames: resolvedPosters,
+      clips: resolvedClips,
       locale: locale,
     );
   }
@@ -233,6 +267,7 @@ class ScenovaServices {
     settings.dispose();
     captureChannel.dispose();
     analytics.dispose();
+    reportedClips.dispose();
     pushRegistrar.dispose();
     clipNotices.dispose();
     feedbackOutbox.dispose();

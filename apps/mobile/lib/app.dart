@@ -59,6 +59,10 @@ class _ScenovaAppState extends State<ScenovaApp> with WidgetsBindingObserver {
 
   /// The notices this process has already routed, so a launch notice delivered
   /// on both the inbox stream and the launch read opens one view.
+  ///
+  /// A notice is identified by its lookup *and* its clip: the same notice
+  /// delivered twice is routed once, while a lookup that gets a second notice
+  /// for a regenerated clip still opens for it (`FEAT-011`).
   final Set<String> _routedNotices = <String>{};
 
   StreamSubscription<ClipNotice>? _noticeSub;
@@ -142,8 +146,9 @@ class _ScenovaAppState extends State<ScenovaApp> with WidgetsBindingObserver {
   }
 
   void _onClipNotice(ClipNotice notice) {
-    if (_routedNotices.contains(notice.lookupId)) return;
-    _routedNotices.add(notice.lookupId);
+    final key = '${notice.lookupId}\u0000${notice.clipUrl}';
+    if (_routedNotices.contains(key)) return;
+    _routedNotices.add(key);
     unawaited(_router.openNoticedLookup(notice));
   }
 

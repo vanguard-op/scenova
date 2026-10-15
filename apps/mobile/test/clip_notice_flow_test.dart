@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scenova/app.dart';
 import 'package:scenova/models/clip_notice.dart';
@@ -414,6 +415,55 @@ void main() {
         await teardown(tester);
       },
     );
+
+    testWidgets('a lookup that gets a second notice opens for its new clip', (
+      tester,
+    ) async {
+      // A reported entry's regenerated clip reaches the reporting reader by a
+      // second notice for the same lookup, so it opens its own view rather than
+      // being read as the notice already routed (`FEAT-011`).
+      final source = ScriptedClipNoticeSource();
+      final api = ScriptedGetLookupApi(result: _waitingWord());
+      final services = buildServices(
+        api: api,
+        clipNoticeSource: source,
+        settings: SettingsController(onboardingComplete: true),
+      );
+
+      usePhoneWindow(tester);
+      await tester.pumpWidget(ScenovaApp(services: services));
+      await tester.pump();
+      await tester.pump();
+
+      source.deliverData(_wirePayload);
+      await tester.pump();
+      await tester.pump();
+      await tester.pump();
+      expect(find.byType(ClipViewScreen), findsOneWidget);
+
+      // The reader closes the clip.
+      Navigator.of(tester.element(find.byType(ClipViewScreen))).maybePop();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.byType(ClipViewScreen), findsNothing);
+
+      source.deliverData(<String, dynamic>{
+        ..._wirePayload,
+        'clipUrl': 'https://cdn.scenova.test/lk_ready-regenerated.mp4',
+      });
+      await tester.pump();
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.byType(ClipViewScreen), findsOneWidget);
+      expect(find.text('xylograph'), findsWidgets);
+      final saved = await services.historyStore.all();
+      expect(
+        saved.single.clipUrl,
+        'https://cdn.scenova.test/lk_ready-regenerated.mp4',
+      );
+      await teardown(tester);
+    });
 
     testWidgets('the view opens for the lookup a notice names', (tester) async {
       final api = ScriptedGetLookupApi(result: _waitingWord());

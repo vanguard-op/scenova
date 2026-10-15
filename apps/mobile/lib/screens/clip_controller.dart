@@ -411,11 +411,21 @@ class ClipViewController extends ChangeNotifier {
       reason: reason.wire,
       clipSource: _clipSource,
     );
-    return services.reportOutbox.submit(
+    final outcome = await services.reportOutbox.submit(
       lookupId: lookupId,
       reason: reason,
       note: note,
     );
+    // A word report regenerates one clip for the reporting reader, delivered by
+    // the clip-ready notice, so the device is registered for it and the
+    // regenerated clip replaces the reported one in history (`FEAT-011`). A
+    // phrase clip is private to the device and its report has no shared effect,
+    // so nothing is regenerated and there is no notice to wait on; a report the
+    // service would not take is retried by the reader first.
+    if (outcome != ReportDelivery.failed && !isPhrase) {
+      unawaited(services.reportedClips.watch(lookupId));
+    }
+    return outcome;
   }
 
   /// The service's lookup for the clip on screen, when there is one.
@@ -676,7 +686,12 @@ class ClipViewController extends ChangeNotifier {
     _noticeDismissed = true;
     _setPhase(ClipPhase.playing);
     _autoplayOrHold();
-    unawaited(_saveToHistory());
+    // A regenerated clip for a reported entry is written to history by the
+    // reported-clip watch, which removes the reported clip and its poster as it
+    // replaces them; saving here as well would write the entry twice.
+    if (!services.reportedClips.isAwaiting(notice.lookupId)) {
+      unawaited(_saveToHistory());
+    }
   }
 
   /// The lookup with [sense] in place of the sense it settles, so the clip the
@@ -828,15 +843,8 @@ class ClipViewController extends ChangeNotifier {
   /// A kept clip replays from the device with no connection (`FEAT-009`); an
   /// entry whose clip the device no longer holds falls back to the source URL,
   /// which replays while online.
-  Future<String?> _deviceClipSource(HistoryEntry entry) async {
-    final key = entry.clipLocalKey;
-    if (key != null) {
-      final source = await services.clips.source(key);
-      if (_disposed) return null;
-      if (source != null) return source;
-    }
-    return entry.clipUrl;
-  }
+  Future<String?> _deviceClipSource(HistoryEntry entry) =>
+      services.savedClips.sourceFor(entry);
 
   /// The saved lookup as a result, with or without the clip the device holds.
   LookupResult _resultFromEntry(HistoryEntry entry, {String? clipUrl}) {
@@ -900,43 +908,8 @@ class ClipViewController extends ChangeNotifier {
       sense: sense,
     );
     await services.historyStore.save(entry);
-    final kept = await _keepClip(entry);
-    await _keepPoster(kept);
-  }
-
-  /// Fetches the clip for [entry] and keeps it on the device.
-  ///
-  /// The clip itself is kept beside the entry (`FEAT-009`), so a saved lookup
-  /// replays with no connection. A clip the device cannot fetch or keep leaves
-  /// the entry on its source, which still replays while online, and returns the
-  /// entry unchanged.
-  Future<HistoryEntry> _keepClip(HistoryEntry entry) async {
-    final clipUrl = entry.clipUrl;
-    if (clipUrl == null) return entry;
-    final key = await services.clips.save(clipUrl: clipUrl, key: entry.id);
-    if (key == null || _disposed) return entry;
-    final kept = entry.copyWith(clipLocalKey: key);
-    await services.historyStore.save(kept);
-    return kept;
-  }
-
-  /// Derives the poster frame for [entry] and keeps it with the stored entry.
-  ///
-  /// The frame is derived from the clip and kept beside the entry on the device
-  /// (`FEAT-009`), so the History row draws it without opening the clip. The
-  /// kept clip is the source when the device holds one, so the frame derives
-  /// from the saved clip rather than reaching for the source again; a clip the
-  /// platform cannot read keeps no frame, and the row falls back to the shared
-  /// still-frame stand-in.
-  Future<void> _keepPoster(HistoryEntry entry) async {
-    final clipUrl = await _deviceClipSource(entry);
-    if (clipUrl == null || _disposed) return;
-    final key = await services.posterFrames.capture(
-      clipUrl: clipUrl,
-      key: entry.id,
-    );
-    if (key == null) return;
-    await services.historyStore.save(entry.copyWith(posterLocalKey: key));
+    final kept = await services.savedClips.keepClip(entry);
+    await services.savedClips.keepPoster(kept);
   }
 
   String _clientLookupId() =>

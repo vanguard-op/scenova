@@ -11,7 +11,9 @@ import 'package:scenova/services/clip_notice_source.dart';
 import 'package:scenova/services/connectivity.dart';
 import 'package:scenova/services/history_store.dart';
 import 'package:scenova/services/lookup_api.dart';
+import 'package:scenova/services/push_registration_api.dart';
 import 'package:scenova/services/report_api.dart';
+import 'package:scenova/services/reported_clip_store.dart';
 import 'package:scenova_design/scenova_design.dart';
 
 import 'support/harness.dart';
@@ -317,6 +319,130 @@ void main() {
 
     // The lookup is still generating, so stop its timers before the test ends.
     controller.dispose();
+    await teardown(tester);
+  });
+
+  testWidgets('reporting a clip registers for the regenerated clip notice', (
+    tester,
+  ) async {
+    final api = MockReportApi();
+    final pushApi = MockPushRegistrationApi();
+    final services = buildServices(
+      api: MockLookupApi(),
+      reportApi: api,
+      pushApi: pushApi,
+    );
+    final controller = _controllerFor(services, 'come');
+    addTearDown(controller.dispose);
+
+    usePhoneWindow(tester);
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+    await tester.pump();
+    expect(controller.phase, ClipPhase.playing);
+    final lookupId = controller.result!.lookupId;
+
+    await _openReportSheet(tester);
+    await _chooseAndSubmit(tester);
+    await tester.pump();
+
+    // A word report regenerates one clip for the reporting reader, delivered by
+    // the clip-ready notice, so the device is registered for it (`FEAT-011`).
+    expect(services.reportedClips.isAwaiting(lookupId), isTrue);
+    expect(pushApi.lookupIds, <String>[lookupId]);
+    await teardown(tester);
+  });
+
+  testWidgets('a phrase report registers for no notice', (tester) async {
+    final api = MockReportApi();
+    final source = ScriptedClipNoticeSource();
+    final services = buildServices(
+      api: MockLookupApi(),
+      reportApi: api,
+      clipNoticeSource: source,
+    );
+    final controller = _controllerFor(services, 'once in a while');
+    addTearDown(controller.dispose);
+
+    usePhoneWindow(tester);
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+    await tester.pump();
+
+    // A phrase clip reaches the device by the clip-ready notice.
+    source.deliver(
+      ClipNotice(
+        lookupId: controller.result!.lookupId,
+        clipUrl: 'https://cdn.scenova.test/phrase.mp4',
+        durationSeconds: 4,
+        resolution: '360p',
+        hasAudio: false,
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(controller.phase, ClipPhase.playing);
+    final lookupId = controller.result!.lookupId;
+
+    await _openReportSheet(tester);
+    await _chooseAndSubmit(tester);
+    await tester.pump();
+
+    // A phrase clip is private to the device, so its report has no shared
+    // effect and nothing is regenerated to wait on (`FEAT-011`).
+    expect(services.reportedClips.isAwaiting(lookupId), isFalse);
+    await teardown(tester);
+  });
+
+  testWidgets('the regenerated clip replaces the reported one in history', (
+    tester,
+  ) async {
+    final api = MockReportApi();
+    final source = ScriptedClipNoticeSource();
+    final store = InMemoryReportedClipStore();
+    final services = buildServices(
+      api: MockLookupApi(),
+      reportApi: api,
+      clipNoticeSource: source,
+      reportedClipStore: store,
+    );
+    final controller = _controllerFor(services, 'come');
+    addTearDown(controller.dispose);
+
+    usePhoneWindow(tester);
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+    await tester.pump();
+    expect(controller.phase, ClipPhase.playing);
+    final lookupId = controller.result!.lookupId;
+
+    await _openReportSheet(tester);
+    await _chooseAndSubmit(tester);
+    await tester.pump();
+
+    final reported = (await services.historyStore.all()).single;
+    expect(reported.lookupId, lookupId);
+    expect(reported.clipUrl, 'mock://clip/library-hit');
+
+    // The regenerated clip arrives by the clip-ready notice (`FEAT-011`).
+    source.deliver(
+      ClipNotice(
+        lookupId: lookupId,
+        clipUrl: 'https://cdn.scenova.test/regenerated.mp4',
+        durationSeconds: 4,
+        resolution: '360p',
+        hasAudio: false,
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
+
+    final replaced = (await services.historyStore.all()).single;
+    expect(replaced.id, reported.id);
+    expect(replaced.clipUrl, 'https://cdn.scenova.test/regenerated.mp4');
+    // The awaited record is cleared once the clip has been replaced.
+    expect(await store.load(), isNot(contains(lookupId)));
     await teardown(tester);
   });
 }
