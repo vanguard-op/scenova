@@ -48,18 +48,18 @@ Response 200: jobId: string, lookupId: string, status: queued|running|succeeded|
 Errors: 401 (not an internal caller), 404 (unknown job). The lookup service consults this on a C-002 poll so a generation that fails or is declined after enqueue resolves to the reader's fallback.
 
 ### C-007: POST /v1/events
-Status: Frozen
+Status: Frozen (revision 1)
 Auth: Firebase ID token in `Authorization` (anonymous before sign-in); rate-limited at the gateway. Events that describe reading behaviour are suppressed by the client until model-processing consent is granted.
 Request: events: [{ eventId: string, name: string (an EVT-### name), occurredAt: string (UTC ISO-8601), anonymousId: string, sessionId: string, platform: android|ios, appVersion: string, locale: string, properties: object }] (batch, at most 50)
 Response 202: accepted: integer
-Errors: 400 (unknown event name; a property carrying personal data), 401 (missing or invalid token), 429 (rate limited)
+Errors: 400 (unknown event name; a property carrying personal data), 401 (missing or invalid token), 429 (rate limited), 503 (event store unavailable; retryable — the batch is retained)
 
 ### C-008: POST /v1/push-registrations
-Status: Frozen (revision 2)
+Status: Frozen (revision 3)
 Auth: Firebase ID token in `Authorization` (anonymous before sign-in); rate-limited at the gateway
 Request: token: string (the platform push token), platform: android|ios, lookupId: string (the lookup the reader asked to be notified about)
 Response 202: registered: boolean
-Errors: 400 (missing or unreadable token, unknown platform, unknown lookup), 401 (missing or invalid token), 429 (rate limited). The notification service pushes a clip-ready notice to this token when that lookup's generation completes; the notice's data payload is lookupId: string, clipUrl: string, durationSeconds: number, resolution: "360p", hasAudio: boolean, and the client obtains the clip from it, plays it, and saves it to device history.
+Errors: 400 (missing or unreadable token, unknown platform, unknown lookup), 401 (missing or invalid token), 429 (rate limited), 503 (registration store unavailable; retryable — the reader should be asked again). The notification service pushes a clip-ready notice to this token when that lookup's generation completes; the notice's data payload is lookupId: string, clipUrl: string, durationSeconds: number, resolution: "360p", hasAudio: boolean, and the client obtains the clip from it, plays it, and saves it to device history.
 
 ### C-009: POST /internal/library/entries
 Status: Frozen (revision 2)
