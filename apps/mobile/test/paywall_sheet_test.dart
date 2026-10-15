@@ -7,6 +7,7 @@ import 'package:scenova/services/app_services.dart';
 import 'package:scenova/services/purchase_service.dart';
 import 'package:scenova/theme/app_theme.dart';
 import 'package:scenova/widgets/paywall_sheet.dart';
+import 'package:scenova/widgets/sign_in_sheet.dart';
 import 'package:scenova_design/scenova_design.dart';
 
 import 'support/harness.dart';
@@ -223,6 +224,26 @@ void main() {
     expect(find.text('Sign in'), findsOneWidget);
     expect(find.text('Continue without a clip'), findsOneWidget);
     expect(find.text('Start Pro'), findsNothing);
+    await teardown(tester);
+  });
+
+  testWidgets('signing in from the prompt loads the options', (tester) async {
+    final session = DevelopmentAccountSession(signedIn: false);
+    await pumpPaywall(tester, entitlement: _signedOut, session: session);
+
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SignInSheet), findsOneWidget);
+
+    await tester.enterText(signInField(0), 'marisol@example.com');
+    await tester.enterText(signInField(1), 'hunter2');
+    await tester.tap(signInAction());
+    await tester.pumpAndSettle();
+
+    expect(session.signInCalls, 1);
+    expect(find.text('Start Pro'), findsOneWidget);
+    expect(find.text('Sign in first'), findsNothing);
     await teardown(tester);
   });
 

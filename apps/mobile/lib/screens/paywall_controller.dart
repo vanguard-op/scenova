@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 
 import '../models/entitlement.dart';
-import '../services/account_session.dart';
 import '../services/analytics.dart';
 import '../services/entitlement_provider.dart';
 import '../services/purchase_service.dart';
@@ -49,23 +48,22 @@ class PaywallController extends ChangeNotifier {
   PaywallController({
     required Entitlement entitlement,
     required this.purchases,
-    required this.session,
     required this.plan,
     required this.analytics,
   }) : _entitlement = entitlement,
        _signedIn = entitlement.signedIn;
 
   final PurchaseService purchases;
-  final AccountSession session;
 
   /// The reader's plan cache, shared with the tier gates (`FEAT-013`): a
   /// completed purchase re-reads it, so the allowance and the clip-retention
-  /// gate take effect on the lookup that follows.
+  /// gate take effect on the lookup that follows, and a sign-in reads back the
+  /// plan the account holds.
   final EntitlementProvider plan;
 
   final AnalyticsClient analytics;
 
-  final Entitlement _entitlement;
+  Entitlement _entitlement;
   bool _signedIn;
   PaywallStatus _status = PaywallStatus.loading;
   StoreOffering? _offering;
@@ -79,7 +77,7 @@ class PaywallController extends ChangeNotifier {
 
   /// Whether the reader holds an account. It starts from the entitlement and
   /// turns true once the reader signs in from the sheet.
-  bool get signedIn => _signedIn;
+  bool get holdsAccount => _signedIn;
 
   PaywallStatus get status => _status;
 
@@ -113,7 +111,6 @@ class PaywallController extends ChangeNotifier {
   /// Reads the store's offering, or settles on the state that explains why it
   /// could not be read.
   Future<void> load() async {
-    _status = PaywallStatus.loading;
     _actionError = null;
     _retryAction = null;
     _notify();
@@ -126,19 +123,7 @@ class PaywallController extends ChangeNotifier {
       _notify();
       return;
     }
-    try {
-      final offering = await purchases.offerings();
-      if (_disposed) return;
-      _offering = offering;
-      _status = PaywallStatus.ready;
-    } on StoreUnavailable {
-      if (_disposed) return;
-      _status = PaywallStatus.storeUnavailable;
-    } on Object {
-      if (_disposed) return;
-      _status = PaywallStatus.error;
-    }
-    _notify();
+    await _readOffering();
   }
 
   /// Starts the Pro subscription, including the trial.
@@ -158,22 +143,42 @@ class PaywallController extends ChangeNotifier {
     };
   }
 
-  /// Signs the reader in, then reads the offering so the options appear.
-  Future<void> signIn() async {
+  /// Takes up the account the reader has just signed into, then reads the plan
+  /// it holds and the store's offering, so the options appear.
+  ///
+  /// The sign-in itself belongs to the sign-in sheet, which hands the reader's
+  /// credentials to the identity provider (`FEAT-013`, D-032).
+  Future<void> signedIn() async {
     if (busy) return;
     _actionError = null;
     _retryAction = null;
+    _signedIn = true;
+    _notify();
+    // The plan follows the account, so the meter reads what the account holds
+    // rather than what the device showed before sign-in (`FEAT-013`).
+    await plan.refresh();
+    _entitlement = await plan.current();
+    await _readOffering();
+  }
+
+  /// Reads the store's offering, or settles on the state that explains why it
+  /// could not be read.
+  Future<void> _readOffering() async {
+    _status = PaywallStatus.loading;
     _notify();
     try {
-      await session.signIn();
+      final offering = await purchases.offerings();
       if (_disposed) return;
-      _signedIn = true;
-      await load();
+      _offering = offering;
+      _status = PaywallStatus.ready;
+    } on StoreUnavailable {
+      if (_disposed) return;
+      _status = PaywallStatus.storeUnavailable;
     } on Object {
       if (_disposed) return;
-      _actionError = 'Signing in did not work. Try again.';
-      _notify();
+      _status = PaywallStatus.error;
     }
+    _notify();
   }
 
   Future<PaywallOutcome?> _purchase(

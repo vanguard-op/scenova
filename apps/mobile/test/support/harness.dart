@@ -48,6 +48,7 @@ import 'package:scenova/services/saved_clip_keeper.dart';
 import 'package:scenova/services/settings_controller.dart';
 import 'package:scenova/services/tier_gates.dart';
 import 'package:scenova/theme/app_theme.dart';
+import 'package:scenova/widgets/sign_in_sheet.dart';
 import 'package:scenova_design/scenova_design.dart';
 
 /// The collaborators a test hands to a screen.
@@ -341,6 +342,18 @@ Future<ScenovaServices> pumpPreferences(
 /// system icon, so a test asserts the app's own icon and not the platform's.
 Finder findIcon(AppIcon icon) => find.byWidgetPredicate(
   (widget) => widget is AppIconView && widget.icon == icon,
+);
+
+/// A field of the sign-in sheet, scoped to the sheet so a field on the surface
+/// behind it is never typed into by mistake.
+Finder signInField(int index) => find
+    .descendant(of: find.byType(SignInSheet), matching: find.byType(TextField))
+    .at(index);
+
+/// The sign-in sheet's own action, for the same reason.
+Finder signInAction() => find.descendant(
+  of: find.byType(SignInSheet),
+  matching: find.widgetWithText(ScenovaButton, 'Sign in'),
 );
 
 /// Sizes the test window to a phone so a mobile screen lays out as designed.

@@ -3,6 +3,7 @@ import 'package:scenova_design/scenova_design.dart';
 
 import '../models/entitlement.dart';
 import '../services/app_services.dart';
+import '../widgets/sign_in_sheet.dart';
 import 'account_controller.dart';
 
 /// Screen 8: Account (`docs/Scenova/screens/08-account.md`).
@@ -66,6 +67,16 @@ class _AccountScreenState extends State<AccountScreen> {
     if (mounted) setState(() {});
   }
 
+  /// Opens the sign-in sheet and, once the reader holds an account, reads the
+  /// plan it holds (`FEAT-013`).
+  Future<void> _signIn() async {
+    final controller = _controller;
+    if (controller == null) return;
+    final signedIn = await showSignInSheet(context);
+    if (!mounted || !signedIn) return;
+    await controller.signedIn();
+  }
+
   @override
   Widget build(BuildContext context) {
     final tokens = ScenovaTokens.of(context);
@@ -97,7 +108,7 @@ class _AccountScreenState extends State<AccountScreen> {
           onRetry: controller.load,
         );
       case AccountStatus.signedOut:
-        return _SignedOut(controller: controller);
+        return _SignedOut(controller: controller, onSignIn: _signIn);
       case AccountStatus.ready:
         return _Plan(
           controller: controller,
@@ -110,9 +121,12 @@ class _AccountScreenState extends State<AccountScreen> {
 /// The signed-out state: the prompt to sign in
 /// (`docs/Scenova/screens/08-account.md` → "Signed out").
 class _SignedOut extends StatelessWidget {
-  const _SignedOut({required this.controller});
+  const _SignedOut({required this.controller, required this.onSignIn});
 
   final AccountController controller;
+
+  /// Opens the sign-in sheet (`FEAT-013`, D-032).
+  final VoidCallback onSignIn;
 
   @override
   Widget build(BuildContext context) {
@@ -136,7 +150,7 @@ class _SignedOut extends StatelessWidget {
                 'Sign in to see your plan and keep your lookups with you, on '
                 'any device.',
             actionLabel: 'Sign in',
-            onAction: controller.signIn,
+            onAction: onSignIn,
           ),
         ),
       ],

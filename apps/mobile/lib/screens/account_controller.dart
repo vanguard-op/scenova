@@ -86,21 +86,18 @@ class AccountController extends ChangeNotifier {
     await _readEntitlement();
   }
 
-  /// Starts the identity provider's sign-in flow, then reads the entitlement.
-  Future<void> signIn() async {
-    if (_busy) return;
-    _beginAction();
-    try {
-      await session.signIn();
-      await _readEntitlement();
-      await plan.refresh();
-    } on AccountSignInUnavailable {
-      _fail('Signing in is not available in this build yet.');
-    } on Object {
-      _fail('Signing in did not work. Try again.');
-    } finally {
-      _endAction();
-    }
+  /// Takes up the account the reader has just signed into, then reads the plan
+  /// and allowance it holds.
+  ///
+  /// The sign-in itself belongs to the sign-in sheet, which hands the reader's
+  /// credentials to the identity provider (`FEAT-013`, D-032); this only
+  /// re-reads what the account now holds, so the plan and the gates the plan
+  /// puts on the device take effect at once.
+  Future<void> signedIn() async {
+    _actionError = null;
+    _retry = null;
+    await _readEntitlement();
+    await plan.refresh();
   }
 
   /// Ends the account session on this device and returns to the signed-out

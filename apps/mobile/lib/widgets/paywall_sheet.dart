@@ -7,6 +7,7 @@ import '../models/entitlement.dart';
 import '../screens/paywall_controller.dart';
 import '../services/app_services.dart';
 import '../services/purchase_service.dart';
+import 'sign_in_sheet.dart';
 
 /// Opens the Paywall sheet over the Clip View
 /// (`docs/Scenova/screens/04-paywall.md`).
@@ -68,7 +69,6 @@ class _PaywallSheetState extends State<_PaywallSheet> {
     final controller = PaywallController(
       entitlement: widget.entitlement,
       purchases: services.purchases,
-      session: services.accountSession,
       plan: services.entitlements,
       analytics: services.analytics,
     );
@@ -92,6 +92,16 @@ class _PaywallSheetState extends State<_PaywallSheet> {
     final outcome = await action();
     if (!mounted || outcome == null) return;
     Navigator.of(context).pop(outcome);
+  }
+
+  /// Opens the sign-in sheet and, once the reader holds an account, reads the
+  /// plan it holds and the store's offering (`FEAT-013`, D-032).
+  Future<void> _signIn() async {
+    final controller = _controller;
+    if (controller == null) return;
+    final signedIn = await showSignInSheet(context);
+    if (!mounted || !signedIn) return;
+    await controller.signedIn();
   }
 
   @override
@@ -287,10 +297,7 @@ class _PaywallSheetState extends State<_PaywallSheet> {
       ScenovaButton(
         label: 'Sign in',
         expanded: true,
-        isSubmitting: controller.busy,
-        onPressed: controller.busy
-            ? null
-            : () => unawaited(controller.signIn()),
+        onPressed: () => unawaited(_signIn()),
       ),
       SizedBox(height: tokens.spacing.sm),
       ScenovaButton(

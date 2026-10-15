@@ -6,6 +6,7 @@ import 'package:scenova/models/entitlement.dart';
 import 'package:scenova/services/account_session.dart';
 import 'package:scenova/services/entitlement_api.dart';
 import 'package:scenova/services/purchase_service.dart';
+import 'package:scenova/widgets/sign_in_sheet.dart';
 import 'package:scenova_design/scenova_design.dart';
 
 import 'support/harness.dart';
@@ -240,11 +241,47 @@ void main() {
     expect(find.text('Sign in to Scenova'), findsOneWidget);
 
     await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+
+    // The prompt opens the sign-in form; the plan is read once the reader holds
+    // an account (FEAT-013, D-032).
+    expect(find.byType(SignInSheet), findsOneWidget);
+
+    await tester.enterText(signInField(0), 'marisol@example.com');
+    await tester.enterText(signInField(1), 'hunter2');
+    await tester.tap(signInAction());
+    await tester.pumpAndSettle();
+
+    expect(session.signInCalls, 1);
+    expect(session.lastEmail, 'marisol@example.com');
+    expect(find.text('Free'), findsOneWidget);
+    await teardown(tester);
+  });
+
+  testWidgets('a sign-in that does not go through stays on the form', (
+    tester,
+  ) async {
+    final session = DevelopmentAccountSession(
+      failure: const AccountSignInException(AccountSignInFailure.credentials),
+    );
+    await pumpAccount(
+      tester,
+      entitlementsApi: _SessionAwareEntitlementApi(session, _free),
+      accountSession: session,
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(signInField(0), 'marisol@example.com');
+    await tester.enterText(signInField(1), 'wrong');
+    await tester.tap(signInAction());
     await tester.pump();
     await tester.pump();
 
-    expect(session.signInCalls, 1);
-    expect(find.text('Free'), findsOneWidget);
+    expect(find.text('That email and password don\'t match.'), findsOneWidget);
+    expect(find.byType(SignInSheet), findsOneWidget);
     await teardown(tester);
   });
 

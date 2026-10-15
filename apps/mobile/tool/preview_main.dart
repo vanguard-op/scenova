@@ -25,6 +25,7 @@ import 'package:scenova/screens/onboarding_screen.dart';
 import 'package:scenova/screens/paywall_controller.dart';
 import 'package:scenova/screens/preferences_controller.dart';
 import 'package:scenova/screens/preferences_screen.dart';
+import 'package:scenova/screens/sign_in_controller.dart';
 import 'package:scenova/services/account_api.dart';
 import 'package:scenova/services/account_session.dart';
 import 'package:scenova/services/analytics.dart';
@@ -62,6 +63,7 @@ import 'package:scenova/theme/app_theme.dart';
 import 'package:scenova/widgets/clear_history_dialog.dart';
 import 'package:scenova/widgets/paywall_sheet.dart';
 import 'package:scenova/widgets/report_sheet.dart';
+import 'package:scenova/widgets/sign_in_sheet.dart';
 import 'package:scenova_design/scenova_design.dart';
 
 void main() => runApp(const PreviewApp());
@@ -480,6 +482,30 @@ List<(String, Widget)> _frames() {
         ),
       ),
     ),
+    ('Account — sign in (the form)', _signIn()),
+    (
+      'Account — sign in, a field to correct',
+      _signIn(drive: _SignInDrive.empty),
+    ),
+    (
+      'Account — sign in, refused',
+      _signIn(
+        session: DevelopmentAccountSession(
+          failure: const AccountSignInException(
+            AccountSignInFailure.credentials,
+          ),
+        ),
+        drive: _SignInDrive.attempt,
+      ),
+    ),
+    ('Account — sign in, offline', _signIn(online: false)),
+    (
+      'Account — sign in, in flight',
+      _signIn(
+        session: DevelopmentAccountSession(latency: const Duration(minutes: 5)),
+        drive: _SignInDrive.attempt,
+      ),
+    ),
     ('Paywall — allowance exhausted (default)', _paywall()),
     (
       'Paywall — purchasing',
@@ -781,6 +807,108 @@ class _PreviewAccountState extends State<_PreviewAccount> {
       AccountScreen(controller: widget.controller);
 }
 
+/// The sign-in sheet over the Account screen's signed-out prompt
+/// (`FEAT-013`; `docs/Scenova/screens/08-account.md` → "Signed out").
+///
+/// [drive] fills the form and submits it once the sheet is up, so the states
+/// that need an attempt — a field to correct, a refusal, and the attempt in
+/// flight — are on screen for the frame. Tooling only.
+Widget _signIn({
+  AccountSession? session,
+  bool online = true,
+  _SignInDrive drive = _SignInDrive.none,
+}) {
+  final services = _services(
+    accountSession: session,
+    online: online,
+    // The Account screen behind the sheet is the signed-out one, which is where
+    // the prompt and the sheet are reached from.
+    entitlementsApi: MockEntitlementApi(
+      error: const EntitlementApiException(401, 'Sign in to see your plan.'),
+    ),
+  );
+  return ScenovaScope(
+    services: services,
+    child: _PreviewSignIn(
+      controller: SignInController(
+        session: services.accountSession,
+        connectivity: services.connectivity,
+      ),
+      drive: drive,
+    ),
+  );
+}
+
+/// What a sign-in preview does once the sheet is up.
+enum _SignInDrive { none, empty, attempt }
+
+/// Opens the sign-in sheet over the Account screen and drives it through the
+/// state the gallery needs to show. Tooling only.
+class _PreviewSignIn extends StatefulWidget {
+  const _PreviewSignIn({required this.controller, required this.drive});
+
+  final SignInController controller;
+  final _SignInDrive drive;
+
+  @override
+  State<_PreviewSignIn> createState() => _PreviewSignInState();
+}
+
+class _PreviewSignInState extends State<_PreviewSignIn> {
+  static const String _email = 'marisol@example.com';
+  static const String _password = 'hunter2';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _open());
+  }
+
+  Future<void> _open() async {
+    unawaited(showSignInSheet(context, controller: widget.controller));
+    if (widget.drive == _SignInDrive.none) return;
+    // The sheet settles before anything is typed into it.
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    if (!mounted) return;
+    switch (widget.drive) {
+      case _SignInDrive.none:
+        break;
+      case _SignInDrive.empty:
+        await widget.controller.submit(email: '', password: '');
+      case _SignInDrive.attempt:
+        _fillForm(email: _email, password: _password);
+        await widget.controller.submit(email: _email, password: _password);
+    }
+  }
+
+  /// Types the reader's credentials into the sheet's own fields.
+  ///
+  /// The controller is given the text directly, so a frame that shows an
+  /// attempt needs the fields filled the way the reader would have left them.
+  /// Tooling only.
+  void _fillForm({required String email, required String password}) {
+    final fields = <EditableText>[];
+    void visit(Element element) {
+      final widget = element.widget;
+      if (widget is EditableText) fields.add(widget);
+      element.visitChildren(visit);
+    }
+
+    WidgetsBinding.instance.rootElement?.visitChildren(visit);
+    if (fields.isNotEmpty) fields.first.controller.text = email;
+    if (fields.length > 1) fields[1].controller.text = password;
+  }
+
+  @override
+  void dispose() {
+    widget.controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => const AccountScreen();
+}
+
 /// The Paywall sheet, driven through the scripted store.
 ///
 /// [tap] fires one of the purchase actions once the offering has loaded, so the
@@ -799,7 +927,6 @@ Widget _paywall({
   final controller = PaywallController(
     entitlement: entitlement,
     purchases: services.purchases,
-    session: services.accountSession,
     plan: services.entitlements,
     analytics: services.analytics,
   );
