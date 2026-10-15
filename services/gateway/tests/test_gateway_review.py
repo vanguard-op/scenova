@@ -153,7 +153,13 @@ def test_an_action_passes_through_with_its_body() -> None:
     feedback = _FakeFeedbackClient(
         body=b'{"actionId":"ma_1","entryId":"le_1","status":"active","state":"actioned"}'
     )
-    payload = {"action": "clear", "phrase": None, "notes": None, "expectedState": "queued"}
+    payload = {
+        "action": "choose",
+        "chosenClip": "serving",
+        "phrase": None,
+        "notes": None,
+        "expectedState": "queued",
+    }
 
     with _client(feedback) as client:
         response = client.post(
@@ -165,7 +171,9 @@ def test_an_action_passes_through_with_its_body() -> None:
     assert feedback.last_method == "POST"
     assert feedback.last_path == "/internal/review/entries/le_1/actions"
     assert feedback.last_body is not None
-    assert b'"action":"clear"' in feedback.last_body.replace(b" ", b"")
+    forwarded = feedback.last_body.replace(b" ", b"")
+    assert b'"action":"choose"' in forwarded
+    assert b'"chosenClip":"serving"' in forwarded
 
 
 def test_a_missing_operator_session_is_unauthorized() -> None:
