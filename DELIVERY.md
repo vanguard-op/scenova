@@ -128,7 +128,7 @@ docs/           BPRD (product-shaper)
 | T-136 | — | infra-engineer | Done | — |
 | T-135 | FEAT-008 | backend-engineer | Done | — |
 | T-138 | — | infra-engineer | Done | — |
-| T-137 | FEAT-011, FEAT-013 | frontend-engineer | In Progress | C-007, C-008 |
+| T-137 | FEAT-011, FEAT-013 | frontend-engineer | Done | C-007, C-008 |
 | T-139 | — | backend-engineer | In Progress | — |
 
 
