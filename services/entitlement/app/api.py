@@ -20,6 +20,10 @@ identity, and is never reachable from the reader client.
 an internal seam rather than a numbered contract: the lookup service calls it
 before it serves or generates, so one lookup spends one unit of the allowance
 whether it hits the library or generates.
+
+`POST /internal/accounts/purge` runs the retention pass: it hard-deletes every
+deleted account past the documented window. It is an internal seam rather than a
+numbered contract, triggered by a scheduled caller.
 """
 
 from __future__ import annotations
@@ -41,6 +45,7 @@ from .models import (
     DeleteAccountResponse,
     EntitlementResponse,
     EntitlementSyncRequest,
+    PurgeResponse,
     SpendRequest,
     SpendResponse,
     SyncResponse,
@@ -63,6 +68,7 @@ def create_app(
         pro_lookups=resolved_settings.pro_lookups,
         topup_lookups=resolved_settings.topup_lookups,
         trial_days=resolved_settings.trial_days,
+        retention_days=resolved_settings.retention_days,
     )
     resolved_verifier = verifier or build_token_verifier(resolved_settings)
 
@@ -126,6 +132,12 @@ def create_app(
         _require_internal(resolved_settings, request.headers)
         subject = Subject(id=payload.subject)
         return await resolved_service.spend(subject, payload.clientLookupId)
+
+    @app.post("/internal/accounts/purge")
+    async def purge_accounts(request: Request) -> PurgeResponse:
+        _require_internal(resolved_settings, request.headers)
+        purged = await resolved_service.purge_deleted_accounts()
+        return PurgeResponse(purged=purged)
 
     return app
 

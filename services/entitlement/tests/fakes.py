@@ -55,6 +55,7 @@ def rig(
     pro_lookups: int = 50,
     topup_lookups: int = 20,
     trial_days: int = 7,
+    retention_days: int = 30,
     clock: Clock | None = None,
 ) -> Rig:
     """Wire the service with an in-memory store and a movable clock."""
@@ -67,6 +68,7 @@ def rig(
         pro_lookups=pro_lookups,
         topup_lookups=topup_lookups,
         trial_days=trial_days,
+        retention_days=retention_days,
         clock=resolved_clock,
     )
     return Rig(service=service, store=store, clock=resolved_clock)

@@ -116,6 +116,19 @@ class DeleteAccountResponse(BaseModel):
     deleted: bool
 
 
+class PurgeResponse(BaseModel):
+    """The retention pass's outcome: how many deleted accounts were hard-deleted.
+
+    The purge is an internal governance seam rather than a numbered contract, like
+    the analytics intake's retention pass: a scheduled caller runs it, and the
+    count is its report.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    purged: int
+
+
 class EntitlementSyncRequest(BaseModel):
     """The C-019 request: one signed store billing event."""
 

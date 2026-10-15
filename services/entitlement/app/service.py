@@ -25,6 +25,10 @@ allowance whether it is served or generated, and a lookup with nothing left is
 refused without spending so it resolves to the fallback. It is an internal seam,
 not a numbered contract.
 
+`purge_deleted_accounts` is the retention pass: a deleted account's record and
+its personal data are hard-deleted once the documented window closes (nfr.md
+"Data lifecycle"). It is an internal seam, not a numbered contract.
+
 A period rolls forward on any access, so a reader who has not opened the app for
 a month is metered against the month they are in, not the one they left. A
 top-up is deliberately not carried into the new period.
@@ -34,6 +38,7 @@ from __future__ import annotations
 
 import asyncio
 import calendar
+import logging
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -69,6 +74,8 @@ from .store import (
     new_purchase_id,
 )
 
+logger = logging.getLogger(__name__)
+
 # The locale a new account starts on. branding.md "Launch locales" ships the
 # English UI at v1; the reader can change it in Preferences.
 DEFAULT_LOCALE = "en"
@@ -85,6 +92,7 @@ class EntitlementService:
         pro_lookups: int,
         topup_lookups: int,
         trial_days: int,
+        retention_days: int,
         clock: Callable[[], datetime] | None = None,
     ) -> None:
         self._store = store
@@ -92,6 +100,7 @@ class EntitlementService:
         self._pro_lookups = max(0, pro_lookups)
         self._topup_lookups = max(0, topup_lookups)
         self._trial_days = max(0, trial_days)
+        self._retention_days = max(0, retention_days)
         self._clock = clock if clock is not None else _utcnow
         # Serialises the read-modify-write of an allowance, so two lookups racing
         # for the last unit cannot both spend it and a redelivered event is
@@ -162,6 +171,28 @@ class EntitlementService:
                 raise NoAccountError("This account no longer exists.")
             await self._store.delete_account(replace(account, deleted_at=_iso(self._clock())))
         return DeleteAccountResponse(deleted=True)
+
+    async def purge_deleted_accounts(self, now: datetime | None = None) -> int:
+        """Hard-delete accounts past the retention window (nfr.md "Data lifecycle").
+
+        A deleted account is a tombstone until the window closes: the reader is
+        signed out and no lookup meters against it, but the record still holds
+        their email and locale. Once the window has closed the record and its
+        personal data are hard-deleted, so the deletion request is honoured within
+        the documented 30 days. The financial records and the shared library are
+        left as they are.
+
+        The pass is idempotent: it is a scheduled job, so running it again finds
+        nothing due and reports zero.
+        """
+
+        moment = now if now is not None else self._clock()
+        cutoff = moment - timedelta(days=self._retention_days)
+        async with self._write_lock:
+            purged = await self._store.purge_deleted_before(cutoff)
+        if purged:
+            logger.info("hard-deleted %d accounts past the retention window", purged)
+        return purged
 
     async def sync(self, request: EntitlementSyncRequest) -> SyncResponse:
         """Apply one signed store billing event (C-019).

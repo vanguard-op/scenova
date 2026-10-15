@@ -31,6 +31,12 @@ DEFAULT_TOPUP_LOOKUPS = 20
 # monetization.md "Trial Period": a 7-day Pro trial at sign-up, no card.
 DEFAULT_TRIAL_DAYS = 7
 
+# nfr.md "Data lifecycle": a deleted account and its entitlement are hard-deleted
+# within 30 days of the deletion request. The window is a policy the docs fix, not
+# a per-environment setting, so it is a constant here rather than an environment
+# variable.
+RETENTION_DAYS = 30
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -49,6 +55,7 @@ class Settings:
     pro_lookups: int = DEFAULT_PRO_LOOKUPS
     topup_lookups: int = DEFAULT_TOPUP_LOOKUPS
     trial_days: int = DEFAULT_TRIAL_DAYS
+    retention_days: int = RETENTION_DAYS
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Settings:

@@ -17,12 +17,14 @@ port, holding the same entities, so no caller changes.
 Deleting an account marks the account record and drops its entitlement, so the
 token subject has no account from then on and no further lookup can spend
 against it. The record is the tombstone the deletion needs, and its personal
-data is hard-deleted with it once the retention window closes.
+data is hard-deleted with it once the retention window closes; the
+`purge_deleted_before` pass is what carries that out (nfr.md "Data lifecycle").
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Protocol
 from uuid import uuid4
 
@@ -106,6 +108,16 @@ class EntitlementStore(Protocol):
         """Mark an account deleted and drop its entitlement."""
         ...
 
+    async def purge_deleted_before(self, cutoff: datetime) -> int:
+        """Hard-delete accounts deleted at or before the cutoff; return the count.
+
+        Only the account record and any entitlement under it go: the record's
+        personal data is what the retention window holds, the financial records
+        stay for their own retention, and the shared library carries no personal
+        data (nfr.md "Data lifecycle").
+        """
+        ...
+
     async def entitlement(self, account_id: str) -> EntitlementRecord | None:
         """The account's entitlement, or None."""
         ...
@@ -180,6 +192,20 @@ class InMemoryEntitlementStore:
         self._accounts[account.id] = account
         self._entitlements.pop(account.id, None)
 
+    async def purge_deleted_before(self, cutoff: datetime) -> int:
+        due = [
+            account_id
+            for account_id, account in self._accounts.items()
+            if account.deleted_at is not None and _parse_iso(account.deleted_at) <= cutoff
+        ]
+        for account_id in due:
+            # The record and its personal data are gone for good; any entitlement
+            # still under it goes too. Purchases are financial records and stay
+            # for their own retention (nfr.md "Data lifecycle").
+            del self._accounts[account_id]
+            self._entitlements.pop(account_id, None)
+        return len(due)
+
     async def entitlement(self, account_id: str) -> EntitlementRecord | None:
         return self._entitlements.get(account_id)
 
@@ -229,3 +255,15 @@ def new_entitlement_id() -> str:
 
 def new_purchase_id() -> str:
     return f"pu_{uuid4().hex}"
+
+
+def _parse_iso(value: str) -> datetime:
+    """Parse a stored UTC ISO-8601 timestamp, normalised to UTC."""
+
+    text = value.strip()
+    if text.endswith(("Z", "z")):
+        text = text[:-1] + "+00:00"
+    parsed = datetime.fromisoformat(text)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
