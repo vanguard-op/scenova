@@ -23,6 +23,12 @@ class AllowanceIndicator extends StatelessWidget {
     if (entitlement.unmetered) {
       label = 'Lookups are free while Scenova is in early access.';
       color = colors.textSecondary;
+    } else if (!entitlement.signedIn) {
+      // The reader holds no account: the guest allowance is device-local, so
+      // the indicator asks them to sign in rather than inventing a count
+      // (`docs/Scenova/monetization.md` → "Guest Allowance").
+      label = 'Sign in to keep your lookups.';
+      color = colors.textSecondary;
     } else if ((entitlement.lookupsRemaining ?? 0) <= 0) {
       label = 'You have used this month\'s lookups.';
       color = colors.warning.element;

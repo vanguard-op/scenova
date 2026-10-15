@@ -174,7 +174,8 @@ void main() {
       entitlement: const Entitlement(
         tier: PlanTier.free,
         signedIn: true,
-        lookupsRemaining: 0,
+        lookupsUsed: 20,
+        lookupsLimit: 20,
       ),
     );
     final controller = ClipViewController(

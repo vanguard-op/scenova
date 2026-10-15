@@ -67,6 +67,14 @@ abstract final class AppConfig {
     defaultValue: false,
   );
 
+  /// The entitlement read (`C-018`). Live by default; opt into the scripted
+  /// plan with `--dart-define=SCENOVA_USE_MOCK_ENTITLEMENT=true`, so the
+  /// Account screen's states can be viewed before the service is reachable.
+  static const bool useMockEntitlementApi = bool.fromEnvironment(
+    'SCENOVA_USE_MOCK_ENTITLEMENT',
+    defaultValue: false,
+  );
+
   /// The hosts that resolve to the developer's own machine, where the local
   /// stack runs over plaintext. `10.0.2.2` is the Android emulator's alias for
   /// the host's loopback interface, so it reaches the same machine as

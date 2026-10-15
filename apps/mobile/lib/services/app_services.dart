@@ -4,6 +4,7 @@ import '../config.dart';
 import '../models/entitlement.dart';
 import '../models/history_entry.dart';
 import '../models/lookup.dart';
+import 'account_session.dart';
 import 'analytics.dart';
 import 'analytics_api.dart';
 import 'capture_channel.dart';
@@ -11,6 +12,7 @@ import 'clip_notice_inbox.dart';
 import 'clip_notice_source.dart';
 import 'clip_store.dart';
 import 'connectivity.dart';
+import 'entitlement_api.dart';
 import 'entitlement_provider.dart';
 import 'feature_flags.dart';
 import 'feedback_api.dart';
@@ -20,6 +22,7 @@ import 'history_store.dart';
 import 'identity.dart';
 import 'lookup_api.dart';
 import 'poster_frame_store.dart';
+import 'purchase_service.dart';
 import 'push_registration_api.dart';
 import 'push_registrar.dart';
 import 'push_tokens.dart';
@@ -44,6 +47,9 @@ class ScenovaServices {
     required this.connectivity,
     required this.settings,
     required this.entitlements,
+    required this.entitlementsApi,
+    required this.accountSession,
+    required this.purchases,
     required this.captureChannel,
     required this.analytics,
     required this.pushRegistrar,
@@ -68,6 +74,17 @@ class ScenovaServices {
   final ConnectivityMonitor connectivity;
   final SettingsController settings;
   final EntitlementProvider entitlements;
+
+  /// The entitlement service (`C-018`): the plan and the lookups spent this
+  /// month, as the Account screen reads them.
+  final EntitlementApi entitlementsApi;
+
+  /// The reader's account session (`FEAT-013`): sign-in and sign-out.
+  final AccountSession accountSession;
+
+  /// The store (`FEAT-013`): the Pro subscription, its management, and restore.
+  final PurchaseService purchases;
+
   final CaptureChannel captureChannel;
 
   /// Emits the product's events (`C-007`).
@@ -139,7 +156,8 @@ class ScenovaServices {
         !AppConfig.useMockAnalyticsApi ||
         !AppConfig.useMockPushApi ||
         !AppConfig.useMockFeedbackApi ||
-        !AppConfig.useMockReportApi;
+        !AppConfig.useMockReportApi ||
+        !AppConfig.useMockEntitlementApi;
     if (useLiveGateway) AppConfig.ensureSecureGateway(AppConfig.apiBaseUrl);
 
     // The identity the lookup path presents: an anonymous Firebase ID token in
@@ -148,6 +166,20 @@ class ScenovaServices {
     final identity = AppConfig.useFirebaseAuth
         ? FirebaseIdentity()
         : AnonymousIdentity();
+
+    // The account phase's seams (`FEAT-013`). The entitlement service is the
+    // frozen `C-018` read; the store wraps RevenueCat (D-008) and the scripted
+    // store stands in until that wiring lands.
+    final entitlementsApi = AppConfig.useMockEntitlementApi
+        ? MockEntitlementApi(latency: AppConfig.mockLatency)
+        : HttpEntitlementApi(
+            baseUrl: AppConfig.apiBaseUrl,
+            idTokenProvider: identity.idToken,
+          );
+    final accountSession = AppConfig.useFirebaseAuth
+        ? FirebaseAccountSession()
+        : DevelopmentAccountSession();
+    final purchases = MockPurchaseService();
 
     final connectivity = ManualConnectivity();
     final settings = SettingsController(
@@ -210,6 +242,9 @@ class ScenovaServices {
       connectivity: connectivity,
       settings: settings,
       entitlements: FixedEntitlementProvider(entitlement),
+      entitlementsApi: entitlementsApi,
+      accountSession: accountSession,
+      purchases: purchases,
       captureChannel: CaptureChannel(),
       analytics: AnalyticsClient(
         api: AppConfig.useMockAnalyticsApi

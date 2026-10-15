@@ -8,11 +8,13 @@ import 'package:scenova/app_router.dart';
 import 'package:scenova/models/entitlement.dart';
 import 'package:scenova/models/history_entry.dart';
 import 'package:scenova/models/lookup.dart';
+import 'package:scenova/screens/account_screen.dart';
 import 'package:scenova/screens/clip_controller.dart';
 import 'package:scenova/screens/clip_view_screen.dart';
 import 'package:scenova/screens/history_screen.dart';
 import 'package:scenova/screens/home_screen.dart';
 import 'package:scenova/screens/onboarding_screen.dart';
+import 'package:scenova/services/account_session.dart';
 import 'package:scenova/services/analytics.dart';
 import 'package:scenova/services/analytics_api.dart';
 import 'package:scenova/services/app_services.dart';
@@ -21,6 +23,7 @@ import 'package:scenova/services/clip_notice_inbox.dart';
 import 'package:scenova/services/clip_notice_source.dart';
 import 'package:scenova/services/clip_store.dart';
 import 'package:scenova/services/connectivity.dart';
+import 'package:scenova/services/entitlement_api.dart';
 import 'package:scenova/services/entitlement_provider.dart';
 import 'package:scenova/services/feature_flags.dart';
 import 'package:scenova/services/feedback_api.dart';
@@ -30,6 +33,7 @@ import 'package:scenova/services/history_store.dart';
 import 'package:scenova/services/identity.dart';
 import 'package:scenova/services/lookup_api.dart';
 import 'package:scenova/services/poster_frame_store.dart';
+import 'package:scenova/services/purchase_service.dart';
 import 'package:scenova/services/push_registration_api.dart';
 import 'package:scenova/services/push_registrar.dart';
 import 'package:scenova/services/push_tokens.dart';
@@ -50,6 +54,9 @@ ScenovaServices buildServices({
   bool online = true,
   SettingsController? settings,
   Entitlement entitlement = Entitlement.unmeteredGuest,
+  EntitlementApi? entitlementsApi,
+  AccountSession? accountSession,
+  PurchaseService? purchases,
   IdentityProvider? identity,
   AnalyticsApi? analyticsApi,
   PushRegistrationApi? pushApi,
@@ -92,6 +99,9 @@ ScenovaServices buildServices({
     connectivity: connectivity,
     settings: settingsController,
     entitlements: FixedEntitlementProvider(entitlement),
+    entitlementsApi: entitlementsApi ?? MockEntitlementApi(),
+    accountSession: accountSession ?? DevelopmentAccountSession(),
+    purchases: purchases ?? MockPurchaseService(),
     captureChannel: CaptureChannel(),
     analytics: AnalyticsClient(
       api: analyticsApi ?? MockAnalyticsApi(),
@@ -244,6 +254,37 @@ Future<Harness> pumpHistory(
     ),
   );
   return Harness(services, router);
+}
+
+/// Builds the Account screen on its own with the real theme, so a test drives
+/// its states through the scripted entitlement, session, and store.
+Future<ScenovaServices> pumpAccount(
+  WidgetTester tester, {
+  EntitlementApi? entitlementsApi,
+  AccountSession? accountSession,
+  PurchaseService? purchases,
+  bool online = true,
+}) async {
+  usePhoneWindow(tester);
+  final services = buildServices(
+    entitlementsApi: entitlementsApi,
+    accountSession: accountSession,
+    purchases: purchases,
+    online: online,
+  );
+  await tester.pumpWidget(
+    ScenovaScope(
+      services: services,
+      child: MaterialApp(
+        theme: AppTheme.build(
+          brightness: Brightness.light,
+          deviceClass: DeviceClass.mobile,
+        ),
+        home: const AccountScreen(),
+      ),
+    ),
+  );
+  return services;
 }
 
 /// Finds the widget drawing [icon], whether it is a custom-set glyph or a

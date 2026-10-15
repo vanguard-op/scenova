@@ -15,11 +15,14 @@ import 'package:scenova/models/entitlement.dart';
 import 'package:scenova/models/feedback.dart';
 import 'package:scenova/models/history_entry.dart';
 import 'package:scenova/models/lookup.dart';
+import 'package:scenova/screens/account_controller.dart';
+import 'package:scenova/screens/account_screen.dart';
 import 'package:scenova/screens/clip_controller.dart';
 import 'package:scenova/screens/clip_view_screen.dart';
 import 'package:scenova/screens/history_screen.dart';
 import 'package:scenova/screens/home_screen.dart';
 import 'package:scenova/screens/onboarding_screen.dart';
+import 'package:scenova/services/account_session.dart';
 import 'package:scenova/services/analytics.dart';
 import 'package:scenova/services/analytics_api.dart';
 import 'package:scenova/services/app_services.dart';
@@ -29,6 +32,7 @@ import 'package:scenova/services/clip_notice_inbox.dart';
 import 'package:scenova/services/clip_notice_source.dart';
 import 'package:scenova/services/clip_store.dart';
 import 'package:scenova/services/connectivity.dart';
+import 'package:scenova/services/entitlement_api.dart';
 import 'package:scenova/services/entitlement_provider.dart';
 import 'package:scenova/services/feature_flags.dart';
 import 'package:scenova/services/feedback_api.dart';
@@ -38,6 +42,7 @@ import 'package:scenova/services/history_store.dart';
 import 'package:scenova/services/identity.dart';
 import 'package:scenova/services/lookup_api.dart';
 import 'package:scenova/services/poster_frame_store.dart';
+import 'package:scenova/services/purchase_service.dart';
 import 'package:scenova/services/push_registration_api.dart';
 import 'package:scenova/services/push_registrar.dart';
 import 'package:scenova/services/push_tokens.dart';
@@ -292,7 +297,8 @@ List<(String, Widget)> _frames() {
         entitlement: const Entitlement(
           tier: PlanTier.free,
           signedIn: false,
-          lookupsRemaining: 0,
+          lookupsUsed: 20,
+          lookupsLimit: 20,
         ),
       ),
     ),
@@ -349,6 +355,90 @@ List<(String, Widget)> _frames() {
     // No auto-open: the reader's own path is driven here so the confirmation
     // that follows a submitted report can be looked at. Tooling only.
     ('Report — submitted (confirmation)', _clip('come')),
+    (
+      'Account — signed out',
+      _account(
+        entitlementsApi: MockEntitlementApi(
+          error: const EntitlementApiException(
+            401,
+            'Sign in to see your plan.',
+          ),
+        ),
+      ),
+    ),
+    (
+      'Account — free',
+      _account(
+        entitlementsApi: MockEntitlementApi(
+          plan: const Entitlement(
+            tier: PlanTier.free,
+            signedIn: true,
+            lookupsUsed: 12,
+            lookupsLimit: 20,
+          ),
+        ),
+      ),
+    ),
+    (
+      'Account — pro',
+      _account(
+        entitlementsApi: MockEntitlementApi(
+          plan: const Entitlement(
+            tier: PlanTier.pro,
+            signedIn: true,
+            lookupsUsed: 8,
+            lookupsLimit: 50,
+          ),
+        ),
+      ),
+    ),
+    (
+      'Account — trial',
+      _account(
+        entitlementsApi: MockEntitlementApi(
+          plan: Entitlement(
+            tier: PlanTier.trial,
+            signedIn: true,
+            lookupsUsed: 3,
+            lookupsLimit: 50,
+            trialEndsAt: DateTime.now().add(const Duration(days: 5)),
+          ),
+        ),
+      ),
+    ),
+    (
+      'Account — purchasing',
+      _account(
+        purchases: MockPurchaseService(latency: const Duration(minutes: 5)),
+        startPro: true,
+      ),
+    ),
+    (
+      'Account — purchase failed',
+      _account(
+        purchases: MockPurchaseService(
+          startProOutcome: const PurchaseFailed(
+            'Your payment was declined. Try another payment method.',
+          ),
+        ),
+        startPro: true,
+      ),
+    ),
+    (
+      'Account — store unreachable',
+      _account(purchases: MockPurchaseService(offline: true), startPro: true),
+    ),
+    (
+      'Account — plan did not load',
+      _account(
+        entitlementsApi: MockEntitlementApi(
+          error: const EntitlementApiException(
+            503,
+            'The entitlement service is unavailable.',
+          ),
+        ),
+      ),
+    ),
   ];
 }
 
@@ -393,6 +483,68 @@ Widget _history({
     services: services,
     child: HistoryScreen(router: AppRouter(services: services)),
   );
+}
+
+/// The Account screen, driven through the scripted entitlement, session, and
+/// store.
+///
+/// [startPro] taps the primary action once the plan has loaded, so the
+/// purchasing, purchase-failed, and store-unreachable states can be looked at.
+Widget _account({
+  EntitlementApi? entitlementsApi,
+  AccountSession? accountSession,
+  PurchaseService? purchases,
+  bool startPro = false,
+}) {
+  final services = _services(
+    entitlementsApi: entitlementsApi,
+    accountSession: accountSession,
+    purchases: purchases,
+  );
+  final controller = AccountController(
+    entitlements: services.entitlementsApi,
+    session: services.accountSession,
+    purchases: services.purchases,
+  );
+  return ScenovaScope(
+    services: services,
+    child: _PreviewAccount(controller: controller, startPro: startPro),
+  );
+}
+
+/// Loads the plan and, when asked, starts a purchase, so an action's states are
+/// on screen for the frame. Tooling only.
+class _PreviewAccount extends StatefulWidget {
+  const _PreviewAccount({required this.controller, required this.startPro});
+
+  final AccountController controller;
+  final bool startPro;
+
+  @override
+  State<_PreviewAccount> createState() => _PreviewAccountState();
+}
+
+class _PreviewAccountState extends State<_PreviewAccount> {
+  @override
+  void initState() {
+    super.initState();
+    final controller = widget.controller;
+    unawaited(
+      controller.load().then((_) async {
+        if (widget.startPro) await controller.startPro();
+      }),
+    );
+  }
+
+  @override
+  void dispose() {
+    widget.controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      AccountScreen(controller: widget.controller);
 }
 
 /// Two saved lookups for the History frames.
@@ -574,6 +726,9 @@ ScenovaServices _services({
   List<HistoryEntry> history = const <HistoryEntry>[],
   bool online = true,
   Entitlement entitlement = Entitlement.unmeteredGuest,
+  EntitlementApi? entitlementsApi,
+  AccountSession? accountSession,
+  PurchaseService? purchases,
   SettingsController? settings,
   FeatureFlags featureFlags = const FixedFeatureFlags(),
   ClipNoticeSource? clipNoticeSource,
@@ -612,6 +767,9 @@ ScenovaServices _services({
     connectivity: connectivity,
     settings: settingsController,
     entitlements: FixedEntitlementProvider(entitlement),
+    entitlementsApi: entitlementsApi ?? MockEntitlementApi(),
+    accountSession: accountSession ?? DevelopmentAccountSession(),
+    purchases: purchases ?? MockPurchaseService(),
     captureChannel: CaptureChannel(),
     analytics: AnalyticsClient(
       api: MockAnalyticsApi(),

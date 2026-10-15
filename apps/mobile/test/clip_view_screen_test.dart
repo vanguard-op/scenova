@@ -782,7 +782,8 @@ void main() {
       entitlement: const Entitlement(
         tier: PlanTier.free,
         signedIn: false,
-        lookupsRemaining: 0,
+        lookupsUsed: 20,
+        lookupsLimit: 20,
       ),
     );
     final controller = controllerFor(services, 'come');

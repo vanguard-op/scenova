@@ -7,6 +7,7 @@ import 'app_router.dart';
 import 'models/analytics_event.dart';
 import 'models/clip_notice.dart';
 import 'models/lookup.dart';
+import 'screens/account_screen.dart';
 import 'screens/clip_action_screen.dart';
 import 'screens/history_screen.dart';
 import 'screens/home_screen.dart';
@@ -228,10 +229,7 @@ class _ScenovaAppState extends State<ScenovaApp> with WidgetsBindingObserver {
                 'Clip sound, reduce motion, the action label, and clearing '
                 'history arrive in a later phase.',
           ),
-          AppRoutes.account: (_) => const PlaceholderScreen(
-            title: 'Account',
-            message: 'Your plan and allowance arrive with the account phase.',
-          ),
+          AppRoutes.account: (_) => const AccountScreen(),
         },
       ),
     );
