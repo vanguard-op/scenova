@@ -101,7 +101,8 @@ docs/           BPRD (product-shaper)
 | T-090 | FEAT-015 | frontend-engineer | Done | C-014 |
 | T-091 | FEAT-015 | frontend-engineer | Done | C-015, C-016 |
 | T-092 | FEAT-009 | frontend-engineer | Done | — |
-| T-097 | FEAT-009 | frontend-engineer | Backlog | C-001, C-008 |
+| T-097 | FEAT-009 | frontend-engineer | In Progress | C-001, C-008 |
+| T-098 | FEAT-001, FEAT-002, FEAT-015 | frontend-engineer | Backlog | — |
 | T-093 | FEAT-001, FEAT-002, FEAT-009, FEAT-015 | frontend-engineer | Done | — |
 | T-094 | FEAT-001, FEAT-002, FEAT-009, FEAT-015 | frontend-engineer | Done | — |
 | T-095 | — | infra-engineer | Done | — |
@@ -138,6 +139,7 @@ docs/           BPRD (product-shaper)
 | D-026 | The Free tier's 50-entry history limit applies to every reader until the paid tier ships | Matches the Free row in `monetization.md` and the History screen's edge case; the tiers are introduced with the account feature | user |
 | D-027 | The review component is carried by the feedback service, with the gateway exposing the console's routes | No standalone review service exists in the stack, and the feedback store already holds the queue, the reports, and the negative feedback; the console's hosting rewrites `/internal/review/**` to the gateway | lead |
 | D-028 | The design system is extracted into a shared package both apps import, rather than mirrored copies | The console carried a byte copy of the palette and its own copies of the shared widgets; every token change and the mark audit would otherwise be made twice, and the token map pointed at one location while two existed | user |
+| D-029 | The device keeps the clip for every reader until the paid tier ships; the account phase applies the Free/Pro split | FEAT-009 requires stored clips to replay with no connection and the roadmap makes offline replay this phase's headline outcome; the tiers are introduced with the account feature | user |
 
 ## Definition of Done
 - **Task:** the acceptance criteria in the cited feature doc are met; the frozen contract is conformed; unit tests pass; format, lint, analyze, and build are clean; work is committed to the dev branch and confined to `Own`.
