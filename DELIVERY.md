@@ -6,7 +6,7 @@
 ## Team & File Ownership
 | Owner | Owns |
 |---|---|
-| infra-engineer | `infra/**`, `ci/**`, `.github/**`, `.devcontainer/**`, `Makefile`, root workspace config |
+| infra-engineer | `infra/**`, `ci/**`, `.github/**`, `.devcontainer/**`, `Makefile`, root workspace config, `services/*/Dockerfile` |
 | backend-engineer | `services/**` |
 | ai-engineer | `ai/**`, `qa/golden/**` |
 | frontend-engineer | `apps/mobile/**`, `apps/console/**`, `packages/scenova_design/**` |
@@ -92,6 +92,7 @@ docs/           BPRD (product-shaper)
 ### Active Phase: Phase 4: Polish and Account
 | Task | Feature | Owner | Status | Contract |
 |---|---|---|---|---|
+| T-101 | — | infra-engineer | In Progress | — |
 
 ## Decisions Log
 | # | Decision | Rationale | By |
