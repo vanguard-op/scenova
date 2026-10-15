@@ -1,0 +1,14 @@
+# Keep the build context to the service's own code and its pinned requirements.
+# Tests, caches, local env files, and build metadata stay out of the image.
+tests/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.env
+.env.*
+*.log
+Dockerfile
+.dockerignore

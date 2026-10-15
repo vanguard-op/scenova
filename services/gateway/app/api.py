@@ -1,9 +1,11 @@
-"""Client HTTP API for the gateway (C-001, C-002, C-007, C-008, C-012, C-013).
+"""Client HTTP API for the gateway (C-001, C-002, C-007, C-008, C-012, C-013, C-018, C-020).
 
 The gateway authenticates the caller, rate-limits lookups, events, push
 registrations, ratings, and reports, validates the request body, and passes the
 downstream service's response through unchanged, so the frozen contract's status
-codes and error codes reach the client as they are produced.
+codes and error codes reach the client as they are produced. The entitlement read
+and the account update carry no rate limit of their own; the account screen reads
+the plan and writes the consent choice, neither of which is a flood surface.
 
 The curator review routes (C-014 to C-016) are operator-only and carried here for
 the console: the gateway authenticates the operator session — curator role and
@@ -26,10 +28,12 @@ from fastapi.responses import JSONResponse
 from .analytics_client import AnalyticsClient, HttpAnalyticsClient
 from .auth import TokenVerifier, build_token_verifier
 from .config import Settings
+from .entitlement_client import EntitlementClient, HttpEntitlementClient
 from .errors import EmptySelectionError, GatewayError, RateLimitedError
 from .feedback_client import FeedbackClient, HttpFeedbackClient
 from .lookup_client import HttpLookupClient, LookupClient, UpstreamResponse
 from .models import (
+    AccountUpdateRequest,
     CreateLookupRequest,
     FeedbackRequest,
     IngestEventsRequest,
@@ -49,6 +53,7 @@ def create_app(
     analytics_client: AnalyticsClient | None = None,
     notification_client: PushRegistrationClient | None = None,
     feedback_client: FeedbackClient | None = None,
+    entitlement_client: EntitlementClient | None = None,
     event_limiter: RateLimiter | None = None,
     registration_limiter: RateLimiter | None = None,
     feedback_limiter: RateLimiter | None = None,
@@ -92,6 +97,10 @@ def create_app(
         base_url=resolved_settings.feedback_base_url,
         timeout_seconds=resolved_settings.upstream_timeout_seconds,
     )
+    resolved_entitlement = entitlement_client or HttpEntitlementClient(
+        base_url=resolved_settings.entitlement_base_url,
+        timeout_seconds=resolved_settings.upstream_timeout_seconds,
+    )
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -102,6 +111,7 @@ def create_app(
             await resolved_analytics.aclose()
             await resolved_notification.aclose()
             await resolved_feedback.aclose()
+            await resolved_entitlement.aclose()
 
     app = FastAPI(title="Scenova API Gateway", version="1.0.0", lifespan=lifespan)
 
@@ -189,6 +199,24 @@ def create_app(
             raise RateLimitedError("Too many reports. Please try again in a moment.")
         correlation_id = _correlation_id(resolved_settings, request)
         upstream = await resolved_feedback.record_report(
+            payload.model_dump(), authorization, correlation_id
+        )
+        return _passthrough(upstream, correlation_id, resolved_settings)
+
+    @app.get("/v1/entitlement")
+    async def get_entitlement(request: Request) -> Response:
+        authorization = request.headers.get("authorization")
+        await resolved_verifier.verify(authorization)
+        correlation_id = _correlation_id(resolved_settings, request)
+        upstream = await resolved_entitlement.get_entitlement(authorization, correlation_id)
+        return _passthrough(upstream, correlation_id, resolved_settings)
+
+    @app.patch("/v1/account")
+    async def update_account(payload: AccountUpdateRequest, request: Request) -> Response:
+        authorization = request.headers.get("authorization")
+        await resolved_verifier.verify(authorization)
+        correlation_id = _correlation_id(resolved_settings, request)
+        upstream = await resolved_entitlement.update_account(
             payload.model_dump(), authorization, correlation_id
         )
         return _passthrough(upstream, correlation_id, resolved_settings)

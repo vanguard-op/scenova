@@ -1,4 +1,4 @@
-"""Client request models for the gateway (C-001, C-002, C-007, C-008, C-012, C-013).
+"""Client request models for the gateway (C-001, C-002, C-007, C-008, C-012, C-013, C-020).
 
 The gateway validates the request shape it routes, so a malformed body is a 400
 before a service is called. For events it validates the envelope only: the
@@ -6,7 +6,9 @@ taxonomy and the personal-data scan stay with the analytics intake, which is
 their single owner. For a push registration it validates the shape only: whether
 the lookup exists and belongs to the caller stays with the notification service.
 For a rating or a report it validates the shape only: the lookup's ownership, the
-served clip, and the review queue stay with the feedback service.
+served clip, and the review queue stay with the feedback service. For an account
+update it validates the shape only: whether at least one field was given and
+whether the locale is one the product offers stay with the entitlement service.
 """
 
 from __future__ import annotations
@@ -90,3 +92,16 @@ class ReportRequest(BaseModel):
     reason: Literal["wrong_meaning", "offensive", "low_quality", "other"]
     note: str | None = Field(default=None, max_length=MAX_REPORT_NOTE_LENGTH)
     clientReportId: str
+
+
+class AccountUpdateRequest(BaseModel):
+    """The C-020 request body.
+
+    Both fields are optional in shape; the contract's rule that at least one is
+    given is enforced by the entitlement service, so the 400 has one owner.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    consentModelProcessing: bool | None = None
+    locale: str | None = None

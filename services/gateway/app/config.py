@@ -16,6 +16,7 @@ DEFAULT_LOOKUP_PORT = "8081"
 DEFAULT_ANALYTICS_PORT = "8086"
 DEFAULT_NOTIFICATION_PORT = "8087"
 DEFAULT_FEEDBACK_PORT = "8085"
+DEFAULT_ENTITLEMENT_PORT = "8084"
 DEFAULT_RATE_LIMIT_PER_MINUTE = 120
 DEFAULT_EVENTS_RATE_LIMIT_PER_MINUTE = 120
 DEFAULT_REGISTRATIONS_RATE_LIMIT_PER_MINUTE = 120
@@ -32,6 +33,7 @@ class Settings:
     analytics_base_url: str = f"http://127.0.0.1:{DEFAULT_ANALYTICS_PORT}"
     notification_base_url: str = f"http://127.0.0.1:{DEFAULT_NOTIFICATION_PORT}"
     feedback_base_url: str = f"http://127.0.0.1:{DEFAULT_FEEDBACK_PORT}"
+    entitlement_base_url: str = f"http://127.0.0.1:{DEFAULT_ENTITLEMENT_PORT}"
     internal_audience: str = DEFAULT_INTERNAL_AUDIENCE
     auth_mode: str = "dev"
     firebase_project_id: str | None = None
@@ -68,11 +70,17 @@ class Settings:
             "FEEDBACK_BASE_URL",
             f"http://127.0.0.1:{_env_str(source, 'FEEDBACK_PORT', DEFAULT_FEEDBACK_PORT)}",
         )
+        entitlement_base_url = _env_str(
+            source,
+            "ENTITLEMENT_BASE_URL",
+            f"http://127.0.0.1:{_env_str(source, 'ENTITLEMENT_PORT', DEFAULT_ENTITLEMENT_PORT)}",
+        )
         return cls(
             lookup_base_url=lookup_base_url,
             analytics_base_url=analytics_base_url,
             notification_base_url=notification_base_url,
             feedback_base_url=feedback_base_url,
+            entitlement_base_url=entitlement_base_url,
             internal_audience=_env_str(source, "INTERNAL_AUDIENCE", DEFAULT_INTERNAL_AUDIENCE),
             auth_mode=_env_str(source, "AUTH_MODE", default_auth_mode),
             firebase_project_id=_env_opt(source, "FIREBASE_PROJECT_ID"),
