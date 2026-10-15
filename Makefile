@@ -61,6 +61,7 @@ setup: ## Create .venv, install pinned dev tooling, seed .env, fetch Flutter dep
 		echo "==> deps $$req"; $(PIP) install --quiet -r "$$req"; \
 	done; \
 	if [ ! -f .env ]; then cp .env.example .env; echo "==> created .env from .env.example"; fi; \
+	if [ -f packages/scenova_design/pubspec.yaml ]; then (cd packages/scenova_design && flutter pub get); else echo "==> skip: no shared design system yet"; fi; \
 	if [ -f apps/mobile/pubspec.yaml ]; then (cd apps/mobile && flutter pub get); else echo "==> skip: no Flutter app yet"; fi; \
 	if [ -f apps/console/pubspec.yaml ]; then (cd apps/console && flutter pub get); else echo "==> skip: no review console yet"; fi
 
@@ -72,6 +73,7 @@ auth: ## Set up local Application Default Credentials for the project (ADC + quo
 fmt: ## Format Python (black) and Dart (dart format) in place
 	@if find services ai -name '*.py' -not -path '*/.*' -print -quit 2>/dev/null | grep -q .; then \
 		$(BLACK) .; $(RUFF) check --fix .; else echo "skip: no Python workspace"; fi
+	@if [ -f packages/scenova_design/pubspec.yaml ]; then (cd packages/scenova_design && dart format .); else echo "skip: no shared design system"; fi
 	@if [ -f apps/mobile/pubspec.yaml ]; then (cd apps/mobile && dart format .); else echo "skip: no Flutter app"; fi
 
 lint: ## Lint Python (ruff) and Dart (flutter analyze), check formatting
@@ -151,6 +153,7 @@ ci: ## Full local CI run (lint, env schema, types, tests, security, infra, build
 clean: ## Remove build and tool caches
 	@rm -rf $(VENV) .pytest_cache .ruff_cache .mypy_cache
 	@find services ai -name '__pycache__' -type d -prune -exec rm -rf {} + 2>/dev/null || true
+	@if [ -f packages/scenova_design/pubspec.yaml ]; then (cd packages/scenova_design && flutter clean) || true; fi
 	@if [ -f apps/mobile/pubspec.yaml ]; then (cd apps/mobile && flutter clean) || true; fi
 	@if [ -f apps/console/pubspec.yaml ]; then (cd apps/console && flutter clean) || true; fi
 	@rm -rf .firebase

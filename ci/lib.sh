@@ -55,6 +55,12 @@ has_flutter() { [ -f apps/mobile/pubspec.yaml ]; }
 
 has_console() { [ -f apps/console/pubspec.yaml ]; }
 
+# The shared design system both apps import: its own tokens and components, and
+# the token and contrast tests that hold the brand to the accessibility target
+# (branding.md "Accessibility"). A nested package, so it is detected and checked
+# on its own rather than through an app's dependency on it.
+has_design() { [ -f packages/scenova_design/pubspec.yaml ]; }
+
 has_terraform() { [ -d infra/terraform ] && find infra/terraform -name '*.tf' -print -quit 2>/dev/null | grep -q .; }
 
 # The review console's build-time configuration (FEAT-015). Values come from

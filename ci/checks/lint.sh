@@ -14,6 +14,16 @@ else
   skip "no Python workspace yet (services/**, ai/**)"
 fi
 
+if has_design; then
+  log "Design system · dart format --set-exit-if-changed"
+  (cd packages/scenova_design && dart format --output=none --set-exit-if-changed .)
+  log "Design system · flutter analyze"
+  (cd packages/scenova_design && flutter analyze)
+  ran=1
+else
+  skip "no shared design system yet (packages/scenova_design/pubspec.yaml)"
+fi
+
 if has_flutter; then
   log "Flutter · dart format --set-exit-if-changed"
   (cd apps/mobile && dart format --output=none --set-exit-if-changed .)

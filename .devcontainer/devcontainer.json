@@ -37,7 +37,10 @@
         "charliermarsh.ruff",
         "hashicorp.terraform",
         "redhat.vscode-yaml"
-      ]
+      ],
+      "settings": {
+        "dart.flutterSdkPath": "/opt/flutter"
+      }
     }
   }
 }
