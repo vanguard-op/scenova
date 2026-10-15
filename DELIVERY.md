@@ -86,7 +86,7 @@ docs/           BPRD (product-shaper)
 ### Completed Phases
 | Phase | Closed | Notes |
 |---|---|---|
-| Phase 3: Trust and Continuity | 2026-10-15 | C-012 to C-016 frozen and conformed at the gate; the moderation change request supersedes the hold semantics (`D-030`). The generation path's release still flagged (`D-023`) |
+| Phase 3: Trust and Continuity | 2026-10-15 | C-012 to C-016 frozen and conformed at the gate; the moderation change (`D-030`) reworked and re-verified. The generation path's release still flagged (`D-023`) |
 | — | — | The conditional closes of the first two phases are decisions-log entries (`D-020`, `D-023`). |
 
 ### Active Phase: Phase 4: Polish and Account
@@ -99,7 +99,8 @@ docs/           BPRD (product-shaper)
 | T-105 | — | backend-engineer | Done | — |
 | T-106 | FEAT-008, FEAT-011 | backend-engineer | Done | C-008 |
 | T-107 | FEAT-015 | frontend-engineer | Done | — |
-| T-108 | FEAT-009, FEAT-010, FEAT-011, FEAT-015 | qa-engineer | In Progress | C-003, C-008, C-009, C-010, C-011, C-013, C-014, C-015, C-016, C-017 |
+| T-109 | FEAT-015 | backend-engineer | In Progress | C-016 |
+| T-108 | FEAT-009, FEAT-010, FEAT-011, FEAT-015 | qa-engineer | Done | C-003, C-008, C-009, C-010, C-011, C-013, C-014, C-015, C-016, C-017 |
 
 ## Decisions Log
 | # | Decision | Rationale | By |
