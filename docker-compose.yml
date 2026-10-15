@@ -1,7 +1,9 @@
-# Local development dependencies only. The application services are run by
-# `make boot` / `make run`, not here. Cloud equivalents (Cloud SQL, Memorystore)
+# Local development dependencies only. The services are run by `make boot`
+# (also inside `make ci`), which starts the Postgres here, applies the schema's
+# migrations through the documented `make db-migrate` path, and only then hands
+# the services their DATABASE_URL. Cloud equivalents (Cloud SQL, Memorystore)
 # are provisioned by infra/terraform; this file mirrors them for local work so
-# the same environment variables (DATABASE_URL, REDIS_URL) apply in both places.
+# the same environment variables apply in both places.
 #
 #   docker compose up -d
 #

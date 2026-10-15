@@ -67,10 +67,34 @@ if [ "$any" -eq 0 ]; then
   exit 0
 fi
 
-# Local dependencies the services talk to, if a compose file is present.
-if [ -f docker-compose.yml ] && command -v docker >/dev/null 2>&1; then
-  log "Boot · docker compose up -d (postgres, redis)"
-  if docker compose up -d postgres redis >/dev/null 2>&1; then compose_up=1; else warn "compose deps not started"; fi
+# The primary database the docs define (architecture.md "Primary Database")
+# handed to the services that read DATABASE_URL: the compose PostgreSQL is
+# brought up and migrated through the single documented database path
+# (`ci/db.sh`, which `make db-up` / `make db-migrate` drive) *before* the first
+# service starts, so a store-backed request is answered by a serving database,
+# not a graceful 503 (nfr.md "Degradation when a dependency fails") from a
+# database that never came up.
+#
+# Docker missing is not an error — the services degrade and the boot check still
+# proves they start — but a database that is here and will not start or will not
+# take the migrations is: it would fail every store call underneath healthy
+# /healthz endpoints. Failing here fails fast and prints ci/db.sh's output.
+if [ -f docker-compose.yml ]; then
+  if command -v docker >/dev/null 2>&1; then
+    bash ci/db.sh up
+    compose_up=1
+    if has_db_migrations; then
+      log "Boot · apply the primary database migrations"
+      bash ci/db.sh migrate
+    else
+      warn "no migrations to apply (infra/db/migrations)"
+    fi
+    # Redis mirrors Memorystore for local parity (rate-limit counters, hot lookup
+    # keys); no service consumes it yet, so a failure is a warning, not a stop.
+    docker compose up -d redis >/dev/null 2>&1 || warn "redis not started (no service consumes it yet)"
+  else
+    warn "docker not available — the local database and cache were not started; database-backed stores answer unavailable"
+  fi
 fi
 
 for entry in "${SERVICES[@]}"; do
