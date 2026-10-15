@@ -11,6 +11,7 @@ from lookup.app.errors import (
     EmptySelectionError,
     LookupNotFoundError,
     PhraseLimitExceededError,
+    SelectionTooLongError,
 )
 from lookup.app.generation import (
     GenerationJobStatus,
@@ -213,6 +214,30 @@ async def test_a_two_to_six_word_selection_is_a_phrase() -> None:
 async def test_more_than_six_words_is_over_the_phrase_limit() -> None:
     with pytest.raises(PhraseLimitExceededError):
         await _service().create_lookup(_request("one two three four five six seven"), "corr")
+
+
+@pytest.mark.asyncio
+async def test_a_selection_over_the_80_character_bound_is_refused() -> None:
+    with pytest.raises(SelectionTooLongError):
+        await _service().create_lookup(_request("a" * 81), "corr")
+
+
+@pytest.mark.asyncio
+async def test_a_selection_at_the_80_character_bound_is_accepted() -> None:
+    response = await _service().create_lookup(_request("a" * 80), "corr")
+
+    assert response.status == LookupStatus.GENERATING
+    assert response.rawSelection == "a" * 80
+
+
+@pytest.mark.asyncio
+async def test_the_character_bound_counts_the_trimmed_selection() -> None:
+    # The whitespace around the selection is not the reader's selection, so it
+    # does not count towards the bound; 80 characters inside whitespace pass.
+    response = await _service().create_lookup(_request(" " * 5 + "a" * 80), "corr")
+
+    assert response.status == LookupStatus.GENERATING
+    assert response.rawSelection == "a" * 80
 
 
 @pytest.mark.asyncio

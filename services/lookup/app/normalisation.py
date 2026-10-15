@@ -4,7 +4,8 @@ A selection is tokenised by whitespace; punctuation attached to a token is
 stripped before lookup while internal marks (apostrophes, hyphens) are kept, so
 "coming," and "well-known" behave as expected. One token is a word lookup; two
 to six tokens are a short phrase routed to the phrase path; more than six is
-over the phrase limit.
+over the phrase limit. A selection is also bounded at 80 characters as written,
+and a selection over the bound is refused before it is looked up.
 """
 
 from __future__ import annotations
@@ -13,6 +14,10 @@ import unicodedata
 
 # A short phrase is two to six words (FEAT-003; settled in the phase-1 decisions).
 MAX_PHRASE_WORDS = 6
+
+# A selection is at most 80 characters as written (C-001 request; schema
+# "Lookup": rawSelection maxLength), counted after trimming.
+MAX_SELECTION_CHARS = 80
 
 
 def strip_edge_punctuation(token: str) -> str:

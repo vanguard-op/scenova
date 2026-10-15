@@ -40,6 +40,13 @@ class PhraseLimitExceededError(LookupError):
     code = "phrase_limit_exceeded"
 
 
+class SelectionTooLongError(LookupError):
+    """The selection held more characters than the 80-character bound allows."""
+
+    status_code = 400
+    code = "selection_too_long"
+
+
 class ClientLookupIdConflictError(LookupError):
     """The idempotency key was reused with a different selection."""
 

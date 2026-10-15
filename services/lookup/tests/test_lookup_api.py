@@ -141,6 +141,14 @@ def test_over_the_phrase_limit_is_a_bad_request() -> None:
     assert response.json()["code"] == "phrase_limit_exceeded"
 
 
+def test_over_the_80_character_bound_is_a_bad_request() -> None:
+    with _client() as client:
+        response = client.post("/internal/lookups", json=_payload("a" * 81), headers=_INTERNAL)
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "selection_too_long"
+
+
 def test_a_reused_client_id_conflicts() -> None:
     with _client() as client:
         client.post("/internal/lookups", json=_payload("coming", "c-1"), headers=_INTERNAL)

@@ -51,6 +51,7 @@ from .errors import (
     EmptySelectionError,
     LookupNotFoundError,
     PhraseLimitExceededError,
+    SelectionTooLongError,
 )
 from .generation import (
     CLIP_TARGET_SECONDS,
@@ -87,7 +88,7 @@ from .models import (
     PartOfSpeech,
     Sense,
 )
-from .normalisation import MAX_PHRASE_WORDS, tokenise
+from .normalisation import MAX_PHRASE_WORDS, MAX_SELECTION_CHARS, tokenise
 from .store import InMemoryLookupStore, LookupStore, PostgresLookupStore, StoredLookup
 
 GENERATION_UNAVAILABLE_NOTICE = (
@@ -220,6 +221,11 @@ class LookupService:
 
         if raw_selection == "":
             raise EmptySelectionError("The selection was empty.")
+        if len(raw_selection) > MAX_SELECTION_CHARS:
+            raise SelectionTooLongError(
+                f"A selection of {len(raw_selection)} characters is over the "
+                f"{MAX_SELECTION_CHARS}-character bound."
+            )
         tokens = tokenise(request.selection)
         if len(tokens) > MAX_PHRASE_WORDS:
             raise PhraseLimitExceededError(
