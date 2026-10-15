@@ -106,19 +106,18 @@ docs/           BPRD (product-shaper)
 | T-112 | FEAT-013 | frontend-engineer | Done | C-018 |
 | T-113 | FEAT-013 | frontend-engineer | Done | C-001, C-018 |
 | T-114 | FEAT-012 | frontend-engineer | Done | C-020 |
-| T-115 | FEAT-009, FEAT-013 | frontend-engineer | In Progress | C-018 |
+| T-115 | FEAT-009, FEAT-013 | frontend-engineer | Done | C-018 |
 | T-116 | FEAT-013 | infra-engineer | Done | — |
 | T-117 | FEAT-013 | frontend-engineer | Backlog | — |
 | T-118 | FEAT-013 | backend-engineer | Done | C-021 |
 | T-119 | FEAT-013 | frontend-engineer | Backlog | C-021 |
 | T-120 | FEAT-013 | infra-engineer | Done | — |
 | T-121 | FEAT-013 | backend-engineer | Done | — |
-| T-122 | FEAT-013 | frontend-engineer | Backlog | — |
+| T-122 | FEAT-013 | frontend-engineer | In Progress | — |
 | T-123 | FEAT-013 | backend-engineer | Done | — |
 | T-124 | FEAT-013 | backend-engineer | Done | — |
 | T-125 | FEAT-012 | backend-engineer | Backlog | C-022 |
 | T-126 | FEAT-012 | frontend-engineer | Backlog | C-022 |
-| T-127 | FEAT-012 | frontend-engineer | Backlog | — |
 
 ## Decisions Log
 | # | Decision | Rationale | By |
@@ -154,6 +153,7 @@ docs/           BPRD (product-shaper)
 | D-029 | The device keeps the clip for every reader until the paid tier ships; the account phase applies the Free/Pro split | FEAT-009 requires stored clips to replay with no connection and the roadmap makes offline replay this phase's headline outcome; the tiers are introduced with the account feature | user |
 | D-030 | A report regenerates one clip for the entry, kept as a candidate on the entry's queue item; the entry keeps serving the clip it already serves to other readers, and the curator resolves with one `choose` action or a `retire` | The reporter is the one who found the clip wrong, so the fresh clip is theirs to see, while a report should not withdraw a clip other readers are using before a curator has judged it. One candidate per entry keeps the spend to one generation however many readers report it | user |
 | D-031 | The report-triggered generation spend is absorbed; the cost and monetization documents are left as they are | The per-clip cost ceiling still applies; only the volume is unaccounted for, and the user chose not to carry the change into the margin model | user |
+| D-033 | The selection-action label ships in English only; the choice is stored and every other language reads that it is shown in English | No translated label set exists to ship, so the platform per-app-locale wiring waits for real translations rather than shipping a choice that does nothing | user |
 | D-032 | Readers sign in with email and password; no third-party sign-in | Keeps store review simple, since offering third-party sign-in would oblige Sign in with Apple alongside it; the identity provider is already Firebase and its providers are declared | user |
 
 ## Definition of Done
