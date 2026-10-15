@@ -53,9 +53,9 @@ docs/           BPRD (product-shaper)
 ## Token Map
 | Token group | Source | Code location |
 |---|---|---|
-| Colors (primary, grey, semantic) | `docs/Scenova/branding.md` Color Palette | `apps/mobile/lib/theme/colors.dart` |
-| Type scale | `docs/Scenova/branding.md` Typography | `apps/mobile/lib/theme/typography.dart` |
-| Spacing, sizing, radius, shadow | `docs/Scenova/branding.md` Spacing, Sizing, Shadows | `apps/mobile/lib/theme/tokens.dart` |
+| Colors (primary, grey, semantic) | `docs/Scenova/branding.md` Color Palette | `packages/scenova_design/lib/src/theme/colors.dart` |
+| Type scale | `docs/Scenova/branding.md` Typography | `packages/scenova_design/lib/src/theme/typography.dart` |
+| Spacing, sizing, radius, shadow | `docs/Scenova/branding.md` Spacing, Sizing, Shadows | `packages/scenova_design/lib/src/theme/tokens.dart` |
 
 ## Assets
 `ASSETS.md`
@@ -103,8 +103,8 @@ docs/           BPRD (product-shaper)
 | T-092 | FEAT-009 | frontend-engineer | Done | — |
 | T-097 | FEAT-009 | frontend-engineer | Backlog | C-001, C-008 |
 | T-093 | FEAT-001, FEAT-002, FEAT-009, FEAT-015 | frontend-engineer | Done | — |
-| T-094 | FEAT-001, FEAT-002, FEAT-009, FEAT-015 | frontend-engineer | In Progress | — |
-| T-095 | — | infra-engineer | Backlog | — |
+| T-094 | FEAT-001, FEAT-002, FEAT-009, FEAT-015 | frontend-engineer | Done | — |
+| T-095 | — | infra-engineer | In Progress | — |
 | T-096 | FEAT-001, FEAT-002, FEAT-009, FEAT-015 | frontend-engineer | Done | — |
 
 ## Decisions Log
