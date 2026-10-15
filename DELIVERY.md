@@ -123,13 +123,13 @@ docs/           BPRD (product-shaper)
 | T-130 | FEAT-013 | backend-engineer | Done | C-003, C-006, C-018, C-019, C-020, C-021, C-022 |
 | T-131 | — | infra-engineer | Done | — |
 | T-132 | FEAT-001, FEAT-002 | frontend-engineer | Done | C-001 |
-| T-133 | FEAT-003 | backend-engineer | Backlog | C-001 |
+| T-133 | FEAT-003 | backend-engineer | In Progress | C-001 |
 | T-134 | — | infra-engineer | Done | — |
 | T-136 | — | infra-engineer | Done | — |
 | T-135 | FEAT-008 | backend-engineer | Done | — |
 | T-138 | — | infra-engineer | Done | — |
 | T-137 | FEAT-011, FEAT-013 | frontend-engineer | Done | C-007, C-008 |
-| T-139 | — | backend-engineer | In Progress | — |
+| T-139 | — | backend-engineer | Done | — |
 
 
 ## Decisions Log
