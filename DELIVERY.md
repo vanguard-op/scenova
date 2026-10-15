@@ -86,29 +86,12 @@ docs/           BPRD (product-shaper)
 ### Completed Phases
 | Phase | Closed | Notes |
 |---|---|---|
-| — | — | No verified phase closed yet; the conditional closes of the first two phases are decisions-log entries (`D-020`, `D-023`). |
+| Phase 3: Trust and Continuity | 2026-10-15 | C-012 to C-016 frozen and conformed; the generation path's release still flagged (`D-023`) |
+| — | — | The conditional closes of the first two phases are decisions-log entries (`D-020`, `D-023`). |
 
-### Active Phase: Phase 3: Trust and Continuity
+### Active Phase: Phase 4: Polish and Account
 | Task | Feature | Owner | Status | Contract |
 |---|---|---|---|---|
-| T-083 | FEAT-010, FEAT-011 | backend-engineer | Done | C-011, C-012, C-013 |
-| T-084 | FEAT-009 | frontend-engineer | Done | — |
-| T-085 | FEAT-008, FEAT-009 | frontend-engineer | Done | C-002 |
-| T-086 | FEAT-010 | frontend-engineer | Done | C-012 |
-| T-087 | FEAT-011 | frontend-engineer | Done | C-013 |
-| T-088 | FEAT-015 | backend-engineer | Done | C-011, C-014, C-015, C-016 |
-| T-089 | FEAT-015 | infra-engineer | Done | — |
-| T-090 | FEAT-015 | frontend-engineer | Done | C-014 |
-| T-091 | FEAT-015 | frontend-engineer | Done | C-015, C-016 |
-| T-092 | FEAT-009 | frontend-engineer | Done | — |
-| T-093 | FEAT-001, FEAT-002, FEAT-009, FEAT-015 | frontend-engineer | Done | — |
-| T-094 | FEAT-001, FEAT-002, FEAT-009, FEAT-015 | frontend-engineer | Done | — |
-| T-095 | — | infra-engineer | Done | — |
-| T-096 | FEAT-001, FEAT-002, FEAT-009, FEAT-015 | frontend-engineer | Done | — |
-| T-097 | FEAT-009 | frontend-engineer | Done | C-001, C-008 |
-| T-098 | FEAT-001, FEAT-002, FEAT-015 | frontend-engineer | Done | — |
-| T-099 | FEAT-015 | frontend-engineer | Done | — |
-| T-100 | FEAT-008, FEAT-009, FEAT-010, FEAT-011, FEAT-015 | qa-engineer | In Progress | C-001, C-002, C-003, C-004, C-005, C-006, C-007, C-008, C-009, C-010, C-011, C-012, C-013, C-014, C-015, C-016 |
 
 ## Decisions Log
 | # | Decision | Rationale | By |

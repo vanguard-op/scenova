@@ -116,3 +116,10 @@ Auth: operator identity carrying the curator role, multi-factor authenticated; n
 Request: action: clear|hold|retire|replace|edit_phrase, phrase: string|null (the new generation phrase, for edit_phrase), notes: string|null (at most 500), expectedState: queued|reviewed|actioned (the state the curator acted on)
 Response 200: actionId: string, entryId: string, status: active|held|retired, state: reviewed|actioned (edit_phrase resolves the queue item as `reviewed`; every other action resolves it as `actioned`)
 Errors: 400 (unknown action; edit_phrase without a phrase; notes over 500 characters), 401 (no operator session), 403 (an operator without the curator role), 404 (unknown entry), 409 (the entry has already moved since the curator saw it), 503 (review service unavailable). Every action records a ModerationAction; `clear` returns the entry to serving, `hold` withholds it, `retire` stops serving it and the next lookup generates a replacement, `replace` retires it and regenerates, and `edit_phrase` records the new phrase and regenerates from it.
+
+### C-017: GET /internal/library/entries/{entryId}
+Status: Frozen
+Auth: internal service identity; never reachable from the client
+Request: entryId: string (path)
+Response 200: entry: { entryId: string, lemma: string, senseLabel: string, partOfSpeech: string, glossPhrase: string, status: active|held|retired, clip: { url: string, durationSeconds: number, resolution: "360p", hasAudio: boolean } }
+Errors: 401 (not an internal caller), 404 (unknown entry, code `entry_not_found`), 503 (library unavailable). The review service reads an entry by id for C-015's detail: the queue holds only an entry id, so the sense key C-010 uses is not at hand.
