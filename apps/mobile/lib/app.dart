@@ -105,8 +105,10 @@ class _ScenovaAppState extends State<ScenovaApp> with WidgetsBindingObserver {
         }
         unawaited(widget.services.analytics.flush());
         // A kill switch disabled while the app was backgrounded takes effect on
-        // the next lookup rather than the next release.
+        // the next lookup rather than the next release, and a plan that changed
+        // elsewhere — a purchase on another device — is re-read.
         unawaited(widget.services.featureFlags.refresh());
+        unawaited(widget.services.entitlements.refresh());
       case AppLifecycleState.hidden:
       case AppLifecycleState.paused:
       case AppLifecycleState.detached:

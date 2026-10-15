@@ -49,6 +49,13 @@ abstract interface class HistoryStore {
   /// later write or a clear succeeds, so the reader can be told and can free
   /// room.
   Future<HistoryStorageState> storageState();
+
+  /// Caps the store to the reader's plan's limit, or removes the cap.
+  ///
+  /// The store consults this on every save, so a plan change — a purchase, or
+  /// the paid-tier kill switch — takes effect on the next lookup. A store with
+  /// no provider keeps the Free cap, so the device is always bounded.
+  Future<int?> Function()? planLimit;
 }
 
 /// The reader's lookups, kept on the device through `shared_preferences`.
@@ -65,8 +72,13 @@ class SharedPreferencesHistoryStore implements HistoryStore {
 
   static const String _entriesKey = 'history.entries';
 
-  /// The most lookups the device keeps; older ones drop off.
-  final int capacity;
+  /// The most lookups the device keeps when no plan is bound; older ones drop
+  /// off. Null keeps every one.
+  final int? capacity;
+
+  /// The reader's plan's cap, consulted on each save (`FEAT-013`).
+  @override
+  Future<int?> Function()? planLimit;
 
   SharedPreferencesAsync? _preferences;
 
@@ -123,10 +135,11 @@ class SharedPreferencesHistoryStore implements HistoryStore {
     List<HistoryEntry> Function(List<HistoryEntry> entries) change,
   ) {
     final result = _pending.then((_) async {
+      final limit = await _limit();
       final entries = change(await _read());
-      final trimmed = entries.length > capacity
+      final trimmed = (limit != null && entries.length > limit)
           ? (entries..sort((a, b) => b.savedAt.compareTo(a.savedAt)))
-                .take(capacity)
+                .take(limit)
                 .toList(growable: false)
           : entries;
       try {
@@ -138,6 +151,21 @@ class SharedPreferencesHistoryStore implements HistoryStore {
     });
     _pending = result.catchError((Object _) {});
     return _pending;
+  }
+
+  /// The most lookups the device keeps, from the reader's plan when one is
+  /// bound.
+  ///
+  /// A plan that cannot be read keeps the store's own cap, so the device stays
+  /// bounded whatever the service does.
+  Future<int?> _limit() async {
+    final provider = planLimit;
+    if (provider == null) return capacity;
+    try {
+      return await provider();
+    } on Object {
+      return capacity;
+    }
   }
 
   Future<List<HistoryEntry>> _read() async {
@@ -176,8 +204,13 @@ class InMemoryHistoryStore implements HistoryStore {
 
   final List<HistoryEntry> _entries;
 
-  /// The most lookups the device keeps; older ones drop off.
-  final int capacity;
+  /// The most lookups the device keeps when no plan is bound; older ones drop
+  /// off. Null keeps every one.
+  final int? capacity;
+
+  /// The reader's plan's cap, consulted on each save (`FEAT-013`).
+  @override
+  Future<int?> Function()? planLimit;
 
   /// Whether the device is out of room, so a test can view the warning.
   bool storageFull;
@@ -203,9 +236,10 @@ class InMemoryHistoryStore implements HistoryStore {
           existing.word == entry.word && existing.phrase == entry.phrase,
     );
     _entries.add(entry);
-    if (_entries.length > capacity) {
+    final limit = await _limit();
+    if (limit != null && _entries.length > limit) {
       _entries.sort((a, b) => b.savedAt.compareTo(a.savedAt));
-      _entries.removeRange(capacity, _entries.length);
+      _entries.removeRange(limit, _entries.length);
     }
   }
 
@@ -223,4 +257,16 @@ class InMemoryHistoryStore implements HistoryStore {
   @override
   Future<HistoryStorageState> storageState() async =>
       storageFull ? HistoryStorageState.full : HistoryStorageState.ok;
+
+  /// The most lookups the device keeps, from the reader's plan when one is
+  /// bound.
+  Future<int?> _limit() async {
+    final provider = planLimit;
+    if (provider == null) return capacity;
+    try {
+      return await provider();
+    } on Object {
+      return capacity;
+    }
+  }
 }

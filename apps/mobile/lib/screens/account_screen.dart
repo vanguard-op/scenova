@@ -46,6 +46,7 @@ class _AccountScreenState extends State<AccountScreen> {
       entitlements: services.entitlementsApi,
       session: services.accountSession,
       purchases: services.purchases,
+      plan: services.entitlements,
     );
     _controller = controller;
     controller.addListener(_onChanged);

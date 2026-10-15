@@ -2,12 +2,15 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scenova/models/clip_notice.dart';
+import 'package:scenova/models/entitlement.dart';
 import 'package:scenova/models/history_entry.dart';
 import 'package:scenova/models/lookup.dart';
 import 'package:scenova/services/clip_notice_inbox.dart';
 import 'package:scenova/services/clip_notice_source.dart';
 import 'package:scenova/services/clip_store.dart';
 import 'package:scenova/services/connectivity.dart';
+import 'package:scenova/services/entitlement_provider.dart';
+import 'package:scenova/services/feature_flags.dart';
 import 'package:scenova/services/history_store.dart';
 import 'package:scenova/services/poster_frame_store.dart';
 import 'package:scenova/services/push_registration_api.dart';
@@ -16,6 +19,7 @@ import 'package:scenova/services/push_tokens.dart';
 import 'package:scenova/services/reported_clip_store.dart';
 import 'package:scenova/services/reported_clip_watch.dart';
 import 'package:scenova/services/saved_clip_keeper.dart';
+import 'package:scenova/services/tier_gates.dart';
 
 import 'support/harness.dart';
 
@@ -96,6 +100,12 @@ Future<_Rig> _rig({
       history: history,
       clips: clipStore,
       posters: posterStore,
+      gates: TierGates(
+        entitlements: const FixedEntitlementProvider(
+          Entitlement.unmeteredGuest,
+        ),
+        flags: const FixedFeatureFlags(),
+      ),
     ),
     store: store,
     push: push,

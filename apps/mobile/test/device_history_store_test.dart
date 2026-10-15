@@ -75,6 +75,29 @@ void main() {
     ]);
   });
 
+  test('the store keeps only what the reader\'s plan allows', () async {
+    // A Pro reader's plan carries no cap, so nothing drops off; a Free reader's
+    // plan caps the device history (`FEAT-009`, `FEAT-013`).
+    final store = SharedPreferencesHistoryStore(capacity: 3);
+    store.planLimit = () async => null;
+    for (var i = 0; i < 5; i++) {
+      await store.save(
+        _entry(
+          word: 'word$i',
+          phrase: 'meaning $i',
+          age: Duration(minutes: 5 - i),
+        ),
+      );
+    }
+
+    expect(await store.all(), hasLength(5));
+
+    store.planLimit = () async => 3;
+    await store.save(_entry(word: 'sixth', phrase: 'c', age: Duration.zero));
+
+    expect(await store.all(), hasLength(3));
+  });
+
   test('removing an entry deletes it from the device', () async {
     final store = SharedPreferencesHistoryStore();
     await store.save(_entry(word: 'keep', phrase: 'a'));

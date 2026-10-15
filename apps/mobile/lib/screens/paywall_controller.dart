@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../models/entitlement.dart';
 import '../services/account_session.dart';
 import '../services/analytics.dart';
+import '../services/entitlement_provider.dart';
 import '../services/purchase_service.dart';
 
 /// What came of the Paywall sheet.
@@ -49,12 +50,19 @@ class PaywallController extends ChangeNotifier {
     required Entitlement entitlement,
     required this.purchases,
     required this.session,
+    required this.plan,
     required this.analytics,
   }) : _entitlement = entitlement,
        _signedIn = entitlement.signedIn;
 
   final PurchaseService purchases;
   final AccountSession session;
+
+  /// The reader's plan cache, shared with the tier gates (`FEAT-013`): a
+  /// completed purchase re-reads it, so the allowance and the clip-retention
+  /// gate take effect on the lookup that follows.
+  final EntitlementProvider plan;
+
   final AnalyticsClient analytics;
 
   final Entitlement _entitlement;
@@ -193,6 +201,9 @@ class PaywallController extends ChangeNotifier {
       switch (outcome) {
         case PurchaseCompleted():
           analytics.purchaseCompleted(productId: product.id, productKind: kind);
+          // The plan the reader just bought is read back, so the retried lookup
+          // spends the new allowance and keeps its clip (`FEAT-013`).
+          await plan.refresh();
           return success;
         case PurchaseDismissed():
           // The reader backed out of the store sheet; the plan is unchanged and

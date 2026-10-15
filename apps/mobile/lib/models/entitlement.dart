@@ -79,6 +79,15 @@ class Entitlement {
   bool get isTrial => tier == PlanTier.trial;
   bool get isFree => tier == PlanTier.free;
 
+  /// Whether this plan keeps a saved clip on the device, so it replays with no
+  /// connection.
+  ///
+  /// Pro and its trial keep every saved clip; the Free tier keeps the word, the
+  /// phrase, and the poster frame but not the clip, so a saved lookup replays
+  /// only while online (`docs/Scenova/monetization.md` → "Feature Gate
+  /// Mapping"). The pre-account case keeps clips: the tiers are not live there.
+  bool get retainsClips => unmetered || isPro || isTrial;
+
   /// The lookups left this period, or null when the plan carries no allowance.
   int? get lookupsRemaining {
     final limit = lookupsLimit;

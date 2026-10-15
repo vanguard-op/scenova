@@ -57,6 +57,7 @@ import 'package:scenova/services/reported_clip_store.dart';
 import 'package:scenova/services/reported_clip_watch.dart';
 import 'package:scenova/services/saved_clip_keeper.dart';
 import 'package:scenova/services/settings_controller.dart';
+import 'package:scenova/services/tier_gates.dart';
 import 'package:scenova/theme/app_theme.dart';
 import 'package:scenova/widgets/clear_history_dialog.dart';
 import 'package:scenova/widgets/paywall_sheet.dart';
@@ -216,6 +217,10 @@ List<(String, Widget)> _frames() {
         clips: _clips(),
       ),
     ),
+    (
+      'History — Free tier (word and phrase, no clip kept)',
+      _history(history: _freeLookups()),
+    ),
     ('Clip — serving from library (playing)', _clip('come')),
     ('Clip — sense choice', _clip('bank')),
     ('Clip — rating noted', _clip('come', rating: ClipRating.helpful)),
@@ -358,6 +363,36 @@ List<(String, Widget)> _frames() {
     ('In place — generating', _inPlaceClip('xylograph')),
     ('In place — empty selection', _inPlaceClip('   ')),
     ('In place — offline', _inPlaceClip('quixotic', online: false)),
+    (
+      'In place — offline, Free (no clip kept)',
+      _inPlaceClip(
+        'come',
+        online: false,
+        entitlement: const Entitlement(
+          tier: PlanTier.free,
+          signedIn: true,
+          lookupsUsed: 3,
+          lookupsLimit: 20,
+        ),
+        history: <HistoryEntry>[_savedLibraryHit()],
+        clips: _clips(),
+      ),
+    ),
+    (
+      'In place — offline, Pro (saved clip replays)',
+      _inPlaceClip(
+        'come',
+        online: false,
+        entitlement: const Entitlement(
+          tier: PlanTier.pro,
+          signedIn: true,
+          lookupsUsed: 3,
+          lookupsLimit: 50,
+        ),
+        history: <HistoryEntry>[_savedLibraryHit()],
+        clips: _clips(),
+      ),
+    ),
     // No auto-open: the reader's own path is driven here so the confirmation
     // that follows a submitted report can be looked at. Tooling only.
     ('Report — submitted (confirmation)', _clip('come')),
@@ -703,6 +738,7 @@ Widget _account({
     entitlements: services.entitlementsApi,
     session: services.accountSession,
     purchases: services.purchases,
+    plan: services.entitlements,
   );
   return ScenovaScope(
     services: services,
@@ -764,6 +800,7 @@ Widget _paywall({
     entitlement: entitlement,
     purchases: services.purchases,
     session: services.accountSession,
+    plan: services.entitlements,
     analytics: services.analytics,
   );
   return ScenovaScope(
@@ -857,6 +894,32 @@ List<HistoryEntry> _savedLookups() {
       clipUrl: 'https://clips.example/come.mp4',
       clipLocalKey: 'come-1',
       posterLocalKey: 'come-1',
+    ),
+    HistoryEntry(
+      id: 'bank-1',
+      word: 'bank',
+      phrase: 'a place that keeps money safe',
+      kind: LookupKind.word,
+      savedAt: now.subtract(const Duration(hours: 2)),
+      clipUrl: 'https://clips.example/bank.mp4',
+    ),
+  ];
+}
+
+/// The saved lookups a Free reader's device holds: the word, the phrase, and
+/// the clip's source, but no clip and no poster frame, so each row draws the
+/// shared still-frame stand-in
+/// (`docs/Scenova/monetization.md` → "Feature Gate Mapping").
+List<HistoryEntry> _freeLookups() {
+  final now = DateTime.now();
+  return <HistoryEntry>[
+    HistoryEntry(
+      id: 'come-1',
+      word: 'come',
+      phrase: 'to move towards someone or something',
+      kind: LookupKind.word,
+      savedAt: now.subtract(const Duration(minutes: 6)),
+      clipUrl: 'https://clips.example/come.mp4',
     ),
     HistoryEntry(
       id: 'bank-1',
@@ -969,11 +1032,24 @@ const Clip _phraseClipNotice = Clip(
 /// The clip view as the in-place hosts present it — the iOS share extension's
 /// sheet and the Android selection action: the compact card over a reading page,
 /// with the page visible around and behind it.
-Widget _inPlaceClip(String selection, {bool online = true}) {
+Widget _inPlaceClip(
+  String selection, {
+  bool online = true,
+  Entitlement entitlement = Entitlement.unmeteredGuest,
+  List<HistoryEntry> history = const <HistoryEntry>[],
+  ClipStore? clips,
+}) {
   return Stack(
     children: <Widget>[
       const _ReadingPage(),
-      _clip(selection, online: online, presentation: ClipPresentation.inPlace),
+      _clip(
+        selection,
+        online: online,
+        entitlement: entitlement,
+        history: history,
+        clips: clips,
+        presentation: ClipPresentation.inPlace,
+      ),
     ],
   );
 }
@@ -1050,10 +1126,14 @@ ScenovaServices _services({
   final clipNotices = ClipNoticeInbox(
     source: clipNoticeSource ?? ScriptedClipNoticeSource(),
   );
+  final entitlements = FixedEntitlementProvider(entitlement);
+  final tierGates = TierGates(entitlements: entitlements, flags: featureFlags);
+  resolvedHistory.planLimit = tierGates.historyLimit;
   final savedClips = SavedClipKeeper(
     history: resolvedHistory,
     clips: resolvedClips,
     posters: resolvedPosters,
+    gates: tierGates,
   );
   return ScenovaServices(
     lookupApi: api ?? MockLookupApi(),
@@ -1061,7 +1141,8 @@ ScenovaServices _services({
     historyStore: resolvedHistory,
     connectivity: connectivity,
     settings: settingsController,
-    entitlements: FixedEntitlementProvider(entitlement),
+    entitlements: entitlements,
+    tierGates: tierGates,
     entitlementsApi: entitlementsApi ?? MockEntitlementApi(),
     accountSession: accountSession ?? DevelopmentAccountSession(),
     accountApi: accountApi ?? MockAccountApi(),

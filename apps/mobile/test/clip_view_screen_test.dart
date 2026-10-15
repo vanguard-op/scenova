@@ -750,6 +750,115 @@ void main() {
     await teardown(tester);
   });
 
+  testWidgets('a Free reader\'s saved lookup does not replay offline', (
+    tester,
+  ) async {
+    // The Free tier keeps the word and phrase but not the clip
+    // (`docs/Scenova/monetization.md` → "Feature Gate Mapping"), so a saved
+    // lookup replays only while online.
+    final services = buildServices(
+      api: MockLookupApi(),
+      online: false,
+      entitlement: const Entitlement(
+        tier: PlanTier.free,
+        signedIn: true,
+        lookupsUsed: 3,
+        lookupsLimit: 20,
+      ),
+      history: InMemoryHistoryStore(
+        seed: <HistoryEntry>[
+          seededEntry(
+            word: 'come',
+            phrase: 'to move towards someone',
+            clipUrl: 'https://clips.example/come.mp4',
+          ),
+        ],
+      ),
+    );
+    final controller = ClipViewController(
+      services: services,
+      selection: CaptureSelection.parse('come'),
+      savedEntry: (await services.historyStore.all()).single,
+    );
+    addTearDown(controller.dispose);
+
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+    await tester.pump();
+
+    expect(controller.phase, ClipPhase.offline);
+    expect(controller.playing, isFalse);
+    expect(find.text('come'), findsWidgets);
+    await teardown(tester);
+  });
+
+  testWidgets('a Pro reader\'s saved lookup replays offline', (tester) async {
+    final services = buildServices(
+      api: MockLookupApi(),
+      online: false,
+      entitlement: const Entitlement(
+        tier: PlanTier.pro,
+        signedIn: true,
+        lookupsUsed: 3,
+        lookupsLimit: 50,
+      ),
+      clips: InMemoryClipStore(
+        seed: <String, String>{'seed-come': 'file:///device/come.mp4'},
+      ),
+      history: InMemoryHistoryStore(
+        seed: <HistoryEntry>[
+          seededEntry(
+            word: 'come',
+            phrase: 'to move towards someone',
+            clipLocalKey: 'seed-come',
+          ),
+        ],
+      ),
+    );
+    final controller = ClipViewController(
+      services: services,
+      selection: CaptureSelection.parse('come'),
+      savedEntry: (await services.historyStore.all()).single,
+    );
+    addTearDown(controller.dispose);
+
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+    await tester.pump();
+
+    expect(controller.phase, ClipPhase.playing);
+    expect(controller.clip?.url, 'file:///device/come.mp4');
+    await teardown(tester);
+  });
+
+  testWidgets('a Free reader\'s lookup keeps no clip on the device', (
+    tester,
+  ) async {
+    final clips = InMemoryClipStore(onSave: (url) async => 'device://$url');
+    final services = buildServices(
+      api: MockLookupApi(),
+      entitlement: const Entitlement(
+        tier: PlanTier.free,
+        signedIn: true,
+        lookupsUsed: 3,
+        lookupsLimit: 20,
+      ),
+      clips: clips,
+    );
+    final controller = controllerFor(services, 'come');
+    addTearDown(controller.dispose);
+
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+    await tester.pump();
+
+    expect(controller.phase, ClipPhase.playing);
+    final saved = (await services.historyStore.all()).single;
+    expect(saved.clipLocalKey, isNull);
+    expect(saved.clipUrl, isNotNull);
+    await teardown(tester);
+  });
+
   testWidgets('a failed lookup shows the error state with a retry', (
     tester,
   ) async {

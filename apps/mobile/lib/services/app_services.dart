@@ -35,6 +35,7 @@ import 'reported_clip_watch.dart';
 import 'saved_clip_keeper.dart';
 import 'settings_controller.dart';
 import 'settings_store.dart';
+import 'tier_gates.dart';
 
 /// The collaborators the presentation layer reads.
 ///
@@ -48,6 +49,7 @@ class ScenovaServices {
     required this.connectivity,
     required this.settings,
     required this.entitlements,
+    required this.tierGates,
     required this.entitlementsApi,
     required this.accountSession,
     required this.accountApi,
@@ -76,6 +78,11 @@ class ScenovaServices {
   final ConnectivityMonitor connectivity;
   final SettingsController settings;
   final EntitlementProvider entitlements;
+
+  /// The gates the reader's plan puts on what the device keeps
+  /// (`docs/Scenova/monetization.md` → "Feature Gate Mapping"): the history
+  /// limit and clip retention.
+  final TierGates tierGates;
 
   /// The entitlement service (`C-018`): the plan and the lookups spent this
   /// month, as the Account screen reads them.
@@ -144,7 +151,7 @@ class ScenovaServices {
   /// the device's own history, and a manual connectivity switch.
   factory ScenovaServices.development({
     String locale = 'en',
-    Entitlement entitlement = Entitlement.unmeteredGuest,
+    Entitlement? entitlement,
     HistoryStore? historyStore,
     List<HistoryEntry> history = const <HistoryEntry>[],
     SettingsStore? settingsStore,
@@ -195,6 +202,19 @@ class ScenovaServices {
           );
     final purchases = MockPurchaseService();
 
+    // The reader's plan (`C-018`): read from the entitlement service at launch
+    // and on each return to the foreground, or fixed where a caller supplied one
+    // (tests and the preview gallery). The gates the plan puts on the device
+    // read it through [TierGates].
+    final resolvedFlags = featureFlags ?? RemoteConfigFeatureFlags();
+    final entitlements = entitlement != null
+        ? FixedEntitlementProvider(entitlement)
+        : ApiEntitlementProvider(api: entitlementsApi);
+    final tierGates = TierGates(
+      entitlements: entitlements,
+      flags: resolvedFlags,
+    );
+
     final connectivity = ManualConnectivity();
     final settings = SettingsController(
       onboardingComplete: !AppConfig.runOnboarding,
@@ -212,10 +232,14 @@ class ScenovaServices {
     final resolvedHistory = historyStore ?? InMemoryHistoryStore(seed: history);
     final resolvedClips = clips ?? DeviceClipStore();
     final resolvedPosters = posterFrames ?? DevicePosterFrameStore();
+    // The store keeps only what the reader's plan allows, so a Free reader's
+    // history is capped and a Pro reader's is not (`FEAT-009`, `FEAT-013`).
+    resolvedHistory.planLimit = tierGates.historyLimit;
     final savedClips = SavedClipKeeper(
       history: resolvedHistory,
       clips: resolvedClips,
       posters: resolvedPosters,
+      gates: tierGates,
     );
     // The clip-ready notice arrives through the platform's messaging service
     // in production; a laptop run drives the same intake by hand, so the
@@ -255,7 +279,8 @@ class ScenovaServices {
       historyStore: resolvedHistory,
       connectivity: connectivity,
       settings: settings,
-      entitlements: FixedEntitlementProvider(entitlement),
+      entitlements: entitlements,
+      tierGates: tierGates,
       entitlementsApi: entitlementsApi,
       accountSession: accountSession,
       accountApi: accountApi,
@@ -277,7 +302,7 @@ class ScenovaServices {
       pushRegistrar: pushRegistrar,
       clipNotices: clipNotices,
       notificationPermission: notificationPermission,
-      featureFlags: featureFlags ?? RemoteConfigFeatureFlags(),
+      featureFlags: resolvedFlags,
       feedbackOutbox: FeedbackOutbox(
         api: AppConfig.useMockFeedbackApi
             ? MockFeedbackApi(latency: AppConfig.mockLatency)

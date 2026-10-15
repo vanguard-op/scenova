@@ -2,6 +2,7 @@ import '../models/history_entry.dart';
 import 'clip_store.dart';
 import 'history_store.dart';
 import 'poster_frame_store.dart';
+import 'tier_gates.dart';
 
 /// Fetches a saved lookup's clip and derives its poster frame, keeping both on
 /// the device beside the entry (`FEAT-009`).
@@ -11,16 +12,23 @@ import 'poster_frame_store.dart';
 /// shows it at a glance. Both are fetched and derived the same way whether the
 /// entry is a fresh lookup or a clip the reader reported that a regenerated one
 /// has replaced.
+///
+/// The reader's plan gates the clip: Pro keeps it, while the Free tier keeps the
+/// word, the phrase, and the poster frame but not the clip, so a Free reader's
+/// saved lookup replays only while online
+/// (`docs/Scenova/monetization.md` → "Feature Gate Mapping").
 class SavedClipKeeper {
   SavedClipKeeper({
     required this.history,
     required this.clips,
     required this.posters,
+    required this.gates,
   });
 
   final HistoryStore history;
   final ClipStore clips;
   final PosterFrameStore posters;
+  final TierGates gates;
 
   /// The source a replay plays for [entry]: the device's own copy when it holds
   /// one, otherwise the entry's source URL, which replays while online.
@@ -37,10 +45,13 @@ class SavedClipKeeper {
   /// with its local key set when the clip was kept.
   ///
   /// A clip the device cannot fetch or keep leaves the entry on its source,
-  /// which still replays while online, and returns the entry unchanged.
+  /// which still replays while online, and returns the entry unchanged. A plan
+  /// that withholds clip retention — the Free tier, or any plan while the paid
+  /// tier is killed — also leaves the entry on its source.
   Future<HistoryEntry> keepClip(HistoryEntry entry) async {
     final clipUrl = entry.clipUrl;
     if (clipUrl == null) return entry;
+    if (!await gates.retainsClips()) return entry;
     final key = await clips.save(clipUrl: clipUrl, key: entry.id);
     if (key == null) return entry;
     final kept = entry.copyWith(clipLocalKey: key);

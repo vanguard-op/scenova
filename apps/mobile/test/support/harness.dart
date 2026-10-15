@@ -46,6 +46,7 @@ import 'package:scenova/services/reported_clip_store.dart';
 import 'package:scenova/services/reported_clip_watch.dart';
 import 'package:scenova/services/saved_clip_keeper.dart';
 import 'package:scenova/services/settings_controller.dart';
+import 'package:scenova/services/tier_gates.dart';
 import 'package:scenova/theme/app_theme.dart';
 import 'package:scenova_design/scenova_design.dart';
 
@@ -90,10 +91,15 @@ ScenovaServices buildServices({
   final clipNotices = ClipNoticeInbox(
     source: clipNoticeSource ?? ScriptedClipNoticeSource(),
   );
+  final entitlements = FixedEntitlementProvider(entitlement);
+  final resolvedFlags = featureFlags ?? const FixedFeatureFlags();
+  final tierGates = TierGates(entitlements: entitlements, flags: resolvedFlags);
+  resolvedHistory.planLimit = tierGates.historyLimit;
   final savedClips = SavedClipKeeper(
     history: resolvedHistory,
     clips: resolvedClips,
     posters: resolvedPosters,
+    gates: tierGates,
   );
   return ScenovaServices(
     lookupApi: api ?? MockLookupApi(),
@@ -101,7 +107,8 @@ ScenovaServices buildServices({
     historyStore: resolvedHistory,
     connectivity: connectivity,
     settings: settingsController,
-    entitlements: FixedEntitlementProvider(entitlement),
+    entitlements: entitlements,
+    tierGates: tierGates,
     entitlementsApi: entitlementsApi ?? MockEntitlementApi(),
     accountSession: accountSession ?? DevelopmentAccountSession(),
     accountApi: accountApi ?? MockAccountApi(),
@@ -119,7 +126,7 @@ ScenovaServices buildServices({
     clipNotices: clipNotices,
     notificationPermission:
         notificationPermission ?? ScriptedNotificationPermission(),
-    featureFlags: featureFlags ?? const FixedFeatureFlags(),
+    featureFlags: resolvedFlags,
     feedbackOutbox: FeedbackOutbox(
       api: feedbackApi ?? MockFeedbackApi(),
       store: feedbackStore ?? InMemoryPendingFeedbackStore(),
@@ -469,6 +476,9 @@ class DelayedHistoryStore implements HistoryStore {
       Completer<List<HistoryEntry>>();
 
   @override
+  Future<int?> Function()? planLimit;
+
+  @override
   Future<List<HistoryEntry>> all() => completer.future;
 
   @override
@@ -490,6 +500,12 @@ class DelayedHistoryStore implements HistoryStore {
 /// A history that fails to read, for the error state.
 class ThrowingHistoryStore implements HistoryStore {
   const ThrowingHistoryStore();
+
+  @override
+  Future<int?> Function()? get planLimit => null;
+
+  @override
+  set planLimit(Future<int?> Function()? value) {}
 
   @override
   Future<List<HistoryEntry>> all() async => throw StateError('unreadable');

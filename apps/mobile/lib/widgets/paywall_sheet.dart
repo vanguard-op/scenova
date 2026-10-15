@@ -69,6 +69,7 @@ class _PaywallSheetState extends State<_PaywallSheet> {
       entitlement: widget.entitlement,
       purchases: services.purchases,
       session: services.accountSession,
+      plan: services.entitlements,
       analytics: services.analytics,
     );
     _controller = controller;

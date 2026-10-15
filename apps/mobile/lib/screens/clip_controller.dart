@@ -111,6 +111,11 @@ class ClipViewController extends ChangeNotifier {
   bool _noticeDismissed = false;
   bool _fromHistory = false;
 
+  /// Whether the reader's plan keeps a saved clip on the device, read with the
+  /// lookup. Pro keeps clips, so a saved clip replays with no connection; the
+  /// Free tier keeps none (`FEAT-009`, `FEAT-013`).
+  bool _planRetainsClips = true;
+
   /// Whether the first load has run. Until it has, a newer selection is left to
   /// the load that mounting triggers rather than starting a second lookup.
   bool _loaded = false;
@@ -164,10 +169,13 @@ class ClipViewController extends ChangeNotifier {
   /// Whether the in-context view is shown at all (`enable_clip_view`).
   bool get _clipViewEnabled => services.featureFlags.clipViewEnabled;
 
-  /// Whether a saved clip replays with no connection
-  /// (`enable_offline_history`). When it is off, offline replay is disabled
-  /// while the on-device history stays.
-  bool get offlineReplayEnabled => services.featureFlags.offlineHistoryEnabled;
+  /// Whether a saved clip replays with no connection.
+  ///
+  /// Offline replay is a Pro benefit — the Free tier keeps no clip on the
+  /// device — and the `enable_offline_history` kill switch can disable it for
+  /// everyone (`docs/Scenova/monetization.md`; `docs/Scenova/release.md`).
+  bool get offlineReplayEnabled =>
+      services.featureFlags.offlineHistoryEnabled && _planRetainsClips;
 
   /// Whether this view is showing a saved lookup from the device.
   bool get replayingSavedEntry => _savedEntry != null;
@@ -249,13 +257,20 @@ class ClipViewController extends ChangeNotifier {
       return;
     }
 
+    // The reader's plan and the release flags decide what the device keeps and
+    // what it may replay with no connection (`FEAT-009`, `FEAT-013`).
+    _entitlement = await services.entitlements.current();
+    _planRetainsClips = await services.tierGates.retainsClips();
+    if (_disposed) return;
+
     // A lookup opened from History replays the clip the device already holds;
     // it starts no lookup and no generation.
     final saved = _savedEntry;
     if (saved != null) {
-      // Offline replay can be switched off at runtime (`enable_offline_history`):
-      // the entry stays on the device, but its clip does not play with no
-      // connection.
+      // Offline replay can be switched off at runtime
+      // (`enable_offline_history`), and a Free reader's plan keeps no clip to
+      // replay: either way the entry stays on the device, but its clip does not
+      // play with no connection (`FEAT-009`, `FEAT-013`).
       if (!services.connectivity.isOnline && !offlineReplayEnabled) {
         _serveSavedEntryOffline(saved);
         return;
@@ -270,9 +285,6 @@ class ClipViewController extends ChangeNotifier {
         source: source,
       );
     }
-
-    _entitlement = await services.entitlements.current();
-    if (_disposed) return;
 
     // A phrase clip is kept only on the device and never enters the shared
     // library, so a phrase this device has already looked up is served from
@@ -808,8 +820,9 @@ class ClipViewController extends ChangeNotifier {
   ///
   /// The word and its phrase come from the device, and the clip the device holds
   /// plays without a lookup — so a saved lookup replays with no connection
-  /// (`FEAT-009`). A saved lookup whose clip the device no longer holds shows
-  /// the word and phrase with the clip unavailable, which is the fallback state.
+  /// (`FEAT-009`). A saved lookup whose clip the device no longer holds, or
+  /// whose clip lives only at its source, shows the word and phrase with the
+  /// clip waiting on a connection.
   Future<void> _serveSavedEntry(HistoryEntry entry) async {
     _fromHistory = true;
     final source = await _deviceClipSource(entry);
@@ -825,8 +838,9 @@ class ClipViewController extends ChangeNotifier {
     if (result.status == LookupStatus.served) _autoplayOrHold();
   }
 
-  /// Shows a saved lookup whose clip cannot replay because offline replay is
-  /// switched off (`enable_offline_history`).
+  /// Shows a saved lookup whose clip cannot replay: the device holds none (the
+  /// Free tier keeps no clip), or offline replay is switched off at runtime
+  /// (`enable_offline_history`).
   ///
   /// The word and phrase stay on the device and are shown; only the clip is
   /// withheld, so the reader keeps their history with no connection.

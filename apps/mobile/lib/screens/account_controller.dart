@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../models/entitlement.dart';
 import '../services/account_session.dart';
 import '../services/entitlement_api.dart';
+import '../services/entitlement_provider.dart';
 import '../services/purchase_service.dart';
 
 /// What the Account screen is showing.
@@ -32,11 +33,17 @@ class AccountController extends ChangeNotifier {
     required this.entitlements,
     required this.session,
     required this.purchases,
+    required this.plan,
   });
 
   final EntitlementApi entitlements;
   final AccountSession session;
   final PurchaseService purchases;
+
+  /// The reader's plan cache, shared with the tier gates (`FEAT-013`): a
+  /// purchase or a sign-in/sign-out re-reads it so the gates the plan puts on
+  /// the device take effect at once.
+  final EntitlementProvider plan;
 
   AccountStatus _status = AccountStatus.loading;
   Entitlement? _entitlement;
@@ -86,6 +93,7 @@ class AccountController extends ChangeNotifier {
     try {
       await session.signIn();
       await _readEntitlement();
+      await plan.refresh();
     } on AccountSignInUnavailable {
       _fail('Signing in is not available in this build yet.');
     } on Object {
@@ -104,6 +112,10 @@ class AccountController extends ChangeNotifier {
       await session.signOut();
       _entitlement = Entitlement.signedOut;
       _status = AccountStatus.signedOut;
+      // The gates fall back to the signed-out plan before the service confirms
+      // it, so a reader who signs out with no connection is not left with the
+      // paid gates (`FEAT-013`).
+      plan.clear();
     } on Object {
       _fail('Signing out did not work. Try again.');
     } finally {
@@ -157,8 +169,12 @@ class AccountController extends ChangeNotifier {
       switch (outcome) {
         case PurchaseCompleted():
           await _readEntitlement();
+          await plan.refresh();
         case PurchaseDismissed():
-          if (refreshOnDismiss) await _readEntitlement();
+          if (refreshOnDismiss) {
+            await _readEntitlement();
+            await plan.refresh();
+          }
         case PurchaseNothingToRestore():
           _fail(nothingToRestore ?? 'No purchases to restore.');
         case PurchaseFailed(:final message):
