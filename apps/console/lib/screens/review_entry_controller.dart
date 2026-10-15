@@ -78,8 +78,10 @@ class ReviewEntryController extends ChangeNotifier {
   ReviewEntryDetail? _detail;
   ReviewApiException? _failure;
   EntryAction? _submitting;
+  ChosenClip? _submittingClip;
   ReviewApiException? _actionFailure;
   EntryAction? _failedAction;
+  ChosenClip? _failedChosenClip;
   String? _failedPhrase;
   int _requestGeneration = 0;
   bool _disposed = false;
@@ -90,6 +92,10 @@ class ReviewEntryController extends ChangeNotifier {
 
   /// The action being recorded, or null when none is in flight.
   EntryAction? get submitting => _submitting;
+
+  /// The clip the in-flight choice names, so only the button that was pressed
+  /// shows its spinner, or null.
+  ChosenClip? get submittingClip => _submittingClip;
 
   /// Whether an action is being recorded, so the screen disables the actions
   /// and shows a spinner (`docs/Scenova/screens/10-review-entry.md` →
@@ -105,6 +111,10 @@ class ReviewEntryController extends ChangeNotifier {
 
   /// The action the Error State is offering to retry, or null.
   EntryAction? get failedAction => _failedAction;
+
+  /// The clip the failed action was choosing, so a retry re-sends the same
+  /// choice, or null.
+  ChosenClip? get failedChosenClip => _failedChosenClip;
 
   /// Loads the entry and its evidence.
   Future<void> load() async {
@@ -143,21 +153,36 @@ class ReviewEntryController extends ChangeNotifier {
 
   /// Records [action] against the entry.
   ///
-  /// The request carries the state the curator saw, so the service refuses an
-  /// action on an entry another curator has moved (`C-016` 409); that refusal
-  /// lands as [ReviewEntryStatus.moved] and the entry is re-read so its current
-  /// state is shown.
-  Future<EntryActionOutcome> act(EntryAction action, {String? phrase}) async {
+  /// A `choose` names the clip that serves every reader from now on
+  /// ([chosenClip]); a phrase edit carries the new [phrase]. The request carries
+  /// the state the curator saw, so the service refuses an action on an entry
+  /// another curator has moved (`C-016` 409); that refusal lands as
+  /// [ReviewEntryStatus.moved] and the entry is re-read so its current state is
+  /// shown.
+  Future<EntryActionOutcome> act(
+    EntryAction action, {
+    ChosenClip? chosenClip,
+    String? phrase,
+  }) async {
     final detail = _detail;
     if (detail == null || _submitting != null) {
       return const EntryActionFailed(
         ReviewApiException(0, 'The entry is not ready to be acted on.'),
       );
     }
+    if (action == EntryAction.choose && chosenClip == null) {
+      // The contract refuses a `choose` without a clip (`C-016` 400); the
+      // screen always names one, so this is a guard rather than a path.
+      return const EntryActionFailed(
+        ReviewApiException(400, 'Choose which clip serves the entry.'),
+      );
+    }
 
     _submitting = action;
+    _submittingClip = action == EntryAction.choose ? chosenClip : null;
     _actionFailure = null;
     _failedAction = null;
+    _failedChosenClip = null;
     _failedPhrase = null;
     _notify();
 
@@ -167,17 +192,20 @@ class ReviewEntryController extends ChangeNotifier {
         EntryActionRequest(
           action: action,
           expectedState: detail.state,
+          chosenClip: action == EntryAction.choose ? chosenClip : null,
           phrase: action == EntryAction.editPhrase ? phrase : null,
         ),
       );
       if (_disposed) return EntryActionRecorded(result);
-      _applyResult(action, result, phrase);
+      _applyResult(action, result, chosenClip: chosenClip, phrase: phrase);
       _submitting = null;
+      _submittingClip = null;
       _notify();
       return EntryActionRecorded(result);
     } on ReviewApiException catch (error) {
       if (_disposed) return EntryActionFailed(error);
       _submitting = null;
+      _submittingClip = null;
       if (error.isUnauthenticated) {
         _notify();
         onSessionExpired();
@@ -206,6 +234,7 @@ class ReviewEntryController extends ChangeNotifier {
       // and the actions panel shows the shared Error State.
       _actionFailure = error;
       _failedAction = action;
+      _failedChosenClip = chosenClip;
       _failedPhrase = phrase;
       _notify();
       return EntryActionFailed(error);
@@ -222,7 +251,7 @@ class ReviewEntryController extends ChangeNotifier {
         ),
       );
     }
-    return act(action, phrase: _failedPhrase);
+    return act(action, chosenClip: _failedChosenClip, phrase: _failedPhrase);
   }
 
   /// Dismisses the action failure without retrying.
@@ -230,22 +259,30 @@ class ReviewEntryController extends ChangeNotifier {
     if (_actionFailure == null) return;
     _actionFailure = null;
     _failedAction = null;
+    _failedChosenClip = null;
     _failedPhrase = null;
     _notify();
   }
 
   /// Moves the entry onto the result of a recorded action.
+  ///
+  /// A `choose` of the candidate makes it the clip the library serves and spends
+  /// the candidate; a `retire` or an `edit_phrase` also clears it, since the
+  /// queue item is resolved or the entry is regenerating.
   void _applyResult(
     EntryAction action,
-    EntryActionResult result,
+    EntryActionResult result, {
+    ChosenClip? chosenClip,
     String? phrase,
-  ) {
+  }) {
     final detail = _detail;
     if (detail == null) return;
     final entry = detail.entry;
     final editedPhrase = action == EntryAction.editPhrase
         ? (phrase ?? entry.glossPhrase).trim()
         : entry.glossPhrase;
+    final chosenCandidate =
+        action == EntryAction.choose && chosenClip == ChosenClip.candidate;
     _detail = ReviewEntryDetail(
       entry: ReviewEntry(
         entryId: entry.entryId,
@@ -253,8 +290,9 @@ class ReviewEntryController extends ChangeNotifier {
         senseLabel: entry.senseLabel,
         glossPhrase: editedPhrase,
         status: result.status,
-        clip: entry.clip,
+        clip: chosenCandidate ? (detail.candidate ?? entry.clip) : entry.clip,
       ),
+      candidate: null,
       reports: detail.reports,
       feedback: detail.feedback,
       state: result.state,

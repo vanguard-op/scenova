@@ -51,9 +51,10 @@ class ReviewStatusBadge extends StatelessWidget {
 /// Components: "Status badge").
 ///
 /// The review state says where the entry sits in the queue; this says whether
-/// the clip is in front of readers. A curator deciding between clear and hold
-/// needs both, so the two badges sit together. Like the review badge it goes
-/// through the shared [StatusBadge], so the status never rests on colour alone.
+/// the clip is in front of readers. A curator deciding whether to keep, replace,
+/// or retire the clip needs both, so the two badges sit together. Like the
+/// review badge it goes through the shared [StatusBadge], so the status never
+/// rests on colour alone.
 class EntryStatusBadge extends StatelessWidget {
   const EntryStatusBadge({super.key, required this.status});
 
@@ -69,15 +70,14 @@ class EntryStatusBadge extends StatelessWidget {
     );
   }
 
-  /// The semantic family the status reads in. Serving is resolved, held is
-  /// withheld, and retired is stopped.
+  /// The semantic family the status reads in. Serving is resolved; retired is
+  /// stopped.
   static ScenovaSemanticColors _family(
     ScenovaColors colors,
     EntryStatus status,
   ) {
     return switch (status) {
       EntryStatus.active => colors.success,
-      EntryStatus.held => colors.warning,
       EntryStatus.retired => colors.error,
     };
   }
@@ -85,7 +85,6 @@ class EntryStatusBadge extends StatelessWidget {
   static AppIcon _icon(EntryStatus status) {
     return switch (status) {
       EntryStatus.active => AppIcons.check,
-      EntryStatus.held => AppIcons.pause,
       EntryStatus.retired => AppIcons.remove,
     };
   }

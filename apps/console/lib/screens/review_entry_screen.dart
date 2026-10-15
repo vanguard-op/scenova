@@ -13,12 +13,16 @@ import '../widgets/entry_evidence_table.dart';
 import '../widgets/status_badge.dart';
 import 'review_entry_controller.dart';
 
+/// The decision a curator records, and the clip it names when it is a choice.
+typedef _OnAction = void Function(EntryAction action, ChosenClip? chosenClip);
+
 /// Screen 10: Review Entry (`docs/Scenova/screens/10-review-entry.md`).
 ///
-/// The queue drills down into one entry. The curator judges the clip with its
-/// generation phrase against the evidence — the reports and the negative
-/// feedback — and clears, holds, retires, or replaces the entry, or edits the
-/// phrase it is generated from.
+/// The queue drills down into one entry. The curator judges the clip serving the
+/// library beside the candidate regenerated for the reporting reader, against
+/// the evidence — the reports and the negative feedback — and resolves the item
+/// by choosing which clip serves every reader from now on, retiring the entry,
+/// or editing the phrase it is generated from.
 ///
 /// The controller is created here and owns the entry's data, its actions, and
 /// its states. A caller may pass one in (a test, or a host that already holds
@@ -207,8 +211,12 @@ class _ReviewEntryScreenState extends State<ReviewEntryScreen> {
             _ActionsPanel(
               detail: detail,
               submitting: controller.submitting,
+              submittingClip: controller.submitting == EntryAction.choose
+                  ? controller.submittingClip
+                  : null,
               failure: controller.actionFailure,
-              onAction: _runAction,
+              onAction: (action, chosenClip) =>
+                  _runAction(action, chosenClip: chosenClip),
               onRetry: _retryAction,
               onDismiss: controller.clearActionFailure,
               onPhrase: (phrase) =>
@@ -222,7 +230,11 @@ class _ReviewEntryScreenState extends State<ReviewEntryScreen> {
   /// Records an action. A destructive one is confirmed first, in a modal that
   /// blocks until it is resolved (`docs/Scenova/screens/10-review-entry.md` →
   /// Overlays).
-  Future<void> _runAction(EntryAction action, {String? phrase}) async {
+  Future<void> _runAction(
+    EntryAction action, {
+    ChosenClip? chosenClip,
+    String? phrase,
+  }) async {
     final controller = _controller;
     if (controller == null) return;
 
@@ -230,20 +242,23 @@ class _ReviewEntryScreenState extends State<ReviewEntryScreen> {
       final outcome = await showDialog<EntryActionOutcome>(
         context: context,
         barrierDismissible: false,
-        builder: (dialogContext) => _ConfirmActionDialog(
-          action: action,
+        builder: (dialogContext) => _ConfirmRetireDialog(
           lemma: controller.detail?.entry.lemma ?? '',
           onConfirm: () => controller.act(action),
         ),
       );
       if (!mounted || outcome is! EntryActionRecorded) return;
-      _confirmAction(action);
+      _confirmAction(action, chosenClip);
       return;
     }
 
-    final outcome = await controller.act(action, phrase: phrase);
+    final outcome = await controller.act(
+      action,
+      chosenClip: chosenClip,
+      phrase: phrase,
+    );
     if (!mounted || outcome is! EntryActionRecorded) return;
-    _confirmAction(action);
+    _confirmAction(action, chosenClip);
   }
 
   /// Re-attempts the action the Error State is offering to retry.
@@ -251,24 +266,23 @@ class _ReviewEntryScreenState extends State<ReviewEntryScreen> {
     final controller = _controller;
     if (controller == null) return;
     final action = controller.failedAction;
+    final chosenClip = controller.failedChosenClip;
     final outcome = await controller.retryFailedAction();
     if (!mounted || action == null || outcome is! EntryActionRecorded) return;
-    _confirmAction(action);
+    _confirmAction(action, chosenClip);
   }
 
   /// Confirms a recorded action and, for one that resolves the queue item,
   /// returns to the queue.
-  void _confirmAction(EntryAction action) {
+  void _confirmAction(EntryAction action, ChosenClip? chosenClip) {
     final message = switch (action) {
-      EntryAction.clear => 'Cleared. The clip is serving readers again.',
-      EntryAction.hold =>
-        'Held. The clip is withheld from new readers until it is cleared '
-            'or replaced.',
+      EntryAction.choose =>
+        chosenClip == ChosenClip.candidate
+            ? 'Chosen. The new clip serves every reader from now on.'
+            : 'Kept. The clip keeps serving every reader.',
       EntryAction.retire =>
         'Retired. The clip has stopped serving; the next lookup of this word '
             'generates a replacement.',
-      EntryAction.replace =>
-        'Replaced. The clip has stopped serving and a new one is generating.',
       EntryAction.editPhrase =>
         'Phrase saved. The entry is regenerating from it.',
     };
@@ -315,13 +329,17 @@ class _EntryHeading extends StatelessWidget {
   }
 }
 
-/// The entry card: the clip with the word as its caption, and the generation
-/// phrase the clip is made from
+/// The entry card: the clip serving the library beside the candidate
+/// regenerated for the reporting reader, with the word, the sense, and the
+/// generation phrase
 /// (`docs/Scenova/screens/10-review-entry.md` → Layout).
 ///
-/// The card owns the clip's playback, so the shared Clip Player is handed
-/// whether it is playing and whether sound is on and reports back when the run
-/// finishes.
+/// The two clips are the evidence the decision rests on, so they sit together
+/// and each owns its own playback. The roles are set in a row of their own above
+/// a row holding the two frames, so the frames line up as a pair however their
+/// notes wrap. An entry with no candidate — queued by the negative-feedback
+/// threshold rather than a report, already resolved, or regenerating — says so
+/// rather than leaving a gap the curator has to interpret.
 class _EntryCard extends StatefulWidget {
   const _EntryCard({required this.detail});
 
@@ -332,8 +350,8 @@ class _EntryCard extends StatefulWidget {
 }
 
 class _EntryCardState extends State<_EntryCard> {
-  bool _playing = false;
-  bool _soundOn = false;
+  bool _servingPlaying = false;
+  bool _candidatePlaying = false;
 
   @override
   Widget build(BuildContext context) {
@@ -341,6 +359,55 @@ class _EntryCardState extends State<_EntryCard> {
     final tokens = ScenovaTokens.of(context);
     final styles = ScenovaTextStyles.of(context);
     final entry = widget.detail.entry;
+    final candidate = widget.detail.candidate;
+
+    const servingRole = _ClipRole(
+      label: 'Serving readers now',
+      note: 'The clip in the library today.',
+    );
+    // A candidate is absent for more than one reason — the entry was queued by
+    // the negative-feedback threshold rather than a report, the choice between
+    // the two clips has been made, or the entry is regenerating — so the note
+    // says what is held rather than guessing why. The evidence beside it carries
+    // the reason.
+    final candidateRole = candidate == null
+        ? const _ClipRole(
+            label: 'New clip for the report',
+            note:
+                'No fresh clip is held for this entry, so there is nothing to '
+                'compare it against.',
+          )
+        : const _ClipRole(
+            label: 'New clip for the report',
+            note: 'Regenerated for the reader who reported it.',
+          );
+
+    Widget servingFrame() => ClipPlayer(
+      status: ClipPlayerStatus.ready,
+      caption: entry.lemma,
+      clip: entry.clip,
+      playing: _servingPlaying,
+      reduceMotion: MediaQuery.disableAnimationsOf(context),
+      onTogglePlay: () => setState(() => _servingPlaying = !_servingPlaying),
+      onCompleted: () => setState(() => _servingPlaying = false),
+    );
+
+    Widget candidateFrame() => candidate == null
+        ? ClipPlayer(
+            status: ClipPlayerStatus.unavailable,
+            caption: entry.lemma,
+            unavailableMessage: 'No new clip for this entry.',
+          )
+        : ClipPlayer(
+            status: ClipPlayerStatus.ready,
+            caption: entry.lemma,
+            clip: candidate,
+            playing: _candidatePlaying,
+            reduceMotion: MediaQuery.disableAnimationsOf(context),
+            onTogglePlay: () =>
+                setState(() => _candidatePlaying = !_candidatePlaying),
+            onCompleted: () => setState(() => _candidatePlaying = false),
+          );
 
     return Container(
       decoration: BoxDecoration(
@@ -352,17 +419,45 @@ class _EntryCardState extends State<_EntryCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          ClipPlayer(
-            status: ClipPlayerStatus.ready,
-            caption: entry.lemma,
-            clip: entry.clip,
-            playing: _playing,
-            soundOn: _soundOn,
-            reduceMotion: MediaQuery.disableAnimationsOf(context),
-            controls: true,
-            onTogglePlay: () => setState(() => _playing = !_playing),
-            onToggleSound: () => setState(() => _soundOn = !_soundOn),
-            onCompleted: () => setState(() => _playing = false),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth < ConsoleLayout.entryClipPairMinWidth) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    servingRole,
+                    SizedBox(height: tokens.spacing.sm),
+                    servingFrame(),
+                    SizedBox(height: tokens.spacing.lg),
+                    candidateRole,
+                    SizedBox(height: tokens.spacing.sm),
+                    candidateFrame(),
+                  ],
+                );
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Expanded(child: servingRole),
+                      SizedBox(width: tokens.spacing.lg),
+                      Expanded(child: candidateRole),
+                    ],
+                  ),
+                  SizedBox(height: tokens.spacing.sm),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Expanded(child: servingFrame()),
+                      SizedBox(width: tokens.spacing.lg),
+                      Expanded(child: candidateFrame()),
+                    ],
+                  ),
+                ],
+              );
+            },
           ),
           SizedBox(height: tokens.spacing.md),
           Text(
@@ -384,6 +479,36 @@ class _EntryCardState extends State<_EntryCard> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The role one of the card's two clips plays, named above its frame.
+class _ClipRole extends StatelessWidget {
+  const _ClipRole({required this.label, required this.note});
+
+  final String label;
+  final String note;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = ScenovaColors.of(context);
+    final tokens = ScenovaTokens.of(context);
+    final styles = ScenovaTextStyles.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Text(
+          label,
+          style: styles.body.copyWith(
+            color: colors.textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        SizedBox(height: tokens.spacing.xs),
+        Text(note, style: styles.caption.copyWith(color: colors.textSecondary)),
+      ],
     );
   }
 }
@@ -448,10 +573,16 @@ class _MovedNote extends StatelessWidget {
 
 /// The decisions a curator can record, and the phrase edit beneath them
 /// (`docs/Scenova/screens/10-review-entry.md` → Components).
+///
+/// Choosing is the primary act: one button keeps the clip already serving and
+/// one makes the candidate the clip every reader gets. Retiring stays quiet
+/// until its confirmation step, where it becomes the modal's primary action
+/// (`docs/Scenova/branding.md` → Buttons).
 class _ActionsPanel extends StatelessWidget {
   const _ActionsPanel({
     required this.detail,
     required this.submitting,
+    required this.submittingClip,
     required this.failure,
     required this.onAction,
     required this.onRetry,
@@ -461,8 +592,13 @@ class _ActionsPanel extends StatelessWidget {
 
   final ReviewEntryDetail detail;
   final EntryAction? submitting;
+
+  /// The clip the in-flight choice names, so only the button that was pressed
+  /// shows its spinner.
+  final ChosenClip? submittingClip;
+
   final ReviewApiException? failure;
-  final ValueChanged<EntryAction> onAction;
+  final _OnAction onAction;
   final VoidCallback onRetry;
   final VoidCallback onDismiss;
   final ValueChanged<String> onPhrase;
@@ -494,14 +630,19 @@ class _ActionsPanel extends StatelessWidget {
       );
     }
 
+    final choosing = submitting == EntryAction.choose;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         Text('Decision', style: styles.h3.copyWith(color: colors.textPrimary)),
         SizedBox(height: tokens.spacing.xs),
         Text(
-          'Clear the entry to serve it again, hold it from new readers, or '
-          'retire or replace its clip.',
+          detail.hasCandidate
+              ? 'Choose which clip serves every reader from now on, or retire '
+                    'the entry.'
+              : 'Keep the clip serving, retire the entry, or rewrite the phrase '
+                    'it is generated from.',
           style: styles.bodySmall.copyWith(color: colors.textSecondary),
         ),
         SizedBox(height: tokens.spacing.md),
@@ -510,31 +651,37 @@ class _ActionsPanel extends StatelessWidget {
           runSpacing: tokens.spacing.md,
           children: <Widget>[
             ScenovaButton(
-              label: EntryAction.clear.label,
+              label: 'Keep the serving clip',
+              // With a candidate beside it, keeping is the quieter of the two
+              // choices; on its own it is the primary resolution.
+              variant: detail.hasCandidate
+                  ? ScenovaButtonVariant.outline
+                  : ScenovaButtonVariant.primary,
               icon: AppIcons.check,
-              isSubmitting: submitting == EntryAction.clear,
-              onPressed: busy ? null : () => onAction(EntryAction.clear),
+              semanticLabel: 'Keep the clip serving the library',
+              isSubmitting: choosing && submittingClip == ChosenClip.serving,
+              onPressed: busy
+                  ? null
+                  : () => onAction(EntryAction.choose, ChosenClip.serving),
             ),
-            ScenovaButton(
-              label: EntryAction.hold.label,
-              variant: ScenovaButtonVariant.outline,
-              icon: AppIcons.pause,
-              isSubmitting: submitting == EntryAction.hold,
-              onPressed: busy ? null : () => onAction(EntryAction.hold),
-            ),
+            if (detail.hasCandidate)
+              ScenovaButton(
+                label: 'Serve the new clip',
+                variant: ScenovaButtonVariant.primary,
+                icon: AppIcons.check,
+                semanticLabel: 'Serve the new clip to every reader',
+                isSubmitting:
+                    choosing && submittingClip == ChosenClip.candidate,
+                onPressed: busy
+                    ? null
+                    : () => onAction(EntryAction.choose, ChosenClip.candidate),
+              ),
             ScenovaButton(
               label: EntryAction.retire.label,
-              variant: ScenovaButtonVariant.destructive,
+              variant: ScenovaButtonVariant.ghost,
               icon: AppIcons.remove,
               isSubmitting: submitting == EntryAction.retire,
-              onPressed: busy ? null : () => onAction(EntryAction.retire),
-            ),
-            ScenovaButton(
-              label: EntryAction.replace.label,
-              variant: ScenovaButtonVariant.destructive,
-              icon: AppIcons.replay,
-              isSubmitting: submitting == EntryAction.replace,
-              onPressed: busy ? null : () => onAction(EntryAction.replace),
+              onPressed: busy ? null : () => onAction(EntryAction.retire, null),
             ),
           ],
         ),
@@ -656,28 +803,23 @@ class _PhraseEditFieldState extends State<_PhraseEditField> {
   }
 }
 
-/// The confirmation a destructive action opens
+/// The confirmation a retire opens
 /// (`docs/Scenova/screens/10-review-entry.md` → Overlays).
 ///
 /// It blocks until it is resolved, states the effect on readers who rely on the
 /// entry before the action is recorded, and carries its own submitting and
 /// error states.
-class _ConfirmActionDialog extends StatefulWidget {
-  const _ConfirmActionDialog({
-    required this.action,
-    required this.lemma,
-    required this.onConfirm,
-  });
+class _ConfirmRetireDialog extends StatefulWidget {
+  const _ConfirmRetireDialog({required this.lemma, required this.onConfirm});
 
-  final EntryAction action;
   final String lemma;
   final Future<EntryActionOutcome> Function() onConfirm;
 
   @override
-  State<_ConfirmActionDialog> createState() => _ConfirmActionDialogState();
+  State<_ConfirmRetireDialog> createState() => _ConfirmRetireDialogState();
 }
 
-class _ConfirmActionDialogState extends State<_ConfirmActionDialog> {
+class _ConfirmRetireDialogState extends State<_ConfirmRetireDialog> {
   bool _submitting = false;
   String? _error;
 
@@ -714,11 +856,9 @@ class _ConfirmActionDialogState extends State<_ConfirmActionDialog> {
     final colors = ScenovaColors.of(context);
     final tokens = ScenovaTokens.of(context);
     final styles = ScenovaTextStyles.of(context);
-    final retire = widget.action == EntryAction.retire;
-    final verb = retire ? 'Retire' : 'Replace';
 
     return AlertDialog(
-      title: Text('$verb “${widget.lemma}”?'),
+      title: Text('Retire “${widget.lemma}”?'),
       content: ConstrainedBox(
         constraints: const BoxConstraints(
           maxWidth: ConsoleLayout.dialogMaxWidth,
@@ -728,7 +868,9 @@ class _ConfirmActionDialogState extends State<_ConfirmActionDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
-              _effect(retire),
+              'Readers stop seeing this clip. The next lookup of '
+              '“${widget.lemma}” generates a replacement, and readers who '
+              'already have the clip keep it.',
               style: styles.body.copyWith(color: colors.textSecondary),
             ),
             if (_error != null)
@@ -772,31 +914,19 @@ class _ConfirmActionDialogState extends State<_ConfirmActionDialog> {
           onPressed: _submitting ? null : () => Navigator.of(context).pop(),
         ),
         ScenovaButton(
-          label: verb,
+          label: EntryAction.retire.label,
           variant: ScenovaButtonVariant.destructive,
-          icon: retire ? AppIcons.remove : AppIcons.replay,
+          icon: AppIcons.remove,
           isSubmitting: _submitting,
           onPressed: _submitting ? null : _confirm,
         ),
       ],
     );
   }
-
-  /// The effect of the action, stated before it is recorded, so a curator knows
-  /// what happens to the readers who rely on the entry.
-  String _effect(bool retire) {
-    if (retire) {
-      return 'Readers stop seeing this clip. The next lookup of '
-          '“${widget.lemma}” generates a replacement, and readers who already '
-          'have the clip keep it.';
-    }
-    return 'This clip stops serving and a new one is generated from a fresh '
-        'phrase. Readers who already have the clip keep it.';
-  }
 }
 
-/// The entry's loading shape: a skeleton card and a skeleton evidence table, so
-/// the layout holds while the entry is in flight
+/// The entry's loading shape: a skeleton card holding both clip panels beside a
+/// skeleton evidence table, so the layout holds while the entry is in flight
 /// (`docs/Scenova/screens/10-review-entry.md` → Loading).
 class _EntrySkeleton extends StatelessWidget {
   const _EntrySkeleton();
@@ -818,6 +948,20 @@ class _EntrySkeleton extends StatelessWidget {
       );
     }
 
+    Widget clipPanel() {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          const SkeletonLine(widthFactor: 0.55, height: 16),
+          SizedBox(height: tokens.spacing.sm),
+          const AspectRatio(
+            aspectRatio: ClipPlayer.aspectRatio,
+            child: SkeletonBlock(),
+          ),
+        ],
+      );
+    }
+
     return SingleChildScrollView(
       padding: EdgeInsets.all(tokens.spacing.xl),
       child: Column(
@@ -836,9 +980,13 @@ class _EntrySkeleton extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: <Widget>[
-                      const AspectRatio(
-                        aspectRatio: ClipPlayer.aspectRatio,
-                        child: SkeletonBlock(),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Expanded(child: clipPanel()),
+                          SizedBox(width: tokens.spacing.lg),
+                          Expanded(child: clipPanel()),
+                        ],
                       ),
                       SizedBox(height: tokens.spacing.md),
                       const SkeletonLine(widthFactor: 0.3),

@@ -183,13 +183,19 @@ void main() {
                 'lemma': 'bank',
                 'senseLabel': '2',
                 'glossPhrase': 'a river bank',
-                'status': 'held',
+                'status': 'active',
                 'clip': <String, Object?>{
                   'url': 'https://cdn.example/bank.mp4',
                   'durationSeconds': 4,
                   'resolution': '360p',
                   'hasAudio': false,
                 },
+              },
+              'candidate': <String, Object?>{
+                'url': 'https://cdn.example/bank-new.mp4',
+                'durationSeconds': 4,
+                'resolution': '360p',
+                'hasAudio': false,
               },
               'reports': <Object?>[
                 <String, Object?>{
@@ -218,12 +224,50 @@ void main() {
       expect(authorization, 'Bearer operator-token');
       expect(detail.entry.lemma, 'bank');
       expect(detail.entry.glossPhrase, 'a river bank');
-      expect(detail.entry.status, EntryStatus.held);
+      expect(detail.entry.status, EntryStatus.active);
       expect(detail.entry.clip.isPlayable, isTrue);
+      expect(detail.hasCandidate, isTrue);
+      expect(detail.candidate!.url, 'https://cdn.example/bank-new.mp4');
       expect(detail.reports.single.reasonLabel, 'Offensive');
       expect(detail.reports.single.note, 'Not for this sense.');
       expect(detail.feedback.single.rating, FeedbackRating.wrong);
       expect(detail.state, ReviewState.queued);
+    });
+
+    test('reads an entry with no candidate as having none to choose', () async {
+      final api = HttpReviewApi(
+        baseUrl: 'https://gateway.example',
+        idTokenProvider: () async => 'token',
+        client: MockClient(
+          (request) async => http.Response(
+            jsonEncode(<String, Object?>{
+              'entry': <String, Object?>{
+                'entryId': 'entry-livid-1',
+                'lemma': 'livid',
+                'senseLabel': '1',
+                'glossPhrase': 'furious',
+                'status': 'active',
+                'clip': <String, Object?>{
+                  'url': 'https://cdn.example/livid.mp4',
+                  'durationSeconds': 4,
+                  'resolution': '360p',
+                  'hasAudio': false,
+                },
+              },
+              'candidate': null,
+              'reports': <Object?>[],
+              'feedback': <Object?>[],
+              'state': 'queued',
+            }),
+            200,
+          ),
+        ),
+      );
+
+      final detail = await api.entry('entry-livid-1');
+
+      expect(detail.hasCandidate, isFalse);
+      expect(detail.candidate, isNull);
     });
 
     test('escapes the entry id in the path', () async {
@@ -291,6 +335,7 @@ void main() {
         expect(contentType, contains('application/json'));
         expect(jsonDecode(body!), <String, Object?>{
           'action': 'edit_phrase',
+          'chosenClip': null,
           'phrase': 'a place to keep money',
           'notes': 'Repeated reports.',
           'expectedState': 'queued',
@@ -299,6 +344,45 @@ void main() {
         expect(result.state, ReviewState.reviewed);
       },
     );
+
+    test('names the chosen clip on a choose', () async {
+      String? body;
+      final api = HttpReviewApi(
+        baseUrl: 'https://gateway.example',
+        idTokenProvider: () async => 'operator-token',
+        client: MockClient((request) async {
+          body = request.body;
+          return http.Response(
+            jsonEncode(<String, Object?>{
+              'actionId': 'action-1',
+              'entryId': 'entry-bank-2',
+              'status': 'active',
+              'state': 'actioned',
+            }),
+            200,
+          );
+        }),
+      );
+
+      final result = await api.act(
+        'entry-bank-2',
+        const EntryActionRequest(
+          action: EntryAction.choose,
+          expectedState: ReviewState.queued,
+          chosenClip: ChosenClip.candidate,
+        ),
+      );
+
+      expect(jsonDecode(body!), <String, Object?>{
+        'action': 'choose',
+        'chosenClip': 'candidate',
+        'phrase': null,
+        'notes': null,
+        'expectedState': 'queued',
+      });
+      expect(result.status, EntryStatus.active);
+      expect(result.state, ReviewState.actioned);
+    });
 
     test('maps a conflict and a missing entry to their cases', () async {
       Future<ReviewApiException> failureFor(int status, String body) async {
@@ -311,8 +395,9 @@ void main() {
           await api.act(
             'entry-bank-2',
             const EntryActionRequest(
-              action: EntryAction.clear,
+              action: EntryAction.choose,
               expectedState: ReviewState.queued,
+              chosenClip: ChosenClip.serving,
             ),
           );
           fail('expected a failure for $status');

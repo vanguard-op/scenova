@@ -35,11 +35,15 @@ abstract final class ConsoleLayout {
   /// narrow to read the phrase in.
   static const double entrySideBySideMinWidth = 760;
 
-  /// The entry card's weight against the evidence table's. The clip and the
-  /// phrase carry the visual focus; the evidence carries the decision, so the
-  /// two stay close and the evidence keeps room for a report's note and time.
-  static const int entryCardFlex = 5;
-  static const int entryEvidenceFlex = 6;
+  /// The entry card's weight against the evidence table's. The card now carries
+  /// two clips side by side, so it takes the larger share; the evidence carries
+  /// the decision and keeps room for a report's note and time.
+  static const int entryCardFlex = 6;
+  static const int entryEvidenceFlex = 5;
+
+  /// The width below which the entry card's two clips stack rather than sit
+  /// side by side, so neither is squeezed into a frame too small to judge.
+  static const double entryClipPairMinWidth = 420;
 
   /// The evidence table's column weights. The report's note carries the most
   /// text; the reason and the time are short.

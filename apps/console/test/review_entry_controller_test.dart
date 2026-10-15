@@ -118,18 +118,70 @@ void main() {
       return controller;
     }
 
-    test('sends the action with the state the curator saw', () async {
+    test('sends the choice with the state the curator saw', () async {
       final api = ScriptedReviewApi();
       final controller = await loaded(api);
 
-      final outcome = await controller.act(EntryAction.hold);
+      final outcome = await controller.act(
+        EntryAction.choose,
+        chosenClip: ChosenClip.candidate,
+      );
 
       expect(outcome, isA<EntryActionRecorded>());
-      expect(api.actions.single.action, EntryAction.hold);
+      expect(api.actions.single.action, EntryAction.choose);
+      expect(api.actions.single.chosenClip, ChosenClip.candidate);
       expect(api.actions.single.expectedState, ReviewState.queued);
-      expect(controller.detail!.entry.status, EntryStatus.held);
+      expect(controller.detail!.entry.status, EntryStatus.active);
       expect(controller.detail!.state, ReviewState.actioned);
     });
+
+    test(
+      'choosing the candidate makes it the clip the library serves',
+      () async {
+        final api = ScriptedReviewApi();
+        final controller = await loaded(api);
+        final candidate = controller.detail!.candidate!;
+
+        await controller.act(
+          EntryAction.choose,
+          chosenClip: ChosenClip.candidate,
+        );
+
+        expect(controller.detail!.entry.clip.url, candidate.url);
+        // The candidate is spent once it is the clip the library serves.
+        expect(controller.detail!.hasCandidate, isFalse);
+      },
+    );
+
+    test(
+      'choosing the serving clip keeps it and spends the candidate',
+      () async {
+        final api = ScriptedReviewApi();
+        final controller = await loaded(api);
+        final serving = controller.detail!.entry.clip.url;
+
+        await controller.act(
+          EntryAction.choose,
+          chosenClip: ChosenClip.serving,
+        );
+
+        expect(controller.detail!.entry.clip.url, serving);
+        expect(controller.detail!.hasCandidate, isFalse);
+      },
+    );
+
+    test(
+      'refuses a choice that names no clip, without calling the service',
+      () async {
+        final api = ScriptedReviewApi();
+        final controller = await loaded(api);
+
+        final outcome = await controller.act(EntryAction.choose);
+
+        expect(outcome, isA<EntryActionFailed>());
+        expect(api.actions, isEmpty);
+      },
+    );
 
     test('records a phrase edit and leaves the entry under review', () async {
       final api = ScriptedReviewApi();
@@ -144,6 +196,7 @@ void main() {
       expect(api.actions.single.phrase, 'a place to keep money');
       expect(controller.detail!.entry.glossPhrase, 'a place to keep money');
       expect(controller.detail!.state, ReviewState.reviewed);
+      expect(controller.detail!.hasCandidate, isFalse);
     });
 
     test(
@@ -158,7 +211,10 @@ void main() {
         );
         api.entryResult = entryDetail(state: ReviewState.actioned);
 
-        final outcome = await controller.act(EntryAction.clear);
+        final outcome = await controller.act(
+          EntryAction.choose,
+          chosenClip: ChosenClip.serving,
+        );
 
         expect(outcome, isA<EntryActionMoved>());
         expect(controller.status, ReviewEntryStatus.moved);
@@ -178,18 +234,24 @@ void main() {
       );
       final controller = await loaded(api);
 
-      final outcome = await controller.act(EntryAction.clear);
+      final outcome = await controller.act(
+        EntryAction.choose,
+        chosenClip: ChosenClip.serving,
+      );
 
       expect(outcome, isA<EntryActionFailed>());
       expect(controller.status, ReviewEntryStatus.loaded);
       expect(controller.actionFailure!.isRetryable, isTrue);
-      expect(controller.failedAction, EntryAction.clear);
+      expect(controller.failedAction, EntryAction.choose);
+      expect(controller.failedChosenClip, ChosenClip.serving);
 
       api.actionError = null;
       final retried = await controller.retryFailedAction();
 
       expect(retried, isA<EntryActionRecorded>());
       expect(api.actions, hasLength(2));
+      // The retry re-sends the same choice.
+      expect(api.actions.last.chosenClip, ChosenClip.serving);
       expect(controller.actionFailure, isNull);
       expect(controller.detail!.entry.status, EntryStatus.active);
     });
@@ -207,7 +269,10 @@ void main() {
       addTearDown(controller.dispose);
       await controller.load();
 
-      final outcome = await controller.act(EntryAction.clear);
+      final outcome = await controller.act(
+        EntryAction.choose,
+        chosenClip: ChosenClip.serving,
+      );
 
       expect(outcome, isA<EntryActionFailed>());
       expect(expired, 1);
@@ -220,7 +285,7 @@ void main() {
       );
       final controller = await loaded(api);
 
-      await controller.act(EntryAction.clear);
+      await controller.act(EntryAction.choose, chosenClip: ChosenClip.serving);
 
       expect(controller.status, ReviewEntryStatus.refused);
     });

@@ -227,8 +227,12 @@ class MockReviewApi implements ReviewApi {
 
   /// The entries the queue lists, with their evidence, so a drill-down into any
   /// row shows a real entry. An action moves the entry here, so the effect of a
-  /// clear, hold, retire, replace, or phrase edit is visible without a service.
+  /// choose, a retire, or a phrase edit is visible without a service.
   final Map<String, ReviewEntryDetail> _entries;
+
+  /// The review state each entry moved to, so the queue the curator returns to
+  /// lists the item as resolved rather than as still waiting.
+  final Map<String, ReviewState> _resolvedStates = <String, ReviewState>{};
 
   /// Every query the console sent, so a test can assert the filter and page it
   /// built.
@@ -298,45 +302,66 @@ class MockReviewApi implements ReviewApi {
 
   List<QueueItem> _items() {
     final now = DateTime.now().toUtc();
+
+    QueueItem item({
+      required String entryId,
+      required String lemma,
+      required String senseLabel,
+      required String reason,
+      required Duration age,
+      required ReviewState state,
+    }) {
+      return QueueItem(
+        entryId: entryId,
+        lemma: lemma,
+        senseLabel: senseLabel,
+        reason: reason,
+        queuedAt: now.subtract(age),
+        // An entry a curator has acted on keeps its place in the queue with the
+        // state it moved to.
+        state: _resolvedStates[entryId] ?? state,
+      );
+    }
+
     return <QueueItem>[
-      QueueItem(
+      item(
         entryId: 'entry-bank-2',
         lemma: 'bank',
         senseLabel: '2',
         reason: ReviewReason.offensive.wireValue,
-        queuedAt: now.subtract(const Duration(minutes: 20)),
+        age: const Duration(minutes: 20),
         state: ReviewState.queued,
       ),
-      QueueItem(
+      item(
         entryId: 'entry-crane-1',
         lemma: 'crane',
         senseLabel: '1',
         reason: ReviewReason.wrongMeaning.wireValue,
-        queuedAt: now.subtract(const Duration(hours: 3)),
+        age: const Duration(hours: 3),
         state: ReviewState.queued,
       ),
-      QueueItem(
+      item(
         entryId: 'entry-livid-1',
         lemma: 'livid',
         senseLabel: '1',
         reason: feedbackThresholdReason,
-        queuedAt: now.subtract(const Duration(hours: 9)),
+        age: const Duration(hours: 9),
         state: ReviewState.queued,
       ),
-      QueueItem(
+      item(
         entryId: 'entry-aardvark-1',
         lemma: 'aardvark',
         senseLabel: '1',
         reason: ReviewReason.lowQuality.wireValue,
-        queuedAt: now.subtract(const Duration(days: 2)),
+        age: const Duration(days: 2),
         state: ReviewState.reviewed,
       ),
-      QueueItem(
+      item(
         entryId: 'entry-tessellate-1',
         lemma: 'tessellate',
         senseLabel: '1',
         reason: ReviewReason.other.wireValue,
-        queuedAt: now.subtract(const Duration(days: 5)),
+        age: const Duration(days: 5),
         state: ReviewState.actioned,
       ),
     ];
@@ -386,22 +411,31 @@ class MockReviewApi implements ReviewApi {
         code: 'invalid_request',
       );
     }
+    if (request.action == EntryAction.choose && request.chosenClip == null) {
+      throw const ReviewApiException(
+        400,
+        'A choice needs the clip that serves the entry.',
+        code: 'invalid_request',
+      );
+    }
 
-    // The service's own effects: clear serves the entry, hold withholds it,
-    // retire and replace stop it serving, and a phrase edit records the new
-    // phrase and regenerates. A phrase edit leaves the item under review; every
-    // other action resolves it (`C-016`).
+    // The service's own effects: a choose keeps the entry serving with the named
+    // clip, a retire stops it serving, and a phrase edit records the new phrase
+    // and regenerates. A phrase edit leaves the item under review; every other
+    // action resolves it (`C-016`).
     final status = switch (request.action) {
-      EntryAction.clear => EntryStatus.active,
-      EntryAction.hold => EntryStatus.held,
-      EntryAction.retire ||
-      EntryAction.replace ||
-      EntryAction.editPhrase => EntryStatus.retired,
+      EntryAction.choose => EntryStatus.active,
+      EntryAction.retire || EntryAction.editPhrase => EntryStatus.retired,
     };
     final state = request.action == EntryAction.editPhrase
         ? ReviewState.reviewed
         : ReviewState.actioned;
     final entry = detail.entry;
+    final chosen =
+        request.action == EntryAction.choose &&
+            request.chosenClip == ChosenClip.candidate
+        ? detail.candidate
+        : null;
     _entries[entryId] = ReviewEntryDetail(
       entry: ReviewEntry(
         entryId: entry.entryId,
@@ -411,12 +445,16 @@ class MockReviewApi implements ReviewApi {
             ? request.phrase!.trim()
             : entry.glossPhrase,
         status: status,
-        clip: entry.clip,
+        clip: chosen ?? entry.clip,
       ),
+      // The queue item is resolved, or the entry is regenerating, so the
+      // candidate it held is spent.
+      candidate: null,
       reports: detail.reports,
       feedback: detail.feedback,
       state: state,
     );
+    _resolvedStates[entryId] = state;
     return EntryActionResult(
       actionId: 'action-${request.action.wireValue}',
       entryId: entryId,
@@ -426,7 +464,9 @@ class MockReviewApi implements ReviewApi {
   }
 
   /// One representative entry per queue row, with the evidence a decision
-  /// rests on: a report, repeated negative feedback, or both.
+  /// rests on: a report, repeated negative feedback, or both. An entry a reader
+  /// reported carries the candidate clip the report regenerated; one queued by
+  /// the negative-feedback threshold has none to choose between.
   static Map<String, ReviewEntryDetail> _seedEntries() {
     final now = DateTime.now().toUtc();
 
@@ -437,6 +477,7 @@ class MockReviewApi implements ReviewApi {
       required String glossPhrase,
       required ReviewState state,
       EntryStatus status = EntryStatus.active,
+      bool hasCandidate = true,
       List<EntryReport> reports = const <EntryReport>[],
       List<EntryFeedback> feedback = const <EntryFeedback>[],
     }) {
@@ -454,6 +495,14 @@ class MockReviewApi implements ReviewApi {
             hasAudio: false,
           ),
         ),
+        candidate: hasCandidate
+            ? ReviewClip(
+                url: 'mock://clip/$entryId-candidate',
+                durationSeconds: 4,
+                resolution: '360p',
+                hasAudio: false,
+              )
+            : null,
         reports: reports,
         feedback: feedback,
         state: state,
@@ -503,6 +552,9 @@ class MockReviewApi implements ReviewApi {
         senseLabel: '1',
         glossPhrase: 'furious',
         state: ReviewState.queued,
+        // Queued by repeated negative feedback rather than a report, so no
+        // candidate clip was regenerated.
+        hasCandidate: false,
         feedback: <EntryFeedback>[
           EntryFeedback(
             rating: FeedbackRating.notHelpful,
@@ -536,6 +588,7 @@ class MockReviewApi implements ReviewApi {
         glossPhrase: 'to fit together in a pattern',
         state: ReviewState.actioned,
         status: EntryStatus.retired,
+        hasCandidate: false,
       ),
     };
   }

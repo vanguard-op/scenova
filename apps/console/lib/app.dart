@@ -125,7 +125,16 @@ class _ConsoleHomeState extends State<ConsoleHome> {
     super.dispose();
   }
 
-  void _openQueue() => setState(() => _openEntry = null);
+  /// Returns to the queue, re-reading it.
+  ///
+  /// The entry the curator just resolved is no longer waiting, so the row and
+  /// the sidebar's open count have to come from the service rather than from the
+  /// page loaded before the action.
+  void _openQueue() {
+    final queue = _queue;
+    setState(() => _openEntry = null);
+    if (queue != null) unawaited(queue.refresh());
+  }
 
   @override
   Widget build(BuildContext context) {

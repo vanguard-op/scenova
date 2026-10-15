@@ -5,21 +5,20 @@ import 'review_queue.dart';
 
 /// The models behind the Review Entry screen, as frozen in `C-015` and `C-016`.
 ///
-/// `C-015` shows one queued entry with the clip, the word and sense, the
-/// generation phrase, the reports and negative feedback against it, and the
-/// queue item's state. `C-016` records the curator's action and returns the
-/// entry's new library status and the item's new state. The wire shapes are the
-/// contract's; nothing here renames a field.
+/// `C-015` shows one queued entry with the clip serving it, the candidate
+/// regenerated for the reporting reader, the word and sense, the generation
+/// phrase, the reports and negative feedback against it, and the queue item's
+/// state. `C-016` records the curator's action and returns the entry's new
+/// library status and the item's new state. The wire shapes are the contract's;
+/// nothing here renames a field.
 
-/// Whether a library entry is serving, withheld, or stopped (`C-015`
-/// `entry.status`).
+/// Whether a library entry is serving or stopped (`C-015` `entry.status`).
 ///
 /// It is the library's own status, distinct from the queue item's review state:
 /// a curator decides an action knowing whether the clip is currently in front
 /// of readers.
 enum EntryStatus {
   active('active', 'Serving'),
-  held('held', 'Held'),
   retired('retired', 'Retired');
 
   const EntryStatus(this.wireValue, this.label);
@@ -37,12 +36,33 @@ enum EntryStatus {
   }
 }
 
+/// Which clip serves every reader from now on (`C-016` `chosenClip`).
+///
+/// A `choose` names one of the two clips on the entry: the clip already serving
+/// the library, or the candidate regenerated for the reporting reader.
+enum ChosenClip {
+  serving('serving', 'the clip serving now'),
+  candidate('candidate', 'the new clip');
+
+  const ChosenClip(this.wireValue, this.label);
+
+  final String wireValue;
+
+  /// How the choice reads in a sentence.
+  final String label;
+
+  static ChosenClip? fromWire(String? value) {
+    for (final clip in ChosenClip.values) {
+      if (clip.wireValue == value) return clip;
+    }
+    return null;
+  }
+}
+
 /// What a curator did to an entry (`C-016` `action`).
 enum EntryAction {
-  clear('clear', 'Clear'),
-  hold('hold', 'Hold'),
+  choose('choose', 'Choose'),
   retire('retire', 'Retire'),
-  replace('replace', 'Replace'),
   editPhrase('edit_phrase', 'Regenerate');
 
   const EntryAction(this.wireValue, this.label);
@@ -60,8 +80,7 @@ enum EntryAction {
 
   /// Whether the action stops the clip serving, so it is confirmed before it is
   /// recorded (`docs/Scenova/screens/10-review-entry.md` → Overlays).
-  bool get isDestructive =>
-      this == EntryAction.retire || this == EntryAction.replace;
+  bool get isDestructive => this == EntryAction.retire;
 }
 
 /// A reader's rating of a clip (`C-012`), as the entry's evidence lists it.
@@ -86,7 +105,8 @@ enum FeedbackRating {
   }
 }
 
-/// The clip behind a queued entry (`C-015` `entry.clip`).
+/// The clip behind a queued entry, or the candidate beside it (`C-015`
+/// `entry.clip` / `candidate`).
 ///
 /// It implements the design system's [ClipSource], so the shared Clip Player
 /// takes it as it is.
@@ -147,6 +167,8 @@ class ReviewEntry {
   final String glossPhrase;
 
   final EntryStatus status;
+
+  /// The clip serving the library.
   final ReviewClip clip;
 
   static ReviewEntry fromJson(Map<String, dynamic> json) {
@@ -213,17 +235,24 @@ class EntryFeedback {
   }
 }
 
-/// The `C-015` 200 response: the entry, its evidence, and its review state.
+/// The `C-015` 200 response: the entry, the candidate beside it, the evidence,
+/// and the review state.
 @immutable
 class ReviewEntryDetail {
   const ReviewEntryDetail({
     required this.entry,
+    this.candidate,
     required this.reports,
     required this.feedback,
     required this.state,
   });
 
   final ReviewEntry entry;
+
+  /// The clip regenerated for the reporting reader and held for the curator to
+  /// choose between, or null when nothing was regenerated — an entry queued by
+  /// the negative-feedback threshold rather than by a report has no candidate.
+  final ReviewClip? candidate;
 
   /// The reports against the entry, newest first.
   final List<EntryReport> reports;
@@ -232,6 +261,9 @@ class ReviewEntryDetail {
   final List<EntryFeedback> feedback;
 
   final ReviewState state;
+
+  /// Whether the entry carries a candidate clip to choose between.
+  bool get hasCandidate => candidate != null;
 
   /// Whether the evidence the decision rests on is empty.
   bool get hasEvidence => reports.isNotEmpty || feedback.isNotEmpty;
@@ -243,8 +275,12 @@ class ReviewEntryDetail {
     final feedback = (json['feedback'] as List<dynamic>)
         .map((rating) => EntryFeedback.fromJson(rating as Map<String, dynamic>))
         .toList(growable: false);
+    final candidate = json['candidate'];
     return ReviewEntryDetail(
       entry: ReviewEntry.fromJson(json['entry'] as Map<String, dynamic>),
+      candidate: candidate == null
+          ? null
+          : ReviewClip.fromJson(candidate as Map<String, dynamic>),
       reports: reports,
       feedback: feedback,
       state:
@@ -253,8 +289,8 @@ class ReviewEntryDetail {
   }
 }
 
-/// The `C-016` request body: the action, the new phrase for an edit, the
-/// curator's note, and the state the curator acted on.
+/// The `C-016` request body: the action, which clip was chosen, the new phrase
+/// for an edit, the curator's note, and the state the curator acted on.
 ///
 /// `expectedState` guards against two curators acting at once: the service
 /// compares it with the item's current state and refuses an action on an entry
@@ -264,11 +300,15 @@ class EntryActionRequest {
   const EntryActionRequest({
     required this.action,
     required this.expectedState,
+    this.chosenClip,
     this.phrase,
     this.notes,
   });
 
   final EntryAction action;
+
+  /// Which clip serves every reader from now on, for a `choose` only.
+  final ChosenClip? chosenClip;
 
   /// The state the curator saw the entry in.
   final ReviewState expectedState;
@@ -282,6 +322,7 @@ class EntryActionRequest {
   Map<String, Object?> toJson() {
     return <String, Object?>{
       'action': action.wireValue,
+      'chosenClip': chosenClip?.wireValue,
       'phrase': phrase,
       'notes': notes,
       'expectedState': expectedState.wireValue,

@@ -106,13 +106,10 @@ void main() {
         ),
       );
       addTearDown(auth.dispose);
-      await pumpConsole(
-        tester,
-        auth: auth,
-        reviewApi: ScriptedReviewApi(
-          result: pageOf(<QueueItem>[queueItem(lemma: 'bank')]),
-        ),
+      final api = ScriptedReviewApi(
+        result: pageOf(<QueueItem>[queueItem(lemma: 'bank')]),
       );
+      await pumpConsole(tester, auth: auth, reviewApi: api);
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('bank'));
@@ -125,6 +122,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(ReviewQueueScreen), findsOneWidget);
+      // The queue is re-read, so the item just resolved is not shown as still
+      // waiting.
+      expect(api.requests, hasLength(2));
     });
   });
 }

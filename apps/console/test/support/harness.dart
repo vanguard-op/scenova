@@ -196,15 +196,12 @@ class ScriptedReviewApi implements ReviewApi {
 }
 
 /// The result the service returns for [request], as its own effects record it:
-/// clear serves the entry, hold withholds it, retire and replace stop it
+/// a choose keeps the entry serving with the named clip, a retire stops it
 /// serving, and a phrase edit leaves it under review (`C-016`).
 EntryActionResult actionResultFor(EntryActionRequest request) {
   final status = switch (request.action) {
-    EntryAction.clear => EntryStatus.active,
-    EntryAction.hold => EntryStatus.held,
-    EntryAction.retire ||
-    EntryAction.replace ||
-    EntryAction.editPhrase => EntryStatus.retired,
+    EntryAction.choose => EntryStatus.active,
+    EntryAction.retire || EntryAction.editPhrase => EntryStatus.retired,
   };
   return EntryActionResult(
     actionId: 'action-${request.action.wireValue}',
@@ -295,6 +292,10 @@ ReviewEntryDetail entryDetail({
   String clipUrl = 'mock://clip/bank',
   bool hasAudio = false,
   double durationSeconds = 4,
+  // An entry a reader reported carries the candidate the report regenerated; an
+  // entry queued by the negative-feedback threshold has none.
+  bool hasCandidate = true,
+  String candidateUrl = 'mock://clip/bank-candidate',
   List<EntryReport>? reports,
   List<EntryFeedback>? feedback,
 }) {
@@ -312,6 +313,14 @@ ReviewEntryDetail entryDetail({
         hasAudio: hasAudio,
       ),
     ),
+    candidate: hasCandidate
+        ? ReviewClip(
+            url: candidateUrl,
+            durationSeconds: durationSeconds,
+            resolution: '360p',
+            hasAudio: false,
+          )
+        : null,
     reports:
         reports ??
         <EntryReport>[
@@ -338,7 +347,8 @@ ReviewEntryDetail entryDetail({
   );
 }
 
-/// An entry with no evidence against it.
+/// An entry with no evidence against it, and so no candidate a report would
+/// have regenerated.
 ReviewEntryDetail entryDetailWithoutEvidence({
   String entryId = 'entry-bank-2',
   ReviewState state = ReviewState.queued,
@@ -346,6 +356,7 @@ ReviewEntryDetail entryDetailWithoutEvidence({
   return entryDetail(
     entryId: entryId,
     state: state,
+    hasCandidate: false,
     reports: const <EntryReport>[],
     feedback: const <EntryFeedback>[],
   );

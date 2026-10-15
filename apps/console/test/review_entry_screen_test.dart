@@ -70,8 +70,8 @@ void main() {
   });
 
   group('ReviewEntryScreen · loaded', () {
-    testWidgets('shows the clip, the word and sense, the phrase, and the '
-        'evidence', (tester) async {
+    testWidgets('shows the serving clip beside the candidate, the word and '
+        'sense, the phrase, and the evidence', (tester) async {
       await pumpEntryScreen(
         tester,
         api: ScriptedReviewApi(
@@ -87,7 +87,11 @@ void main() {
       expect(find.text('Sense 2'), findsOneWidget);
       expect(find.text('bank · sense 2'), findsOneWidget);
       expect(find.text('a river bank'), findsWidgets);
-      expect(find.byType(ClipPlayer), findsOneWidget);
+
+      // The two clips the decision rests on, each with its role named.
+      expect(find.text('Serving readers now'), findsOneWidget);
+      expect(find.text('New clip for the report'), findsOneWidget);
+      expect(find.byType(ClipPlayer), findsNWidgets(2));
 
       // The evidence: the report with its reason and note, and the rating.
       expect(find.text('Evidence'), findsOneWidget);
@@ -101,15 +105,32 @@ void main() {
       expect(find.text('Queued'), findsOneWidget);
       expect(find.text('Serving'), findsOneWidget);
 
-      // The actions and the phrase edit.
-      expect(find.text('Clear'), findsOneWidget);
-      expect(find.text('Hold'), findsOneWidget);
+      // The choices, the retire, and the phrase edit.
+      expect(find.text('Keep the serving clip'), findsOneWidget);
+      expect(find.text('Serve the new clip'), findsOneWidget);
       expect(find.text('Retire'), findsOneWidget);
-      expect(find.text('Replace'), findsOneWidget);
       expect(find.text('Regenerate'), findsOneWidget);
     });
 
-    testWidgets('mutes a clip with audio and offers the sound explicitly', (
+    testWidgets('offers no new clip when the entry has no candidate', (
+      tester,
+    ) async {
+      await pumpEntryScreen(
+        tester,
+        api: ScriptedReviewApi(entryResult: entryDetail(hasCandidate: false)),
+      );
+
+      expect(find.text('Serving readers now'), findsOneWidget);
+      expect(find.text('No new clip for this entry.'), findsOneWidget);
+      expect(find.text('Serve the new clip'), findsNothing);
+      // Keeping the serving clip is the primary resolution on its own.
+      final keep = tester.widget<ScenovaButton>(
+        find.widgetWithText(ScenovaButton, 'Keep the serving clip'),
+      );
+      expect(keep.variant, ScenovaButtonVariant.primary);
+    });
+
+    testWidgets('marks a clip that carries audio as muted by default', (
       tester,
     ) async {
       await pumpEntryScreen(
@@ -117,8 +138,8 @@ void main() {
         api: ScriptedReviewApi(entryResult: entryDetail(hasAudio: true)),
       );
 
+      // The clip that carries audio says so; the silent candidate does not.
       expect(find.text('Muted'), findsOneWidget);
-      expect(find.text('Listen'), findsOneWidget);
     });
 
     testWidgets('shows an entry with no evidence without inventing any', (
@@ -152,7 +173,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byType(ClipPlayer), findsOneWidget);
+      expect(find.byType(ClipPlayer), findsNWidgets(2));
       expect(find.text('This clip could not be loaded.'), findsOneWidget);
     });
   });
@@ -162,16 +183,17 @@ void main() {
       final api = DelayedReviewApi()..entryCompleter.complete(entryDetail());
       final controller = await pumpEntryScreen(tester, api: api);
 
-      await tester.ensureVisible(find.text('Clear'));
+      await tester.ensureVisible(find.text('Serve the new clip'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Clear'));
+      await tester.tap(find.text('Serve the new clip'));
       await tester.pump();
 
       expect(controller.isSubmitting, isTrue);
-      final hold = tester.widget<ScenovaButton>(
-        find.widgetWithText(ScenovaButton, 'Hold'),
+      expect(controller.submittingClip, ChosenClip.candidate);
+      final keep = tester.widget<ScenovaButton>(
+        find.widgetWithText(ScenovaButton, 'Keep the serving clip'),
       );
-      expect(hold.onPressed, isNull);
+      expect(keep.onPressed, isNull);
     });
   });
 
@@ -244,7 +266,7 @@ void main() {
       );
       await pumpEntryScreen(tester, api: api, onBack: () => backs++);
 
-      await tapVisible(tester, find.text('Clear'));
+      await tapVisible(tester, find.text('Keep the serving clip'));
 
       expect(find.text('The action could not be recorded'), findsOneWidget);
       expect(backs, 0);
@@ -253,7 +275,8 @@ void main() {
       await tapVisible(tester, find.text('Try again'));
 
       expect(api.actions, hasLength(2));
-      expect(api.actions.last.action, EntryAction.clear);
+      expect(api.actions.last.action, EntryAction.choose);
+      expect(api.actions.last.chosenClip, ChosenClip.serving);
       expect(backs, 1);
       await settleSnackBar(tester);
     });
@@ -266,7 +289,7 @@ void main() {
       );
       await pumpEntryScreen(tester, api: api);
 
-      await tapVisible(tester, find.text('Clear'));
+      await tapVisible(tester, find.text('Keep the serving clip'));
 
       expect(find.text('The action could not be recorded'), findsOneWidget);
       expect(find.text('Try again'), findsNothing);
@@ -274,7 +297,7 @@ void main() {
       await tapVisible(tester, find.text('Dismiss'));
 
       expect(find.text('Decision'), findsOneWidget);
-      expect(find.text('Clear'), findsOneWidget);
+      expect(find.text('Keep the serving clip'), findsOneWidget);
     });
   });
 
@@ -308,7 +331,7 @@ void main() {
 
       api.actionError = const ReviewApiException(409, 'The entry has moved.');
       api.entryResult = entryDetail(state: ReviewState.actioned);
-      await controller.act(EntryAction.clear);
+      await controller.act(EntryAction.choose, chosenClip: ChosenClip.serving);
 
       await pumpController(tester, controller);
 
@@ -319,24 +342,44 @@ void main() {
       );
       expect(find.text('Actioned'), findsOneWidget);
       expect(find.text('Decision'), findsNothing);
-      expect(find.text('Clear'), findsNothing);
+      expect(find.text('Keep the serving clip'), findsNothing);
     });
   });
 
   group('ReviewEntryScreen · actions', () {
-    testWidgets('clears the entry, confirms, and returns to the queue', (
+    testWidgets('choosing the new clip confirms and returns to the queue', (
       tester,
     ) async {
       var backs = 0;
       final api = ScriptedReviewApi();
       await pumpEntryScreen(tester, api: api, onBack: () => backs++);
 
-      await tapVisible(tester, find.text('Clear'));
+      await tapVisible(tester, find.text('Serve the new clip'));
 
-      expect(api.actions.single.action, EntryAction.clear);
+      expect(api.actions.single.action, EntryAction.choose);
+      expect(api.actions.single.chosenClip, ChosenClip.candidate);
       expect(backs, 1);
       expect(
-        find.text('Cleared. The clip is serving readers again.'),
+        find.text('Chosen. The new clip serves every reader from now on.'),
+        findsOneWidget,
+      );
+      await settleSnackBar(tester);
+    });
+
+    testWidgets('keeping the serving clip records the choice and returns', (
+      tester,
+    ) async {
+      var backs = 0;
+      final api = ScriptedReviewApi();
+      await pumpEntryScreen(tester, api: api, onBack: () => backs++);
+
+      await tapVisible(tester, find.text('Keep the serving clip'));
+
+      expect(api.actions.single.action, EntryAction.choose);
+      expect(api.actions.single.chosenClip, ChosenClip.serving);
+      expect(backs, 1);
+      expect(
+        find.text('Kept. The clip keeps serving every reader.'),
         findsOneWidget,
       );
       await settleSnackBar(tester);
@@ -376,11 +419,8 @@ void main() {
       final api = ScriptedReviewApi();
       await pumpEntryScreen(tester, api: api, onBack: () => backs++);
 
-      await tapVisible(tester, find.text('Replace'));
-      expect(
-        find.textContaining('a new one is generated from a fresh phrase'),
-        findsOneWidget,
-      );
+      await tapVisible(tester, find.text('Retire'));
+      expect(find.byType(AlertDialog), findsOneWidget);
 
       await tapVisible(tester, find.text('Cancel'));
 
