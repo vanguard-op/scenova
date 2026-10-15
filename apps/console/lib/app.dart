@@ -151,7 +151,7 @@ class _ConsoleHomeState extends State<ConsoleHome> {
                   onOpenEntry: (item) => setState(() => _openEntry = item),
                   onSignOut: () => unawaited(auth.signOut()),
                 )
-              : ReviewEntryScreen(item: entry, onBack: _openQueue),
+              : ReviewEntryScreen(entryId: entry.entryId, onBack: _openQueue),
         );
       },
     );

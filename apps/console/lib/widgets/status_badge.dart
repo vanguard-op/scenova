@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/review_entry.dart';
 import '../models/review_queue.dart';
 import '../theme/colors.dart';
 import '../theme/tokens.dart';
@@ -76,6 +77,81 @@ class ReviewStatusBadge extends StatelessWidget {
       ReviewState.queued => AppIcons.queued,
       ReviewState.reviewed => AppIcons.seeIt,
       ReviewState.actioned => AppIcons.actioned,
+    };
+  }
+}
+
+/// The library status of an entry (`docs/Scenova/screens/10-review-entry.md` →
+/// Components: "Status badge").
+///
+/// The review state says where the entry sits in the queue; this says whether
+/// the clip is in front of readers. A curator deciding between clear and hold
+/// needs both, so the two badges sit together. Like the review badge it carries
+/// a label and an icon, so the status never rests on colour alone.
+class EntryStatusBadge extends StatelessWidget {
+  const EntryStatusBadge({super.key, required this.status});
+
+  final EntryStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = ScenovaColors.of(context);
+    final tokens = ScenovaTokens.of(context);
+    final styles = ScenovaTextStyles.of(context);
+    final family = _family(colors, status);
+
+    return Semantics(
+      label: 'Library status: ${status.label}',
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: tokens.spacing.sm,
+          vertical: tokens.spacing.xs,
+        ),
+        decoration: BoxDecoration(
+          color: family.tint,
+          borderRadius: BorderRadius.circular(ScenovaRadius.full),
+          border: Border.all(color: family.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            AppIconView(
+              icon: _icon(status),
+              size: tokens.sizing.iconSm,
+              color: family.text,
+            ),
+            SizedBox(width: tokens.spacing.xs),
+            Text(
+              status.label,
+              style: styles.caption.copyWith(
+                color: family.text,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// The semantic family the status reads in. Serving is resolved, held is
+  /// withheld, and retired is stopped.
+  static ScenovaSemanticColors _family(
+    ScenovaColors colors,
+    EntryStatus status,
+  ) {
+    return switch (status) {
+      EntryStatus.active => colors.success,
+      EntryStatus.held => colors.warning,
+      EntryStatus.retired => colors.error,
+    };
+  }
+
+  static AppIcon _icon(EntryStatus status) {
+    return switch (status) {
+      EntryStatus.active => AppIcons.check,
+      EntryStatus.held => AppIcons.pause,
+      EntryStatus.retired => AppIcons.remove,
     };
   }
 }

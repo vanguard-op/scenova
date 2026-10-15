@@ -67,6 +67,14 @@ class ConsoleScope extends InheritedWidget {
     return scope!.services;
   }
 
+  /// The services when a [ConsoleScope] is above this widget, or null.
+  ///
+  /// A screen that can also be driven by an injected controller — a test, or a
+  /// host that already holds one — reads the scope this way rather than
+  /// requiring it.
+  static ConsoleServices? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<ConsoleScope>()?.services;
+
   @override
   bool updateShouldNotify(ConsoleScope oldWidget) =>
       services != oldWidget.services;

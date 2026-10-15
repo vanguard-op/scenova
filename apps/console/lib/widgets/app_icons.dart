@@ -111,6 +111,10 @@ abstract final class AppIcons {
   static const AppIcon refused = SystemIcon(Icons.lock_outline_rounded);
   static const AppIcon filter = SystemIcon(Icons.filter_list_rounded);
   static const AppIcon sortNewest = SystemIcon(Icons.sort_rounded);
+
+  // Console chrome: the Review Entry screen's actions and notes.
+  static const AppIcon warning = SystemIcon(Icons.warning_amber_rounded);
+  static const AppIcon check = SystemIcon(Icons.check_rounded);
 }
 
 /// Draws an [AppIcon] at one of the iconography direction's three states.

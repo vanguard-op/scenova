@@ -3,7 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scenova_console/app.dart';
+import 'package:scenova_console/models/review_entry.dart';
 import 'package:scenova_console/models/review_queue.dart';
+import 'package:scenova_console/screens/review_entry_controller.dart';
+import 'package:scenova_console/screens/review_entry_screen.dart';
 import 'package:scenova_console/services/console_services.dart';
 import 'package:scenova_console/services/operator_auth.dart';
 import 'package:scenova_console/services/review_api.dart';
@@ -111,16 +114,41 @@ class FakeOperatorAuth implements OperatorAuth {
 
 /// A review service that answers from a script, and records the queries.
 class ScriptedReviewApi implements ReviewApi {
-  ScriptedReviewApi({this.result, this.error});
+  ScriptedReviewApi({
+    this.result,
+    this.error,
+    this.entryResult,
+    this.entryError,
+    this.actionResult,
+    this.actionError,
+  });
 
-  /// The page every request resolves to.
+  /// The page every queue request resolves to.
   ReviewQueuePage? result;
 
-  /// The failure every request throws, when one is scripted.
+  /// The failure every queue request throws, when one is scripted.
   ReviewApiException? error;
 
-  /// Every query the console sent.
+  /// The entry every entry request resolves to, or null for a seeded entry.
+  ReviewEntryDetail? entryResult;
+
+  /// The failure every entry request throws, when one is scripted.
+  ReviewApiException? entryError;
+
+  /// The result every action resolves to, or null for the action's own effect.
+  EntryActionResult? actionResult;
+
+  /// The failure every action throws, when one is scripted.
+  ReviewApiException? actionError;
+
+  /// Every queue query the console sent.
   final List<Map<String, Object?>> requests = <Map<String, Object?>>[];
+
+  /// Every entry id the console asked for.
+  final List<String> entryRequests = <String>[];
+
+  /// Every action the console recorded.
+  final List<EntryActionRequest> actions = <EntryActionRequest>[];
 
   @override
   Future<ReviewQueuePage> queue({
@@ -146,12 +174,54 @@ class ScriptedReviewApi implements ReviewApi {
       pageCount: base.pageCount,
     );
   }
+
+  @override
+  Future<ReviewEntryDetail> entry(String entryId) async {
+    entryRequests.add(entryId);
+    final failure = entryError;
+    if (failure != null) throw failure;
+    return entryResult ?? entryDetail(entryId: entryId);
+  }
+
+  @override
+  Future<EntryActionResult> act(
+    String entryId,
+    EntryActionRequest request,
+  ) async {
+    actions.add(request);
+    final failure = actionError;
+    if (failure != null) throw failure;
+    return actionResult ?? actionResultFor(request);
+  }
+}
+
+/// The result the service returns for [request], as its own effects record it:
+/// clear serves the entry, hold withholds it, retire and replace stop it
+/// serving, and a phrase edit leaves it under review (`C-016`).
+EntryActionResult actionResultFor(EntryActionRequest request) {
+  final status = switch (request.action) {
+    EntryAction.clear => EntryStatus.active,
+    EntryAction.hold => EntryStatus.held,
+    EntryAction.retire ||
+    EntryAction.replace ||
+    EntryAction.editPhrase => EntryStatus.retired,
+  };
+  return EntryActionResult(
+    actionId: 'action-${request.action.wireValue}',
+    entryId: 'entry-bank-2',
+    status: status,
+    state: request.action == EntryAction.editPhrase
+        ? ReviewState.reviewed
+        : ReviewState.actioned,
+  );
 }
 
 /// A review service whose first response the test completes, for the loading
 /// state.
 class DelayedReviewApi implements ReviewApi {
   final Completer<ReviewQueuePage> completer = Completer<ReviewQueuePage>();
+  final Completer<ReviewEntryDetail> entryCompleter =
+      Completer<ReviewEntryDetail>();
 
   @override
   Future<ReviewQueuePage> queue({
@@ -160,6 +230,13 @@ class DelayedReviewApi implements ReviewApi {
     String? word,
     int page = 1,
   }) => completer.future;
+
+  @override
+  Future<ReviewEntryDetail> entry(String entryId) => entryCompleter.future;
+
+  @override
+  Future<EntryActionResult> act(String entryId, EntryActionRequest request) =>
+      Completer<EntryActionResult>().future;
 }
 
 /// A queue with nothing in it.
@@ -204,6 +281,76 @@ QueueItem queueItem({
   );
 }
 
+/// An entry with its evidence, for seeding a detail response.
+///
+/// The defaults are one report and one negative rating, so the evidence table
+/// has something to list; pass empty lists for an entry with none.
+ReviewEntryDetail entryDetail({
+  String entryId = 'entry-bank-2',
+  String lemma = 'bank',
+  String senseLabel = '2',
+  String glossPhrase = 'a river bank',
+  EntryStatus status = EntryStatus.active,
+  ReviewState state = ReviewState.queued,
+  String clipUrl = 'mock://clip/bank',
+  bool hasAudio = false,
+  double durationSeconds = 4,
+  List<EntryReport>? reports,
+  List<EntryFeedback>? feedback,
+}) {
+  return ReviewEntryDetail(
+    entry: ReviewEntry(
+      entryId: entryId,
+      lemma: lemma,
+      senseLabel: senseLabel,
+      glossPhrase: glossPhrase,
+      status: status,
+      clip: ReviewClip(
+        url: clipUrl,
+        durationSeconds: durationSeconds,
+        resolution: '360p',
+        hasAudio: hasAudio,
+      ),
+    ),
+    reports:
+        reports ??
+        <EntryReport>[
+          EntryReport(
+            reportId: 'report-1',
+            reason: ReviewReason.wrongMeaning.wireValue,
+            note: 'Not the sense I meant.',
+            createdAt: DateTime.now().toUtc().subtract(
+              const Duration(hours: 2),
+            ),
+          ),
+        ],
+    feedback:
+        feedback ??
+        <EntryFeedback>[
+          EntryFeedback(
+            rating: FeedbackRating.wrong,
+            createdAt: DateTime.now().toUtc().subtract(
+              const Duration(hours: 4),
+            ),
+          ),
+        ],
+    state: state,
+  );
+}
+
+/// An entry with no evidence against it.
+ReviewEntryDetail entryDetailWithoutEvidence({
+  String entryId = 'entry-bank-2',
+  ReviewState state = ReviewState.queued,
+}) {
+  return entryDetail(
+    entryId: entryId,
+    state: state,
+    reports: const <EntryReport>[],
+    feedback: const <EntryFeedback>[],
+  );
+}
+
 /// Wires the console with the given collaborators and pumps it.
 Future<ConsoleServices> pumpConsole(
   WidgetTester tester, {
@@ -215,6 +362,38 @@ Future<ConsoleServices> pumpConsole(
   await tester.pumpWidget(ConsoleApp(services: services));
   await tester.pump();
   return services;
+}
+
+/// Pumps the Review Entry screen under the console's real theme, inside a
+/// console scope so its own controller can be built.
+Future<ReviewEntryController> pumpEntryScreen(
+  WidgetTester tester, {
+  required ReviewApi api,
+  String entryId = 'entry-bank-2',
+  VoidCallback? onBack,
+}) async {
+  useDesktopWindow(tester);
+  final controller = ReviewEntryController(
+    api: api,
+    entryId: entryId,
+    onSessionExpired: () {},
+  );
+  addTearDown(controller.dispose);
+  await controller.load();
+  await tester.pumpWidget(
+    MaterialApp(
+      theme: AppTheme.build(brightness: Brightness.light),
+      home: Scaffold(
+        body: ReviewEntryScreen(
+          entryId: entryId,
+          onBack: onBack ?? () {},
+          controller: controller,
+        ),
+      ),
+    ),
+  );
+  await tester.pump();
+  return controller;
 }
 
 /// Pumps a widget under the console's real theme, without the app shell.

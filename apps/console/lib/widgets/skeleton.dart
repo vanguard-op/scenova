@@ -6,8 +6,9 @@ import '../theme/tokens.dart';
 /// A placeholder used while a screen loads.
 ///
 /// The queue renders a skeleton table while its first page is in flight
-/// (`docs/Scenova/screens/09-review-queue.md` → Loading), so the layout holds
-/// its shape and the page does not jump when the data lands.
+/// (`docs/Scenova/screens/09-review-queue.md` → Loading), and the entry renders
+/// a skeleton card (`docs/Scenova/screens/10-review-entry.md` → Loading), so
+/// the layout holds its shape and the page does not jump when the data lands.
 class SkeletonList extends StatelessWidget {
   const SkeletonList({super.key, this.rows = 4});
 
@@ -28,18 +29,42 @@ class SkeletonList extends StatelessWidget {
   }
 }
 
-/// A single placeholder bar. It holds still when reduce motion is on.
-class SkeletonLine extends StatefulWidget {
+/// A single placeholder bar: a block at [height] and [widthFactor] of the
+/// width it is given.
+class SkeletonLine extends StatelessWidget {
   const SkeletonLine({super.key, this.height = 14, this.widthFactor = 1});
 
   final double height;
   final double widthFactor;
 
   @override
-  State<SkeletonLine> createState() => _SkeletonLineState();
+  Widget build(BuildContext context) {
+    return FractionallySizedBox(
+      alignment: Alignment.centerLeft,
+      widthFactor: widthFactor,
+      child: SkeletonBlock(height: height, radius: ScenovaRadius.sm),
+    );
+  }
 }
 
-class _SkeletonLineState extends State<SkeletonLine>
+/// A placeholder block.
+///
+/// It fills the width and height it is given, so it can hold a surface's whole
+/// frame — the clip's 16:9 shape, say — rather than a single line of text. It
+/// holds still when reduce motion is on.
+class SkeletonBlock extends StatefulWidget {
+  const SkeletonBlock({super.key, this.height, this.radius = ScenovaRadius.md});
+
+  /// The block's height, or null to fill the height it is given.
+  final double? height;
+
+  final double radius;
+
+  @override
+  State<SkeletonBlock> createState() => _SkeletonBlockState();
+}
+
+class _SkeletonBlockState extends State<SkeletonBlock>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
@@ -67,27 +92,23 @@ class _SkeletonLineState extends State<SkeletonLine>
     final colors = ScenovaColors.of(context);
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
 
-    return FractionallySizedBox(
-      alignment: Alignment.centerLeft,
-      widthFactor: widget.widthFactor,
-      child: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, child) {
-          final opacity = reduceMotion
-              ? ScenovaOpacity.placeholderStill
-              : ScenovaOpacity.placeholderMin +
-                    (_controller.value *
-                        (ScenovaOpacity.placeholderMax -
-                            ScenovaOpacity.placeholderMin));
-          return Container(
-            height: widget.height,
-            decoration: BoxDecoration(
-              color: colors.surfaceSecondary.withValues(alpha: opacity),
-              borderRadius: BorderRadius.circular(ScenovaRadius.sm),
-            ),
-          );
-        },
-      ),
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final opacity = reduceMotion
+            ? ScenovaOpacity.placeholderStill
+            : ScenovaOpacity.placeholderMin +
+                  (_controller.value *
+                      (ScenovaOpacity.placeholderMax -
+                          ScenovaOpacity.placeholderMin));
+        return Container(
+          height: widget.height,
+          decoration: BoxDecoration(
+            color: colors.surfaceSecondary.withValues(alpha: opacity),
+            borderRadius: BorderRadius.circular(widget.radius),
+          ),
+        );
+      },
     );
   }
 }

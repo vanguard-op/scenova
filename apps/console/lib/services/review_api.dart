@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../config.dart';
+import '../models/review_entry.dart';
 import '../models/review_queue.dart';
 
 /// A review-request failure, mapped from the contract's error set.
@@ -30,6 +31,16 @@ class ReviewApiException implements Exception {
   /// factor: access is refused and the attempt is logged (`C-014`, 403).
   bool get isForbidden => statusCode == 403;
 
+  /// The entry is unknown, or has nothing queued (`C-015`/`C-016`, 404).
+  bool get isNotFound => statusCode == 404;
+
+  /// The entry has moved since the curator saw it, so another action stands
+  /// (`C-016`, 409).
+  bool get isConflict => statusCode == 409;
+
+  /// The action or the phrase did not match the contract (`C-016`, 400).
+  bool get isInvalidRequest => statusCode == 400;
+
   /// The review service is unavailable: retrying may succeed (`C-014`, 503).
   bool get isRetryable => statusCode == 429 || statusCode >= 500;
 
@@ -37,7 +48,7 @@ class ReviewApiException implements Exception {
   String toString() => 'ReviewApiException($statusCode, $message)';
 }
 
-/// The review surface, as frozen in `C-014`.
+/// The review surface, as frozen in `C-014` to `C-016`.
 abstract interface class ReviewApi {
   /// `GET /internal/review/queue`.
   Future<ReviewQueuePage> queue({
@@ -46,6 +57,12 @@ abstract interface class ReviewApi {
     String? word,
     int page,
   });
+
+  /// `GET /internal/review/entries/{entryId}`.
+  Future<ReviewEntryDetail> entry(String entryId);
+
+  /// `POST /internal/review/entries/{entryId}/actions`.
+  Future<EntryActionResult> act(String entryId, EntryActionRequest request);
 }
 
 /// Talks to the gateway over HTTP.
@@ -83,8 +100,35 @@ class HttpReviewApi implements ReviewApi {
         headers: await _headers(),
       ),
     );
-    return _decode(response);
+    return ReviewQueuePage.fromJson(_decodeBody(response));
   }
+
+  @override
+  Future<ReviewEntryDetail> entry(String entryId) async {
+    final response = await _send(
+      () async => _client.get(_entryUri(entryId), headers: await _headers()),
+    );
+    return ReviewEntryDetail.fromJson(_decodeBody(response));
+  }
+
+  @override
+  Future<EntryActionResult> act(
+    String entryId,
+    EntryActionRequest request,
+  ) async {
+    final response = await _send(
+      () async => _client.post(
+        Uri.parse('${_entryUri(entryId)}/actions'),
+        headers: await _headers(json: true),
+        body: jsonEncode(request.toJson()),
+      ),
+    );
+    return EntryActionResult.fromJson(_decodeBody(response));
+  }
+
+  Uri _entryUri(String entryId) => Uri.parse(
+    '$baseUrl/internal/review/entries/${Uri.encodeComponent(entryId)}',
+  );
 
   Uri _uri(ReviewReason? reason, ReviewState? state, String? word, int page) {
     final query = <String, String>{'page': '$page'};
@@ -96,7 +140,7 @@ class HttpReviewApi implements ReviewApi {
         .replace(queryParameters: query);
   }
 
-  Future<Map<String, String>> _headers() async {
+  Future<Map<String, String>> _headers({bool json = false}) async {
     String? token;
     try {
       token = await idTokenProvider();
@@ -108,6 +152,7 @@ class HttpReviewApi implements ReviewApi {
     }
     return <String, String>{
       'accept': 'application/json',
+      if (json) 'content-type': 'application/json',
       if (token != null) 'authorization': 'Bearer $token',
     };
   }
@@ -124,14 +169,14 @@ class HttpReviewApi implements ReviewApi {
     }
   }
 
-  ReviewQueuePage _decode(http.Response response) {
+  Map<String, dynamic> _decodeBody(http.Response response) {
     final status = response.statusCode;
     if (status >= 200 && status < 300) {
       final body = jsonDecode(response.body);
       if (body is! Map<String, dynamic>) {
-        throw const ReviewApiException(0, 'The service returned no queue.');
+        throw const ReviewApiException(0, 'The service returned no body.');
       }
-      return ReviewQueuePage.fromJson(body);
+      return body;
     }
     throw _mapError(status, response.body);
   }
@@ -153,6 +198,8 @@ class HttpReviewApi implements ReviewApi {
     final fallback = switch (status) {
       401 => 'Your session has ended. Sign in again.',
       403 => 'The curator role is required to open the review console.',
+      404 => 'This entry is no longer waiting for review.',
+      409 => 'This entry has already moved since you opened it.',
       _ => 'The review service is unavailable.',
     };
     final message = (serviceMessage == null || serviceMessage.isEmpty)
@@ -170,16 +217,25 @@ class HttpReviewApi implements ReviewApi {
 /// viewed and tested.
 class MockReviewApi implements ReviewApi {
   MockReviewApi({this.latency = Duration.zero, List<ReviewQueuePage>? script})
-    : _script = List<ReviewQueuePage>.of(script ?? const <ReviewQueuePage>[]);
+    : _script = List<ReviewQueuePage>.of(script ?? const <ReviewQueuePage>[]),
+      _entries = _seedEntries();
 
   /// Simulated network latency.
   final Duration latency;
 
   final List<ReviewQueuePage> _script;
 
+  /// The entries the queue lists, with their evidence, so a drill-down into any
+  /// row shows a real entry. An action moves the entry here, so the effect of a
+  /// clear, hold, retire, replace, or phrase edit is visible without a service.
+  final Map<String, ReviewEntryDetail> _entries;
+
   /// Every query the console sent, so a test can assert the filter and page it
   /// built.
   final List<Map<String, Object?>> requests = <Map<String, Object?>>[];
+
+  /// Every action the console recorded, so a test can assert what it sent.
+  final List<EntryActionRequest> actions = <EntryActionRequest>[];
 
   @override
   Future<ReviewQueuePage> queue({
@@ -284,5 +340,203 @@ class MockReviewApi implements ReviewApi {
         state: ReviewState.actioned,
       ),
     ];
+  }
+
+  @override
+  Future<ReviewEntryDetail> entry(String entryId) async {
+    await _delay();
+    final detail = _entries[entryId];
+    if (detail == null) {
+      throw const ReviewApiException(
+        404,
+        'This entry is no longer waiting for review.',
+        code: 'review_entry_not_found',
+      );
+    }
+    return detail;
+  }
+
+  @override
+  Future<EntryActionResult> act(
+    String entryId,
+    EntryActionRequest request,
+  ) async {
+    actions.add(request);
+    await _delay();
+    final detail = _entries[entryId];
+    if (detail == null) {
+      throw const ReviewApiException(
+        404,
+        'This entry is no longer waiting for review.',
+        code: 'review_entry_not_found',
+      );
+    }
+    if (detail.state != request.expectedState) {
+      throw const ReviewApiException(
+        409,
+        'This entry has already moved since you opened it.',
+        code: 'review_conflict',
+      );
+    }
+    if (request.action == EntryAction.editPhrase &&
+        (request.phrase ?? '').trim().isEmpty) {
+      throw const ReviewApiException(
+        400,
+        'A phrase edit needs the new generation phrase.',
+        code: 'invalid_request',
+      );
+    }
+
+    // The service's own effects: clear serves the entry, hold withholds it,
+    // retire and replace stop it serving, and a phrase edit records the new
+    // phrase and regenerates. A phrase edit leaves the item under review; every
+    // other action resolves it (`C-016`).
+    final status = switch (request.action) {
+      EntryAction.clear => EntryStatus.active,
+      EntryAction.hold => EntryStatus.held,
+      EntryAction.retire ||
+      EntryAction.replace ||
+      EntryAction.editPhrase => EntryStatus.retired,
+    };
+    final state = request.action == EntryAction.editPhrase
+        ? ReviewState.reviewed
+        : ReviewState.actioned;
+    final entry = detail.entry;
+    _entries[entryId] = ReviewEntryDetail(
+      entry: ReviewEntry(
+        entryId: entry.entryId,
+        lemma: entry.lemma,
+        senseLabel: entry.senseLabel,
+        glossPhrase: request.action == EntryAction.editPhrase
+            ? request.phrase!.trim()
+            : entry.glossPhrase,
+        status: status,
+        clip: entry.clip,
+      ),
+      reports: detail.reports,
+      feedback: detail.feedback,
+      state: state,
+    );
+    return EntryActionResult(
+      actionId: 'action-${request.action.wireValue}',
+      entryId: entryId,
+      status: status,
+      state: state,
+    );
+  }
+
+  /// One representative entry per queue row, with the evidence a decision
+  /// rests on: a report, repeated negative feedback, or both.
+  static Map<String, ReviewEntryDetail> _seedEntries() {
+    final now = DateTime.now().toUtc();
+
+    ReviewEntryDetail detail({
+      required String entryId,
+      required String lemma,
+      required String senseLabel,
+      required String glossPhrase,
+      required ReviewState state,
+      EntryStatus status = EntryStatus.active,
+      List<EntryReport> reports = const <EntryReport>[],
+      List<EntryFeedback> feedback = const <EntryFeedback>[],
+    }) {
+      return ReviewEntryDetail(
+        entry: ReviewEntry(
+          entryId: entryId,
+          lemma: lemma,
+          senseLabel: senseLabel,
+          glossPhrase: glossPhrase,
+          status: status,
+          clip: ReviewClip(
+            url: 'mock://clip/$entryId',
+            durationSeconds: 4,
+            resolution: '360p',
+            hasAudio: false,
+          ),
+        ),
+        reports: reports,
+        feedback: feedback,
+        state: state,
+      );
+    }
+
+    return <String, ReviewEntryDetail>{
+      'entry-bank-2': detail(
+        entryId: 'entry-bank-2',
+        lemma: 'bank',
+        senseLabel: '2',
+        glossPhrase: 'a river bank',
+        state: ReviewState.queued,
+        reports: <EntryReport>[
+          EntryReport(
+            reportId: 'report-1',
+            reason: ReviewReason.offensive.wireValue,
+            note: 'This is not what the word means here.',
+            createdAt: now.subtract(const Duration(minutes: 20)),
+          ),
+        ],
+        feedback: <EntryFeedback>[
+          EntryFeedback(
+            rating: FeedbackRating.wrong,
+            createdAt: now.subtract(const Duration(minutes: 40)),
+          ),
+        ],
+      ),
+      'entry-crane-1': detail(
+        entryId: 'entry-crane-1',
+        lemma: 'crane',
+        senseLabel: '1',
+        glossPhrase: 'a machine that lifts',
+        state: ReviewState.queued,
+        reports: <EntryReport>[
+          EntryReport(
+            reportId: 'report-2',
+            reason: ReviewReason.wrongMeaning.wireValue,
+            note: null,
+            createdAt: now.subtract(const Duration(hours: 3)),
+          ),
+        ],
+      ),
+      'entry-livid-1': detail(
+        entryId: 'entry-livid-1',
+        lemma: 'livid',
+        senseLabel: '1',
+        glossPhrase: 'furious',
+        state: ReviewState.queued,
+        feedback: <EntryFeedback>[
+          EntryFeedback(
+            rating: FeedbackRating.notHelpful,
+            createdAt: now.subtract(const Duration(hours: 9)),
+          ),
+          EntryFeedback(
+            rating: FeedbackRating.notHelpful,
+            createdAt: now.subtract(const Duration(hours: 12)),
+          ),
+        ],
+      ),
+      'entry-aardvark-1': detail(
+        entryId: 'entry-aardvark-1',
+        lemma: 'aardvark',
+        senseLabel: '1',
+        glossPhrase: 'a burrowing mammal',
+        state: ReviewState.reviewed,
+        reports: <EntryReport>[
+          EntryReport(
+            reportId: 'report-3',
+            reason: ReviewReason.lowQuality.wireValue,
+            note: 'The clip is too dark to make out.',
+            createdAt: now.subtract(const Duration(days: 2)),
+          ),
+        ],
+      ),
+      'entry-tessellate-1': detail(
+        entryId: 'entry-tessellate-1',
+        lemma: 'tessellate',
+        senseLabel: '1',
+        glossPhrase: 'to fit together in a pattern',
+        state: ReviewState.actioned,
+        status: EntryStatus.retired,
+      ),
+    };
   }
 }

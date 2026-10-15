@@ -35,6 +35,11 @@ dependencies:
   # rather than a hardcoded English string (`branding.md` → "Formats").
   intl: ^0.20.3
 
+  # Streams the clip in the shared Clip Player, so a curator judges the clip
+  # itself rather than a poster. The entry view is the one console screen that
+  # shows a clip; the plugin's web implementation plays it in the browser.
+  video_player: ^2.14.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -35,4 +35,39 @@ abstract final class ConsoleLayout {
 
   /// The width of a detail screen's field labels.
   static const double detailLabelWidth = 120;
+
+  // The Review Entry screen (`docs/Scenova/screens/10-review-entry.md`).
+
+  /// The width at which the entry card and the evidence table sit side by side.
+  /// Below it they stack, so the card is never squeezed into a column too
+  /// narrow to read the phrase in.
+  static const double entrySideBySideMinWidth = 760;
+
+  /// The entry card's weight against the evidence table's. The clip and the
+  /// phrase carry the visual focus; the evidence carries the decision, so the
+  /// two stay close and the evidence keeps room for a report's note and time.
+  static const int entryCardFlex = 5;
+  static const int entryEvidenceFlex = 6;
+
+  /// The clip's shape. The clips are generated in a 16:9 frame.
+  static const double clipAspectRatio = 16 / 9;
+
+  /// The clip's own play control, drawn on a still frame. Well above the
+  /// pointer minimum, so the one action on an empty frame is unmistakable.
+  static const double clipPlayAffordanceSize = 64;
+
+  /// The evidence table's column weights. The report's note carries the most
+  /// text; the reason and the time are short.
+  static const int evidenceReasonFlex = 3;
+  static const int evidenceNoteFlex = 6;
+  static const int evidenceWhenFlex = 3;
+  static const int feedbackRatingFlex = 6;
+  static const int feedbackWhenFlex = 3;
+
+  /// The phrase edit field's width, wide enough for a seven-word phrase.
+  static const double phraseFieldWidth = 420;
+
+  /// The width a confirmation modal is held to, so its wording reads on a few
+  /// lines rather than stretching across the window.
+  static const double dialogMaxWidth = 440;
 }
