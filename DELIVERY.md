@@ -105,8 +105,8 @@ docs/           BPRD (product-shaper)
 | T-111 | FEAT-013 | backend-engineer | Done | C-001 |
 | T-112 | FEAT-013 | frontend-engineer | Done | C-018 |
 | T-113 | FEAT-013 | frontend-engineer | Done | C-001, C-018 |
-| T-114 | FEAT-012 | frontend-engineer | In Progress | C-020 |
-| T-115 | FEAT-009, FEAT-013 | frontend-engineer | Backlog | C-018 |
+| T-114 | FEAT-012 | frontend-engineer | Done | C-020 |
+| T-115 | FEAT-009, FEAT-013 | frontend-engineer | In Progress | C-018 |
 | T-116 | FEAT-013 | infra-engineer | Done | — |
 | T-117 | FEAT-013 | frontend-engineer | Backlog | — |
 | T-118 | FEAT-013 | backend-engineer | Done | C-021 |
@@ -116,6 +116,9 @@ docs/           BPRD (product-shaper)
 | T-122 | FEAT-013 | frontend-engineer | Backlog | — |
 | T-123 | FEAT-013 | backend-engineer | Done | — |
 | T-124 | FEAT-013 | backend-engineer | Done | — |
+| T-125 | FEAT-012 | backend-engineer | Backlog | C-022 |
+| T-126 | FEAT-012 | frontend-engineer | Backlog | C-022 |
+| T-127 | FEAT-012 | frontend-engineer | Backlog | — |
 
 ## Decisions Log
 | # | Decision | Rationale | By |
