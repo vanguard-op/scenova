@@ -22,6 +22,11 @@ abstract interface class FeatureFlags {
   /// stays.
   bool get offlineHistoryEnabled;
 
+  /// `enable_paid_tier`: whether the paid tier is live. When it is off, every
+  /// reader reverts to Free and the Paywall is hidden, so an exhausted allowance
+  /// shows the word and phrase without offering a plan.
+  bool get paidTierEnabled;
+
   /// Fetches the latest values from the runtime source and applies them.
   ///
   /// Best-effort: a fetch that fails, or a source that is not configured on this
@@ -44,11 +49,13 @@ class RemoteConfigFeatureFlags implements FeatureFlags {
   RemoteConfigFeatureFlags({
     bool? clipViewDefault,
     bool? offlineHistoryDefault,
+    bool? paidTierDefault,
     Future<FirebaseApp> Function()? initialize,
     FirebaseRemoteConfig? remoteConfigOverride,
   }) : _clipViewEnabled = clipViewDefault ?? AppConfig.clipViewEnabledByDefault,
        _offlineHistoryEnabled =
            offlineHistoryDefault ?? AppConfig.offlineHistoryEnabledByDefault,
+       _paidTierEnabled = paidTierDefault ?? AppConfig.paidTierEnabledByDefault,
        _initialize = initialize ?? initializeFirebaseClient,
        _remoteConfig = remoteConfigOverride;
 
@@ -58,8 +65,12 @@ class RemoteConfigFeatureFlags implements FeatureFlags {
   /// The Remote Config parameter name for the offline-replay kill switch.
   static const String offlineHistoryKey = 'enable_offline_history';
 
+  /// The Remote Config parameter name for the paid-tier kill switch.
+  static const String paidTierKey = 'enable_paid_tier';
+
   bool _clipViewEnabled;
   bool _offlineHistoryEnabled;
+  bool _paidTierEnabled;
   final Future<FirebaseApp> Function() _initialize;
   FirebaseRemoteConfig? _remoteConfig;
 
@@ -70,12 +81,16 @@ class RemoteConfigFeatureFlags implements FeatureFlags {
   bool get offlineHistoryEnabled => _offlineHistoryEnabled;
 
   @override
+  bool get paidTierEnabled => _paidTierEnabled;
+
+  @override
   Future<void> refresh() async {
     try {
       final remote = await _remote();
       await remote.setDefaults(<String, Object>{
         clipViewKey: AppConfig.clipViewEnabledByDefault,
         offlineHistoryKey: AppConfig.offlineHistoryEnabledByDefault,
+        paidTierKey: AppConfig.paidTierEnabledByDefault,
       });
       await remote.setConfigSettings(
         RemoteConfigSettings(
@@ -86,6 +101,7 @@ class RemoteConfigFeatureFlags implements FeatureFlags {
       await remote.fetchAndActivate();
       _clipViewEnabled = remote.getBool(clipViewKey);
       _offlineHistoryEnabled = remote.getBool(offlineHistoryKey);
+      _paidTierEnabled = remote.getBool(paidTierKey);
     } on Object {
       // The flag source is unreachable or unconfigured on this platform; the
       // last known value stands rather than the feature flipping off by
@@ -109,6 +125,7 @@ class FixedFeatureFlags implements FeatureFlags {
   const FixedFeatureFlags({
     this.clipViewEnabled = true,
     this.offlineHistoryEnabled = true,
+    this.paidTierEnabled = true,
   });
 
   @override
@@ -116,6 +133,9 @@ class FixedFeatureFlags implements FeatureFlags {
 
   @override
   final bool offlineHistoryEnabled;
+
+  @override
+  final bool paidTierEnabled;
 
   @override
   Future<void> refresh() async {}

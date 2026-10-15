@@ -204,6 +204,21 @@ abstract final class AppConfig {
     defaultValue: true,
   );
 
+  /// Whether the paid tier is live before a runtime flag value has been fetched
+  /// (`enable_paid_tier`).
+  ///
+  /// `release.md` starts the flag Off for its dark launch, but the paid tier is
+  /// the Polish and Account phase's own deliverable and its rollout is under
+  /// way. Following the convention of the two flags above, the client's fallback
+  /// matches that rolled-out state so a fetch that has not landed keeps the
+  /// Paywall working; the kill switch is a Remote Config value of `false`, which
+  /// reverts every reader to Free and hides the Paywall. A local run can force
+  /// the fallback with `--dart-define=SCENOVA_PAID_TIER=false`.
+  static const bool paidTierEnabledByDefault = bool.fromEnvironment(
+    'SCENOVA_PAID_TIER',
+    defaultValue: true,
+  );
+
   /// How long a Remote Config fetch may take before it is abandoned.
   static const Duration remoteConfigFetchTimeout = Duration(seconds: 10);
 

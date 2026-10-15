@@ -12,12 +12,26 @@ void main() {
     expect(RemoteConfigFeatureFlags().offlineHistoryEnabled, isTrue);
   });
 
+  test('the paid tier is on by default', () {
+    expect(const FixedFeatureFlags().paidTierEnabled, isTrue);
+    expect(RemoteConfigFeatureFlags().paidTierEnabled, isTrue);
+  });
+
+  test('the paid tier can be killed, hiding the Paywall', () {
+    final flags = RemoteConfigFeatureFlags(paidTierDefault: false);
+
+    expect(flags.paidTierEnabled, isFalse);
+    // The kill switch never touches the other flags.
+    expect(flags.clipViewEnabled, isTrue);
+  });
+
   test(
     'a fetch that cannot reach the flag source leaves the flags alone',
     () async {
       final flags = RemoteConfigFeatureFlags(
         clipViewDefault: false,
         offlineHistoryDefault: false,
+        paidTierDefault: false,
         initialize: () async => throw StateError('Firebase is not configured'),
       );
 
@@ -26,6 +40,7 @@ void main() {
 
       expect(flags.clipViewEnabled, isFalse);
       expect(flags.offlineHistoryEnabled, isFalse);
+      expect(flags.paidTierEnabled, isFalse);
     },
   );
 }

@@ -350,7 +350,16 @@ class _DelayedPurchaseService implements PurchaseService {
   final Completer<PurchaseOutcome> completer = Completer<PurchaseOutcome>();
 
   @override
+  Future<StoreOffering> offerings() async => const StoreOffering(
+    proMonthly: StoreProduct(id: 'pro.monthly', displayPrice: r'$6.99'),
+    topUp: StoreProduct(id: 'topup.20', displayPrice: r'$2.99'),
+  );
+
+  @override
   Future<PurchaseOutcome> startPro() => completer.future;
+
+  @override
+  Future<PurchaseOutcome> buyTopUp() => completer.future;
 
   @override
   Future<PurchaseOutcome> managePlan() => completer.future;

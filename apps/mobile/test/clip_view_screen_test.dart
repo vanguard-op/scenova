@@ -799,6 +799,62 @@ void main() {
     await teardown(tester);
   });
 
+  testWidgets('the exhausted state opens the Paywall sheet', (tester) async {
+    final services = buildServices(
+      api: MockLookupApi(),
+      entitlement: const Entitlement(
+        tier: PlanTier.free,
+        signedIn: true,
+        lookupsUsed: 20,
+        lookupsLimit: 20,
+      ),
+    );
+    final controller = controllerFor(services, 'come');
+    addTearDown(controller.dispose);
+
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.text('See plans'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Start Pro'), findsOneWidget);
+    expect(find.text('Buy a top-up'), findsOneWidget);
+    await teardown(tester);
+  });
+
+  testWidgets('with the paid tier killed the Paywall is hidden', (
+    tester,
+  ) async {
+    final services = buildServices(
+      api: MockLookupApi(),
+      featureFlags: const FixedFeatureFlags(paidTierEnabled: false),
+      entitlement: const Entitlement(
+        tier: PlanTier.free,
+        signedIn: true,
+        lookupsUsed: 20,
+        lookupsLimit: 20,
+      ),
+    );
+    final controller = controllerFor(services, 'come');
+    addTearDown(controller.dispose);
+
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+    await tester.pump();
+
+    // The word and phrase still show; only the Paywall is gone.
+    expect(controller.phase, ClipPhase.allowanceExhausted);
+    expect(find.text('come'), findsWidgets);
+    expect(find.text('See plans'), findsNothing);
+    expect(
+      find.text('You have used this month\'s lookups. They reset next month.'),
+      findsOneWidget,
+    );
+    await teardown(tester);
+  });
+
   testWidgets('a very long word wraps to two lines and then truncates', (
     tester,
   ) async {

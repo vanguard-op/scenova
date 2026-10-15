@@ -22,6 +22,7 @@ import 'package:scenova/screens/clip_view_screen.dart';
 import 'package:scenova/screens/history_screen.dart';
 import 'package:scenova/screens/home_screen.dart';
 import 'package:scenova/screens/onboarding_screen.dart';
+import 'package:scenova/screens/paywall_controller.dart';
 import 'package:scenova/services/account_session.dart';
 import 'package:scenova/services/analytics.dart';
 import 'package:scenova/services/analytics_api.dart';
@@ -54,6 +55,7 @@ import 'package:scenova/services/reported_clip_watch.dart';
 import 'package:scenova/services/saved_clip_keeper.dart';
 import 'package:scenova/services/settings_controller.dart';
 import 'package:scenova/theme/app_theme.dart';
+import 'package:scenova/widgets/paywall_sheet.dart';
 import 'package:scenova/widgets/report_sheet.dart';
 import 'package:scenova_design/scenova_design.dart';
 
@@ -439,6 +441,64 @@ List<(String, Widget)> _frames() {
         ),
       ),
     ),
+    ('Paywall — allowance exhausted (default)', _paywall()),
+    (
+      'Paywall — purchasing',
+      _paywall(
+        purchases: MockPurchaseService(latency: const Duration(minutes: 5)),
+        tap: PaywallAction.startPro,
+      ),
+    ),
+    (
+      'Paywall — purchase failed',
+      _paywall(
+        purchases: MockPurchaseService(
+          startProOutcome: const PurchaseFailed(
+            'Your payment was declined. Try another payment method.',
+          ),
+        ),
+        tap: PaywallAction.startPro,
+      ),
+    ),
+    (
+      'Paywall — signed out',
+      _paywall(
+        entitlement: const Entitlement(
+          tier: PlanTier.guest,
+          signedIn: false,
+          lookupsUsed: 20,
+          lookupsLimit: 20,
+        ),
+      ),
+    ),
+    (
+      'Paywall — store unreachable',
+      _paywall(purchases: MockPurchaseService(offline: true)),
+    ),
+    (
+      'Paywall — already Pro (top-up only)',
+      _paywall(
+        entitlement: const Entitlement(
+          tier: PlanTier.pro,
+          signedIn: true,
+          lookupsUsed: 50,
+          lookupsLimit: 50,
+        ),
+      ),
+    ),
+    (
+      'Clip — allowance exhausted (Paywall hidden)',
+      _clip(
+        'come',
+        entitlement: const Entitlement(
+          tier: PlanTier.free,
+          signedIn: true,
+          lookupsUsed: 20,
+          lookupsLimit: 20,
+        ),
+        featureFlags: const FixedFeatureFlags(paidTierEnabled: false),
+      ),
+    ),
   ];
 }
 
@@ -545,6 +605,101 @@ class _PreviewAccountState extends State<_PreviewAccount> {
   @override
   Widget build(BuildContext context) =>
       AccountScreen(controller: widget.controller);
+}
+
+/// The Paywall sheet, driven through the scripted store.
+///
+/// [tap] fires one of the purchase actions once the offering has loaded, so the
+/// purchasing and purchase-failed states can be looked at. Tooling only.
+Widget _paywall({
+  Entitlement entitlement = _exhaustedFreePreview,
+  PurchaseService? purchases,
+  AccountSession? accountSession,
+  PaywallAction? tap,
+}) {
+  final services = _services(
+    entitlement: entitlement,
+    purchases: purchases,
+    accountSession: accountSession,
+  );
+  final controller = PaywallController(
+    entitlement: entitlement,
+    purchases: services.purchases,
+    session: services.accountSession,
+    analytics: services.analytics,
+  );
+  return ScenovaScope(
+    services: services,
+    child: _PreviewPaywall(
+      controller: controller,
+      entitlement: entitlement,
+      tap: tap,
+    ),
+  );
+}
+
+/// The Free plan at its limit, for the Paywall frames. Tooling only.
+const Entitlement _exhaustedFreePreview = Entitlement(
+  tier: PlanTier.free,
+  signedIn: true,
+  lookupsUsed: 20,
+  lookupsLimit: 20,
+);
+
+/// Opens the Paywall sheet with a prepared controller, so one state per frame is
+/// on screen. Tooling only.
+class _PreviewPaywall extends StatefulWidget {
+  const _PreviewPaywall({
+    required this.controller,
+    required this.entitlement,
+    this.tap,
+  });
+
+  final PaywallController controller;
+  final Entitlement entitlement;
+  final PaywallAction? tap;
+
+  @override
+  State<_PreviewPaywall> createState() => _PreviewPaywallState();
+}
+
+class _PreviewPaywallState extends State<_PreviewPaywall> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _open());
+  }
+
+  Future<void> _open() async {
+    await widget.controller.load();
+    if (!mounted) return;
+    unawaited(
+      showPaywallSheet(
+        context,
+        entitlement: widget.entitlement,
+        controller: widget.controller,
+      ),
+    );
+    final action = widget.tap;
+    if (action == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(
+        action == PaywallAction.startPro
+            ? widget.controller.startPro()
+            : widget.controller.buyTopUp(),
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    widget.controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => const Scaffold(body: SizedBox.shrink());
 }
 
 /// Two saved lookups for the History frames.

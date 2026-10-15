@@ -10,7 +10,7 @@ import '../models/report.dart';
 import '../services/app_services.dart';
 import '../services/push_registrar.dart';
 import '../services/settings_controller.dart';
-import '../widgets/coming_later_sheet.dart';
+import '../widgets/paywall_sheet.dart';
 import '../widgets/report_sheet.dart';
 import 'clip_controller.dart';
 
@@ -352,26 +352,23 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
         );
 
       case ClipPhase.allowanceExhausted:
+        // The word and phrase still show; no clip is generated until the
+        // allowance is restored. With the paid tier killed the Paywall is hidden
+        // and the reader keeps reading without a clip (`enable_paid_tier`).
+        final paywall = _paywallEnabled;
         return _withHeaderAndActions(
           context,
           player: ClipPlayer(
             status: ClipPlayerStatus.unavailable,
             caption: _controller.word,
-            unavailableMessage: 'A plan unlocks this clip.',
+            unavailableMessage: paywall
+                ? 'A plan unlocks this clip.'
+                : 'No clip this month.',
           ),
-          note:
-              'You have used this month\'s lookups. A plan brings more clips.',
-          action: ScenovaButton(
-            label: 'See plans',
-            variant: ScenovaButtonVariant.primary,
-            onPressed: () => showComingLaterSheet(
-              context,
-              title: 'Plans',
-              message:
-                  'Pro and top-ups arrive with the account phase. Nothing is '
-                  'charged until then.',
-            ),
-          ),
+          note: paywall
+              ? 'You have used this month\'s lookups. A plan brings more clips.'
+              : 'You have used this month\'s lookups. They reset next month.',
+          action: paywall ? _plansAction(context) : null,
         );
 
       case ClipPhase.wordAndPhrase:
@@ -726,6 +723,39 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
   void _enableConsent() {
     _settings.consentModelProcessing = true;
     ScenovaScope.of(context).analytics.consentChanged(consent: true);
+    _controller.retry();
+  }
+
+  /// Whether the Paywall is live (`enable_paid_tier`). When the flag is off
+  /// every reader reverts to Free and the Paywall is hidden
+  /// (`docs/Scenova/release.md` → "Rollout Phases & Feature Flags").
+  bool get _paywallEnabled =>
+      ScenovaScope.of(context).featureFlags.paidTierEnabled;
+
+  /// The action that opens the Paywall from the exhausted state. A reader who
+  /// already holds Pro is offered the top-up rather than Pro again
+  /// (`docs/Scenova/screens/04-paywall.md` → Edge Cases).
+  Widget _plansAction(BuildContext context) {
+    final alreadyPro =
+        _controller.entitlement.isPro || _controller.entitlement.isTrial;
+    return ScenovaButton(
+      label: alreadyPro ? 'Add lookups' : 'See plans',
+      variant: ScenovaButtonVariant.primary,
+      onPressed: () => unawaited(_openPaywall()),
+    );
+  }
+
+  /// Opens the Paywall sheet over the clip
+  /// (`docs/Scenova/screens/04-paywall.md`).
+  ///
+  /// A purchase restores the allowance, so the lookup continues; a dismissal
+  /// leaves the word and phrase in place.
+  Future<void> _openPaywall() async {
+    final outcome = await showPaywallSheet(
+      context,
+      entitlement: _controller.entitlement,
+    );
+    if (!mounted || outcome == null) return;
     _controller.retry();
   }
 
