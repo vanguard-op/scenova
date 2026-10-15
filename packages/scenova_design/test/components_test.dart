@@ -40,6 +40,23 @@ Future<void> pumpThemed(
 }
 
 void main() {
+  group('Clip sources', () {
+    test('a served clip and a device-kept clip are both playable', () {
+      expect(isPlayableClipUrl('https://clips.example/come.mp4'), isTrue);
+      expect(isPlayableClipUrl('http://10.0.2.2:8080/come.mp4'), isTrue);
+      // A clip the device kept for offline replay opens from its own store.
+      expect(
+        isPlayableClipUrl('file:///data/user/0/app/files/clips/clip_come'),
+        isTrue,
+      );
+    });
+
+    test('a scripted or empty source is not playable', () {
+      expect(isPlayableClipUrl('mock://clip/library-hit'), isFalse);
+      expect(isPlayableClipUrl(''), isFalse);
+    });
+  });
+
   group('ClipPlayer', () {
     testWidgets('names what the surface is doing while it is not ready', (
       tester,

@@ -30,9 +30,11 @@ enum ClipPlayerStatus {
 /// reduce motion is on the clip holds on a still frame and plays on tap.
 ///
 /// A ready clip streams through `video_player`: the surface shows the clip, and
-/// the progress line and the play control follow real playback. A source the
-/// platform cannot stream — a saved placeholder, say — keeps the still frame
-/// instead, so the surface always shows something honest.
+/// the progress line and the play control follow real playback. A clip the
+/// device kept for offline replay opens from its own store the same way, so a
+/// saved clip plays with no connection. A source the platform cannot open — a
+/// saved placeholder, say — keeps the still frame instead, so the surface
+/// always shows something honest.
 ///
 /// The player is controlled: the host owns whether it is playing and whether
 /// sound is on, and is told when playback finishes. A host that also wants the
@@ -198,6 +200,8 @@ class _ClipPlayerState extends State<ClipPlayer>
     if (_video != null && _videoSource == source) return;
     _teardownVideo();
 
+    // A network clip streams from its URL; a clip the device kept opens from
+    // the same URL shape over `file`, which the platform's own player reads.
     final controller = VideoPlayerController.networkUrl(source);
     _video = controller;
     _videoSource = source;

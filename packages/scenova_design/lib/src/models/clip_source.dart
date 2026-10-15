@@ -5,6 +5,9 @@
 /// takes one shape without either app handing it its model.
 abstract interface class ClipSource {
   /// The clip's source URL.
+  ///
+  /// A clip served by the product is an http(s) URL; a clip the device kept for
+  /// offline replay is a `file:` URL in the device's own store.
   String get url;
 
   /// The clip's length in seconds, or zero when the service reports none.
@@ -17,14 +20,16 @@ abstract interface class ClipSource {
   bool get hasAudio;
 }
 
-/// Whether [url] is a source the platform can stream.
+/// Whether [url] is a source the platform can open.
 ///
-/// The product's clips are served over http(s). A saved placeholder or a
-/// scripted development source is not a stream, so a surface keeps its still
-/// frame rather than asking the platform to open something it cannot play.
+/// The product's clips are served over http(s), and a clip the device kept
+/// replays from the device's own store over `file`, so both are opened. A saved
+/// placeholder or a scripted development source is neither, so a surface keeps
+/// its still frame rather than asking the platform to open something it cannot
+/// play.
 bool isPlayableClipUrl(String url) {
   if (url.isEmpty) return false;
   final uri = Uri.tryParse(url);
   if (uri == null) return false;
-  return uri.scheme == 'http' || uri.scheme == 'https';
+  return uri.scheme == 'http' || uri.scheme == 'https' || uri.scheme == 'file';
 }
