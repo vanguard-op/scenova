@@ -4,12 +4,12 @@ Frozen interfaces between layers. The lead is the only writer. A change after `F
 change request: mark it `Frozen (revision N)` and re-dispatch both sides.
 
 ### C-001: POST /v1/lookups
-Status: Frozen (revision 2)
+Status: Frozen (revision 3)
 Auth: Firebase ID token in `Authorization` (anonymous before sign-in; upgraded to the reader's account at sign-in); rate-limited at the gateway. The caller asserts consent; generation is refused when consent is absent.
 Request: selection: string (raw selected text, trimmed, at most six words), clientLookupId: string (idempotency key), platform: android|ios, locale: string, consentModelProcessing: boolean
-Response 200: lookupId: string, kind: word|phrase, rawSelection: string, normalisedLemma: string|null, status: served|generating|fallback|denied|empty (a phrase lookup is never `served`; a phrase clip reaches the client by C-008's notice, never on this response), senses: [{ senseLabel: string, partOfSpeech: string, glossPhrase: string, entryId: string|null, clip: { url: string, durationSeconds: number, resolution: "360p", hasAudio: boolean }|null }], notice: string|null, correlationId: string
+Response 200: lookupId: string, kind: word|phrase, rawSelection: string, normalisedLemma: string|null, status: served|generating|fallback|denied|empty (a phrase lookup is never `served`; a phrase clip reaches the client by C-008's notice, never on this response), senses: [{ senseLabel: string, partOfSpeech: string, glossPhrase: string, entryId: string|null, clip: { url: string, durationSeconds: number, resolution: "360p", hasAudio: boolean }|null }], notice: string|null, allowance: { used: integer, limit: integer, periodEnd: string }|null (null for a reader who is not signed in, whose allowance is device-local), correlationId: string
 Errors: 400 (empty or whitespace selection; selection over the six-word phrase limit), 401 (missing or invalid token), 409 (clientLookupId reused with a different selection), 429 (rate limited), 503 (upstream lookup unavailable; retryable)
-Body: error responses are `{"code": string, "message": string}`. `notice` carries a clip-availability advisory; `senseLabel` is a plain human label and is not a signal.
+Body: error responses are `{"code": string, "message": string}`. `notice` carries a clip-availability advisory; `senseLabel` is a plain human label and is not a signal. A signed-in reader's lookup spends one unit of their monthly allowance whether it is served or generated; when the allowance is spent the lookup resolves to `fallback` with the word and phrase and no clip, and `allowance.used` equals `allowance.limit`. A reader who is not signed in is metered on the device and never carries an allowance here.
 
 ### C-002: GET /v1/lookups/{lookupId}
 Status: Frozen (revision 2)
@@ -123,3 +123,24 @@ Auth: internal service identity; never reachable from the client
 Request: entryId: string (path)
 Response 200: entry: { entryId: string, lemma: string, senseLabel: string, partOfSpeech: string, glossPhrase: string, status: active|retired, clip: { url: string, durationSeconds: number, resolution: "360p", hasAudio: boolean } }
 Errors: 401 (not an internal caller), 404 (unknown entry, code `entry_not_found`), 503 (library unavailable). The review service reads an entry by id for C-015's detail: the queue holds only an entry id, so the sense key C-010 uses is not at hand.
+
+### C-018: GET /v1/entitlement
+Status: Frozen
+Auth: Firebase ID token belonging to a signed-in reader's account
+Request: none
+Response 200: plan: free|trial|pro, lookupsUsed: integer, lookupsLimit: integer, periodStart: string, periodEnd: string, status: active|grace|expired, trialEndsAt: string|null
+Errors: 401 (missing or invalid token, or a token with no account), 503 (entitlement service unreachable). When the service is unreachable the client allows lookups up to a small grace and reconciles later; a reader is never blocked by it.
+
+### C-019: POST /internal/entitlements/sync
+Status: Frozen
+Auth: internal service identity; the payment processor's signed webhook, never reachable from the client
+Request: accountId: string (the reader the store purchase belongs to), event: purchase|renewal|cancellation|refund|failed_payment, store: app_store|play_store, productId: string, productKind: subscription|topup, amountMinor: integer, currency: string, occurredAt: string
+Response 202: applied: boolean
+Errors: 400 (unknown event, store or product kind; a missing amount), 401 (not the payment processor), 404 (unknown account), 503 (entitlement store unavailable). A subscription sets the plan and the allowance period; a top-up adds its lookups to the current period and does not carry over; a refund removes the entitlement; a cancellation or a failed payment lets the paid period run out before the reader reverts to free.
+
+### C-020: PATCH /v1/account
+Status: Frozen
+Auth: Firebase ID token belonging to the reader's account
+Request: consentModelProcessing: boolean|null, locale: string|null (at least one)
+Response 200: consentModelProcessing: boolean, locale: string
+Errors: 400 (no field given; an unknown locale), 401 (missing or invalid token, or a token with no account), 503 (account store unavailable). The consent choice is stored on the account and follows the reader to a new device; before sign-in it is held on the device alone.
