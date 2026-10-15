@@ -74,6 +74,9 @@ class _FakeFeedbackClient:
     ) -> UpstreamResponse:
         raise AssertionError("the review routes are not used in these tests")
 
+    async def anonymize_subject(self, subject: str, correlation_id: str) -> UpstreamResponse:
+        raise AssertionError("the anonymization seam is not used in these tests")
+
     async def _record(
         self, path: str, payload: Mapping[str, Any], authorization: str | None
     ) -> UpstreamResponse:

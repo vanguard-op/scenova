@@ -30,6 +30,7 @@ from datetime import UTC, datetime
 
 from .config import Settings
 from .errors import (
+    FeedbackStoreUnavailableError,
     InvalidRequestError,
     ReviewConflictError,
     ReviewEntryNotFoundError,
@@ -119,6 +120,21 @@ class ReviewService:
     ) -> QueueResponse:
         """List the entries awaiting review, newest first (C-014)."""
 
+        try:
+            return await self._queue(reason=reason, state=state, word=word, page=page)
+        except FeedbackStoreUnavailableError as exc:
+            raise ReviewUnavailableError(
+                "The review service is unavailable. Please try again."
+            ) from exc
+
+    async def _queue(
+        self,
+        *,
+        reason: str | None,
+        state: ReviewState | None,
+        word: str | None,
+        page: int,
+    ) -> QueueResponse:
         items = await self._store.queue_items()
         enriched = await self._read_entries(items)
 
@@ -156,6 +172,14 @@ class ReviewService:
     async def entry(self, entry_id: str) -> EntryDetailResponse:
         """Show one queued entry with its candidate, evidence, and state (C-015)."""
 
+        try:
+            return await self._entry(entry_id)
+        except FeedbackStoreUnavailableError as exc:
+            raise ReviewUnavailableError(
+                "The review service is unavailable. Please try again."
+            ) from exc
+
+    async def _entry(self, entry_id: str) -> EntryDetailResponse:
         item = await self._store.queue_item(entry_id)
         if item is None:
             raise ReviewEntryNotFoundError("No entry is queued for review.")
@@ -174,6 +198,14 @@ class ReviewService:
     async def act(self, entry_id: str, request: ActionRequest) -> ActionResponse:
         """Record a curator's action and move the entry and its queue item (C-016)."""
 
+        try:
+            return await self._act(entry_id, request)
+        except FeedbackStoreUnavailableError as exc:
+            raise ReviewUnavailableError(
+                "The review service is unavailable. Please try again."
+            ) from exc
+
+    async def _act(self, entry_id: str, request: ActionRequest) -> ActionResponse:
         async with self._action_lock:
             item = await self._store.queue_item(entry_id)
             if item is None:

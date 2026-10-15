@@ -24,6 +24,7 @@ from gateway.app.auth import DevTokenVerifier
 from gateway.app.config import Settings
 from gateway.app.entitlement_client import EntitlementClient
 from gateway.app.errors import UpstreamUnavailableError
+from gateway.app.feedback_client import FeedbackClient
 from gateway.app.lookup_client import LookupClient, UpstreamResponse
 from gateway.app.ratelimit import InMemoryFixedWindowRateLimiter
 
@@ -145,11 +146,54 @@ class _RecordingAnalyticsClient:
         return None
 
 
+class _RecordingFeedbackClient:
+    """A feedback client that records the anonymization calls it is handed."""
+
+    def __init__(self, *, error: Exception | None = None, status_code: int = 200) -> None:
+        self.error = error
+        self.status_code = status_code
+        self.anonymized: list[str] = []
+
+    async def record_feedback(
+        self, payload: Mapping[str, Any], authorization: str | None, correlation_id: str
+    ) -> UpstreamResponse:
+        raise AssertionError("the rating intake is not used in these tests")
+
+    async def record_report(
+        self, payload: Mapping[str, Any], authorization: str | None, correlation_id: str
+    ) -> UpstreamResponse:
+        raise AssertionError("the report intake is not used in these tests")
+
+    async def review(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: Mapping[str, str] | None,
+        body: bytes | None,
+        authorization: str | None,
+        correlation_id: str,
+    ) -> UpstreamResponse:
+        raise AssertionError("the review routes are not used in these tests")
+
+    async def anonymize_subject(self, subject: str, correlation_id: str) -> UpstreamResponse:
+        self.anonymized.append(subject)
+        if self.error is not None:
+            raise self.error
+        return UpstreamResponse(
+            status_code=self.status_code, body=b'{"anonymized":1}', content_type="application/json"
+        )
+
+    async def aclose(self) -> None:
+        return None
+
+
 def _client(
     entitlement: EntitlementClient,
     *,
     lookup: LookupClient | None = None,
     analytics: AnalyticsClient | None = None,
+    feedback: FeedbackClient | None = None,
 ) -> TestClient:
     return TestClient(
         create_app(
@@ -159,6 +203,7 @@ def _client(
             entitlement_client=entitlement,
             lookup_client=lookup or _RecordingLookupClient(),
             analytics_client=analytics or _RecordingAnalyticsClient(),
+            feedback_client=feedback or _RecordingFeedbackClient(),
         )
     )
 
@@ -273,22 +318,24 @@ def test_an_unreachable_entitlement_service_is_a_service_unavailable() -> None:
     assert response.json()["code"] == "upstream_unavailable"
 
 
-def test_deletion_anonymizes_the_readers_lookups_and_events() -> None:
+def test_deletion_anonymizes_the_readers_lookups_events_ratings_and_reports() -> None:
     # A deletion reaches the reader's data across the services, not only the
-    # account store: their lookups and their events are anonymized behind the
-    # account (nfr.md "Privacy & Compliance"; analytics.md "Analytics Data
-    # Governance").
+    # account store: their lookups, their events, and their ratings and reports
+    # are anonymized behind the account (nfr.md "Privacy & Compliance";
+    # analytics.md "Analytics Data Governance").
     entitlement = _FakeEntitlementClient(status_code=202, body=b'{"deleted":true}')
     lookup = _RecordingLookupClient()
     analytics = _RecordingAnalyticsClient()
+    feedback = _RecordingFeedbackClient()
 
-    with _client(entitlement, lookup=lookup, analytics=analytics) as client:
+    with _client(entitlement, lookup=lookup, analytics=analytics, feedback=feedback) as client:
         response = client.delete("/v1/account", headers=_READER)
 
     assert response.status_code == 202
     assert response.json() == {"deleted": True}
     assert lookup.anonymized == ["reader-1"]
     assert analytics.anonymized == ["reader-1"]
+    assert feedback.anonymized == ["reader-1"]
 
 
 def test_a_refused_deletion_anonymizes_nothing() -> None:
@@ -297,13 +344,15 @@ def test_a_refused_deletion_anonymizes_nothing() -> None:
     )
     lookup = _RecordingLookupClient()
     analytics = _RecordingAnalyticsClient()
+    feedback = _RecordingFeedbackClient()
 
-    with _client(entitlement, lookup=lookup, analytics=analytics) as client:
+    with _client(entitlement, lookup=lookup, analytics=analytics, feedback=feedback) as client:
         response = client.delete("/v1/account", headers=_READER)
 
     assert response.status_code == 401
     assert lookup.anonymized == []
     assert analytics.anonymized == []
+    assert feedback.anonymized == []
 
 
 def test_an_unreachable_store_does_not_fail_the_deletion() -> None:
@@ -313,14 +362,16 @@ def test_an_unreachable_store_does_not_fail_the_deletion() -> None:
     entitlement = _FakeEntitlementClient(status_code=202, body=b'{"deleted":true}')
     lookup = _RecordingLookupClient(error=UpstreamUnavailableError("down"))
     analytics = _RecordingAnalyticsClient()
+    feedback = _RecordingFeedbackClient()
 
-    with _client(entitlement, lookup=lookup, analytics=analytics) as client:
+    with _client(entitlement, lookup=lookup, analytics=analytics, feedback=feedback) as client:
         response = client.delete("/v1/account", headers=_READER)
 
     assert response.status_code == 202
     assert response.json() == {"deleted": True}
-    # The other store is still anonymized.
+    # The other stores are still anonymized.
     assert analytics.anonymized == ["reader-1"]
+    assert feedback.anonymized == ["reader-1"]
 
 
 def test_a_store_that_refuses_the_erasure_does_not_fail_the_deletion() -> None:
@@ -329,9 +380,11 @@ def test_a_store_that_refuses_the_erasure_does_not_fail_the_deletion() -> None:
     entitlement = _FakeEntitlementClient(status_code=202, body=b'{"deleted":true}')
     lookup = _RecordingLookupClient()
     analytics = _RecordingAnalyticsClient(status_code=401)
+    feedback = _RecordingFeedbackClient()
 
-    with _client(entitlement, lookup=lookup, analytics=analytics) as client:
+    with _client(entitlement, lookup=lookup, analytics=analytics, feedback=feedback) as client:
         response = client.delete("/v1/account", headers=_READER)
 
     assert response.status_code == 202
     assert analytics.anonymized == ["reader-1"]
+    assert feedback.anonymized == ["reader-1"]

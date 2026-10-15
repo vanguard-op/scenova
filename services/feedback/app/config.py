@@ -51,6 +51,10 @@ class Settings:
     auth_mode: str = "dev"
     firebase_project_id: str | None = None
     internal_audience: str = DEFAULT_INTERNAL_AUDIENCE
+    # The internal anonymization seam (a deleted reader's feedback and reports)
+    # is a service-to-service call; a direct caller must assert the audience
+    # (nfr.md "Privacy & Compliance").
+    require_internal_auth: bool = True
     correlation_id_header: str = DEFAULT_CORRELATION_ID_HEADER
     lookup_base_url: str = f"http://127.0.0.1:{DEFAULT_LOOKUP_PORT}"
     lookup_timeout_seconds: float = DEFAULT_LOOKUP_TIMEOUT_SECONDS
@@ -62,6 +66,11 @@ class Settings:
     rate_limit_per_minute: int = DEFAULT_RATE_LIMIT_PER_MINUTE
     rate_limit_window_seconds: int = DEFAULT_RATE_LIMIT_WINDOW_SECONDS
     negative_feedback_threshold: int = DEFAULT_NEGATIVE_FEEDBACK_THRESHOLD
+    # The primary database the feedback, report, and review records live in
+    # (architecture.md "Primary Database"). Empty resolves to the in-memory store,
+    # which the unit tests and a bare local run use; every deployed environment
+    # supplies it.
+    database_url: str | None = None
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Settings:
@@ -87,6 +96,7 @@ class Settings:
             auth_mode=_env_str(source, "AUTH_MODE", default_auth_mode),
             firebase_project_id=_env_opt(source, "FIREBASE_PROJECT_ID"),
             internal_audience=_env_str(source, "INTERNAL_AUDIENCE", DEFAULT_INTERNAL_AUDIENCE),
+            require_internal_auth=_env_bool(source, "FEEDBACK_REQUIRE_INTERNAL_AUTH", True),
             correlation_id_header=_env_str(
                 source, "CORRELATION_ID_HEADER", DEFAULT_CORRELATION_ID_HEADER
             ),
@@ -114,7 +124,15 @@ class Settings:
                 "FEEDBACK_NEGATIVE_THRESHOLD",
                 DEFAULT_NEGATIVE_FEEDBACK_THRESHOLD,
             ),
+            database_url=_env_opt(source, "DATABASE_URL"),
         )
+
+
+def _env_bool(env: Mapping[str, str], name: str, default: bool) -> bool:
+    value = env.get(name)
+    if value in (None, ""):
+        return default
+    return value.strip().lower() not in {"0", "false", "no", "off"}
 
 
 def _env_str(env: Mapping[str, str], name: str, default: str) -> str:

@@ -103,6 +103,22 @@ class ReportResponse(BaseModel):
     state: ReportStatus
 
 
+class AnonymizeRequest(BaseModel):
+    """The internal anonymization seam's request: the deleted reader's subject."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    subject: str
+
+
+class AnonymizeResponse(BaseModel):
+    """The internal anonymization seam's response: how many records were stripped."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    anonymized: int
+
+
 class EntryStatus(StrEnum):
     """Whether a library entry is served or retired (C-015, C-016).
 

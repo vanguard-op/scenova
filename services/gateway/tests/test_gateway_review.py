@@ -76,6 +76,9 @@ class _FakeFeedbackClient:
             status_code=self.status_code, body=self.body, content_type="application/json"
         )
 
+    async def anonymize_subject(self, subject: str, correlation_id: str) -> UpstreamResponse:
+        raise AssertionError("the anonymization seam is not used in these tests")
+
     async def aclose(self) -> None:
         return None
 

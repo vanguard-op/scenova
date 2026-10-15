@@ -28,6 +28,7 @@ from dataclasses import replace
 from datetime import UTC, datetime
 
 from .config import Settings
+from .db import create_engine
 from .errors import (
     AlreadyReportedError,
     ClientFeedbackIdConflictError,
@@ -56,6 +57,7 @@ from .store import (
     FeedbackRecord,
     FeedbackStore,
     InMemoryFeedbackStore,
+    PostgresFeedbackStore,
     ReportRecord,
     ReviewItem,
     new_feedback_id,
@@ -160,9 +162,23 @@ class FeedbackService:
                 await self._start_candidate(entry_id, item, reader_lookup_id=request.lookupId)
         return ReportResponse(reportId=report.id, state=report.status)
 
-    async def aclose(self) -> None:
-        """Release the lookup, library, and pipeline clients' connections."""
+    async def anonymize_subject(self, subject: str) -> int:
+        """Anonymize the reader's ratings and reports after their account is deleted.
 
+        A rating and a report are personal data (schema "Feedback", "Report"), so
+        a data-subject deletion severs the identity and drops the client
+        idempotency keys rather than leaving them beside a live identity (nfr.md
+        "Privacy & Compliance"). It is idempotent, so a re-run for a reader whose
+        records were already anonymized finds nothing and reports zero.
+        """
+
+        async with self._write_lock:
+            return await self._store.anonymize_subject(subject)
+
+    async def aclose(self) -> None:
+        """Release the store and the lookup, library, and pipeline clients."""
+
+        await self._store.aclose()
         await self._lookups.aclose()
         await self._library.aclose()
         await self._pipeline.aclose()
@@ -250,7 +266,7 @@ def build_default_service(
     """Build the service with its store, lookup reader, library, and pipeline."""
 
     return FeedbackService(
-        store=store if store is not None else InMemoryFeedbackStore(),
+        store=store if store is not None else build_default_store(settings),
         lookups=HttpLookupDirectory(
             base_url=settings.lookup_base_url,
             internal_audience=settings.internal_audience,
@@ -269,6 +285,20 @@ def build_default_service(
         ),
         negative_feedback_threshold=settings.negative_feedback_threshold,
     )
+
+
+def build_default_store(settings: Settings) -> FeedbackStore:
+    """The feedback store the service holds its records in.
+
+    An environment with no `DATABASE_URL` keeps the in-memory store, so a bare
+    local run and the unit tests need no database; every deployed environment
+    resolves the relational store the primary database holds (architecture.md
+    "Primary Database").
+    """
+
+    if settings.database_url is None:
+        return InMemoryFeedbackStore()
+    return PostgresFeedbackStore(create_engine(settings.database_url))
 
 
 def _require_served_clip(record: LookupRecord) -> None:

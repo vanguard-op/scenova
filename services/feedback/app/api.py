@@ -13,6 +13,10 @@ operator surface (FEAT-015). They take an operator's token, require the curator
 role and a multi-factor session, and are never reachable from the reader client.
 The gateway authenticates the operator session before it forwards the call; the
 gate enforces the same rule here so a directly-addressed instance is refused too.
+
+`POST /internal/feedback/anonymize` anonymizes a deleted reader's ratings and
+reports. It is an internal seam rather than a numbered contract, called when the
+reader's account is deleted (nfr.md "Privacy & Compliance").
 """
 
 from __future__ import annotations
@@ -27,10 +31,12 @@ from fastapi.responses import JSONResponse
 
 from .auth import TokenVerifier, build_token_verifier
 from .config import Settings
-from .errors import FeedbackError, RateLimitedError
+from .errors import FeedbackError, RateLimitedError, UnauthorizedError
 from .models import (
     ActionRequest,
     ActionResponse,
+    AnonymizeRequest,
+    AnonymizeResponse,
     EntryDetailResponse,
     FeedbackRequest,
     FeedbackResponse,
@@ -43,8 +49,8 @@ from .models import (
 from .operator import OperatorVerifier, build_operator_verifier
 from .ratelimit import InMemoryFixedWindowRateLimiter, RateLimiter
 from .review import ReviewService, build_default_review_service
-from .service import FeedbackService, build_default_service
-from .store import FeedbackStore, InMemoryFeedbackStore
+from .service import FeedbackService, build_default_service, build_default_store
+from .store import FeedbackStore
 
 
 def create_app(
@@ -59,7 +65,7 @@ def create_app(
     """Build the feedback service application."""
 
     resolved_settings = settings or Settings.from_env()
-    resolved_store = store if store is not None else InMemoryFeedbackStore()
+    resolved_store = store if store is not None else build_default_store(resolved_settings)
     resolved_service = service or build_default_service(resolved_settings, store=resolved_store)
     resolved_review = review_service or build_default_review_service(
         resolved_settings, resolved_store
@@ -121,6 +127,15 @@ def create_app(
             raise RateLimitedError("Too many reports. Please try again in a moment.")
         return await resolved_service.record_report(payload, subject.id)
 
+    @app.post("/internal/feedback/anonymize")
+    async def anonymize_feedback(
+        payload: AnonymizeRequest,
+        x_internal_audience: Annotated[str | None, Header()] = None,
+    ) -> AnonymizeResponse:
+        _require_internal(resolved_settings, x_internal_audience)
+        anonymized = await resolved_service.anonymize_subject(payload.subject)
+        return AnonymizeResponse(anonymized=anonymized)
+
     @app.get("/internal/review/queue")
     async def review_queue(
         reason: Annotated[ReportReason | None, Query()] = None,
@@ -155,6 +170,20 @@ def create_app(
         return await resolved_review.act(entry_id, payload)
 
     return app
+
+
+def _require_internal(settings: Settings, audience: str | None) -> None:
+    """Refuse a caller that is not an internal service.
+
+    The anonymization seam is a service-to-service call made by the gateway after
+    a deletion; the reader client never reaches it (nfr.md "Privacy &
+    Compliance").
+    """
+
+    if not settings.require_internal_auth:
+        return
+    if audience != settings.internal_audience:
+        raise UnauthorizedError("This endpoint is for internal callers only.")
 
 
 def _first_error_message(exc: RequestValidationError) -> str:

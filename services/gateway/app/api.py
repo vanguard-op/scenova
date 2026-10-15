@@ -14,9 +14,9 @@ flood surface.
 
 An account deletion is the one place the gateway sequences more than one
 service: once the entitlement service has removed the account, the gateway
-anonymizes the reader's lookups and events behind it (nfr.md "Privacy &
-Compliance"; analytics.md "Analytics Data Governance"). The erasure is a
-secondary effect, so a store that cannot be reached is logged and left for the
+anonymizes the reader's lookups, events, ratings, and reports behind it (nfr.md
+"Privacy & Compliance"; analytics.md "Analytics Data Governance"). The erasure is
+a secondary effect, so a store that cannot be reached is logged and left for the
 data-subject-request runbook to re-run rather than failing the deletion.
 
 The curator review routes (C-014 to C-016) are operator-only and carried here for
@@ -111,6 +111,7 @@ def create_app(
     )
     resolved_feedback = feedback_client or HttpFeedbackClient(
         base_url=resolved_settings.feedback_base_url,
+        internal_audience=resolved_settings.internal_audience,
         timeout_seconds=resolved_settings.upstream_timeout_seconds,
     )
     resolved_entitlement = entitlement_client or HttpEntitlementClient(
@@ -252,14 +253,18 @@ def create_app(
         correlation_id = _correlation_id(resolved_settings, request)
         upstream = await resolved_entitlement.delete_account(authorization, correlation_id)
         if upstream.status_code == 202:
-            # The account is gone, so the reader's lookups and events are
-            # anonymized behind it (nfr.md "Privacy & Compliance"; analytics.md
-            # "Analytics Data Governance"). The erasure is a secondary effect:
-            # a store that cannot be reached is logged and left for the
-            # data-subject-request runbook to re-run, rather than failing a
-            # deletion the reader has already completed.
+            # The account is gone, so the reader's lookups, events, ratings, and
+            # reports are anonymized behind it (nfr.md "Privacy & Compliance";
+            # analytics.md "Analytics Data Governance"). The erasure is a
+            # secondary effect: a store that cannot be reached is logged and left
+            # for the data-subject-request runbook to re-run, rather than failing
+            # a deletion the reader has already completed.
             await _erase_reader_data(
-                resolved_client, resolved_analytics, subject.id, correlation_id
+                resolved_client,
+                resolved_analytics,
+                resolved_feedback,
+                subject.id,
+                correlation_id,
             )
         return _passthrough(upstream, correlation_id, resolved_settings)
 
@@ -321,20 +326,23 @@ def _internal_payload(payload: CreateLookupRequest, subject: Subject) -> dict[st
 async def _erase_reader_data(
     lookup: LookupClient,
     analytics: AnalyticsClient,
+    feedback: FeedbackClient,
     subject: str,
     correlation_id: str,
 ) -> None:
-    """Anonymize a deleted reader's lookups and events (nfr.md "Privacy & Compliance").
+    """Anonymize a deleted reader's lookups, events, ratings, and reports.
 
     The reader's account is already gone when this runs, so the erasure is a
     secondary effect of the deletion: a store that cannot be reached is logged
     and left for the data-subject-request runbook to re-run — the seams are
-    idempotent — rather than failing a deletion the reader has completed.
+    idempotent — rather than failing a deletion the reader has completed (nfr.md
+    "Privacy & Compliance").
     """
 
     for name, anonymize in (
         ("lookup", lookup.anonymize_subject),
         ("analytics", analytics.anonymize_subject),
+        ("feedback", feedback.anonymize_subject),
     ):
         try:
             response = await anonymize(subject, correlation_id)

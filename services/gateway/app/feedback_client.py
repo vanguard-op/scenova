@@ -40,6 +40,8 @@ class FeedbackClient(Protocol):
         correlation_id: str,
     ) -> UpstreamResponse: ...
 
+    async def anonymize_subject(self, subject: str, correlation_id: str) -> UpstreamResponse: ...
+
     async def aclose(self) -> None: ...
 
 
@@ -50,9 +52,11 @@ class HttpFeedbackClient:
         self,
         *,
         base_url: str,
+        internal_audience: str,
         timeout_seconds: float = 10.0,
         transport: httpx2.AsyncBaseTransport | None = None,
     ) -> None:
+        self._internal_audience = internal_audience
         self._client = httpx2.AsyncClient(
             base_url=base_url.rstrip("/"),
             timeout=timeout_seconds,
@@ -109,6 +113,29 @@ class HttpFeedbackClient:
 
     async def aclose(self) -> None:
         await self._client.aclose()
+
+    async def anonymize_subject(self, subject: str, correlation_id: str) -> UpstreamResponse:
+        """Anonymize a deleted reader's ratings and reports (nfr.md "Privacy & Compliance").
+
+        A service-to-service call, so it carries the internal audience rather than
+        the reader's token; the reader client never reaches this seam.
+        """
+
+        headers = {
+            "x-correlation-id": correlation_id,
+            "x-internal-audience": self._internal_audience,
+        }
+        try:
+            response = await self._client.post(
+                "/internal/feedback/anonymize", headers=headers, json={"subject": subject}
+            )
+        except httpx2.HTTPError as exc:
+            raise UpstreamUnavailableError("The feedback service is unavailable.") from exc
+        return UpstreamResponse(
+            status_code=response.status_code,
+            body=response.content,
+            content_type=response.headers.get("content-type", "application/json"),
+        )
 
     async def _post(
         self,
