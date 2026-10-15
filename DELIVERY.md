@@ -93,6 +93,9 @@ docs/           BPRD (product-shaper)
 | Task | Feature | Owner | Status | Contract |
 |---|---|---|---|---|
 | T-101 | — | infra-engineer | In Progress | — |
+| T-102 | FEAT-010, FEAT-011, FEAT-015 | backend-engineer | Backlog | C-003, C-009, C-010, C-011, C-013, C-014, C-015, C-016, C-017 |
+| T-103 | FEAT-015 | frontend-engineer | Backlog | C-014, C-015, C-016 |
+| T-104 | FEAT-009, FEAT-011 | frontend-engineer | Backlog | C-008, C-013 |
 
 ## Decisions Log
 | # | Decision | Rationale | By |
@@ -126,6 +129,8 @@ docs/           BPRD (product-shaper)
 | D-027 | The review component is carried by the feedback service, with the gateway exposing the console's routes | No standalone review service exists in the stack, and the feedback store already holds the queue, the reports, and the negative feedback; the console's hosting rewrites `/internal/review/**` to the gateway | lead |
 | D-028 | The design system is extracted into a shared package both apps import, rather than mirrored copies | The console carried a byte copy of the palette and its own copies of the shared widgets; every token change and the mark audit would otherwise be made twice, and the token map pointed at one location while two existed | user |
 | D-029 | The device keeps the clip for every reader until the paid tier ships; the account phase applies the Free/Pro split | FEAT-009 requires stored clips to replay with no connection and the roadmap makes offline replay this phase's headline outcome; the tiers are introduced with the account feature | user |
+| D-030 | A report regenerates one clip for the entry, kept as a candidate on the entry's queue item; the entry keeps serving the clip it already serves to other readers, and the curator resolves with one `choose` action or a `retire` | The reporter is the one who found the clip wrong, so the fresh clip is theirs to see, while a report should not withdraw a clip other readers are using before a curator has judged it. One candidate per entry keeps the spend to one generation however many readers report it | user |
+| D-031 | The report-triggered generation spend is absorbed; the cost and monetization documents are left as they are | The per-clip cost ceiling still applies; only the volume is unaccounted for, and the user chose not to carry the change into the margin model | user |
 
 ## Definition of Done
 - **Task:** the acceptance criteria in the cited feature doc are met; the frozen contract is conformed; unit tests pass; format, lint, analyze, and build are clean; work is committed to the dev branch and confined to `Own`.

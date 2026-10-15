@@ -62,24 +62,24 @@ Response 202: registered: boolean
 Errors: 400 (missing or unreadable token, unknown platform, unknown lookup), 401 (missing or invalid token), 429 (rate limited). The notification service pushes a clip-ready notice to this token when that lookup's generation completes; the notice's data payload is lookupId: string, clipUrl: string, durationSeconds: number, resolution: "360p", hasAudio: boolean, and the client obtains the clip from it, plays it, and saves it to device history.
 
 ### C-009: POST /internal/library/entries
-Status: Frozen (revision 1)
+Status: Frozen (revision 2)
 Auth: internal service identity; never reachable from the client
-Request: entry: { id: string, lemma: string, partOfSpeech: string, senseLabel: string, glossPhrase: string (at most 60), clipAssetId: string, status: active|held|retired, source: seeded|generated, createdAt: string, updatedAt: string }, asset: { id: string, durationSeconds: number (three to four), resolution: "360p", storageKey: string, url: string, hasAudio: boolean, synthIdWatermark: boolean, createdAt: string }
-Response 202: entryId: string, status: active|held|retired
+Request: entry: { id: string, lemma: string, partOfSpeech: string, senseLabel: string, glossPhrase: string (at most 60), clipAssetId: string, status: active|retired, source: seeded|generated, createdAt: string, updatedAt: string }, asset: { id: string, durationSeconds: number (three to four), resolution: "360p", storageKey: string, url: string, hasAudio: boolean, synthIdWatermark: boolean, createdAt: string }
+Response 202: entryId: string, status: active|retired
 Errors: 400 (missing key fields or clip), 401 (not an internal caller), 503 (library unavailable). Upserts by the lemma and sense key.
 
 ### C-010: GET /internal/library/entries
-Status: Frozen (revision 1)
+Status: Frozen (revision 2)
 Auth: internal service identity; never reachable from the client
 Request: lemma: string, senseLabel: string, partOfSpeech: string (query)
-Response 200: entry: { entryId: string, status: active|held|retired, glossPhrase: string, clip: { url: string, durationSeconds: number, resolution: "360p", hasAudio: boolean } }|null
-Errors: 401 (not an internal caller), 503 (library unavailable). Only an `active` entry is served; `held` and `retired` read as null to the lookup, which then regenerates.
+Response 200: entry: { entryId: string, status: active|retired, glossPhrase: string, clip: { url: string, durationSeconds: number, resolution: "360p", hasAudio: boolean } }|null
+Errors: 401 (not an internal caller), 503 (library unavailable). Only an `active` entry is served; a `retired` entry reads as null to the lookup, which then regenerates.
 
 ### C-011: PATCH /internal/library/entries/{entryId}
-Status: Frozen
+Status: Frozen (revision 1)
 Auth: internal service identity; never reachable from the client
-Request: entryId: string (path), status: active|held|retired
-Response 200: entryId: string, status: active|held|retired
+Request: entryId: string (path), status: active|retired
+Response 200: entryId: string, status: active|retired
 Errors: 400 (unknown status), 401 (not an internal caller), 404 (unknown entry), 503 (library unavailable).
 
 ### C-012: POST /v1/feedback
@@ -90,36 +90,36 @@ Response 202: recorded: boolean
 Errors: 400 (unknown rating; a lookup with no clip served to the reader), 401 (missing or invalid token), 404 (unknown lookup, or not owned by the caller), 409 (clientFeedbackId reused with a different rating), 429 (rate limited), 503 (feedback store unavailable). One reader's rating of a lookup replaces their earlier rating for the same entry rather than adding to it; a rating on a phrase lookup is recorded against the lookup and never touches the shared library; a rating that crosses the negative-feedback threshold queues the entry for review.
 
 ### C-013: POST /v1/reports
-Status: Frozen
+Status: Frozen (revision 1)
 Auth: Firebase ID token in `Authorization` (anonymous before sign-in); rate-limited at the gateway. The lookup must belong to the caller's token subject.
 Request: lookupId: string, reason: wrong_meaning|offensive|low_quality|other, note: string|null (at most 300), clientReportId: string (idempotency key)
-Response 202: reportId: string, status: queued
-Errors: 400 (unknown reason; a note over 300 characters; a lookup with no clip served to the reader), 401 (missing or invalid token), 404 (unknown lookup, or not owned by the caller), 409 (clientReportId reused with a different report; the same reader has already reported this entry), 429 (rate limited), 503 (feedback store unavailable). A report queues the entry for review and holds it from new readers until it is reviewed; a report on an entry already under review joins the existing queue item; a report on a phrase lookup is recorded against the lookup and has no shared effect.
+Response 202: reportId: string, state: queued
+Errors: 400 (unknown reason; a note over 300 characters; a lookup with no clip served to the reader), 401 (missing or invalid token), 404 (unknown lookup, or not owned by the caller), 409 (clientReportId reused with a different report; the same reader has already reported this entry), 429 (rate limited), 503 (feedback store unavailable). A report opens a queue item for the entry, or joins the one already open, and the entry keeps serving to other readers; one clip is regenerated for the entry and held as the candidate the curator chooses between, so an entry costs one generation however many readers report it; a report on a phrase lookup is recorded against the lookup and has no shared effect.
 
 ### C-014: GET /internal/review/queue
-Status: Frozen (revision 1)
+Status: Frozen (revision 2)
 Auth: operator identity carrying the curator role, multi-factor authenticated; never reachable from the reader client. A caller without the role is refused and the attempt is logged.
 Request: reason: wrong_meaning|offensive|low_quality|other|null, state: queued|reviewed|actioned|null, word: string|null, page: integer (query)
 Response 200: items: [{ entryId: string, lemma: string, senseLabel: string, reason: wrong_meaning|offensive|low_quality|other|feedback_threshold, queuedAt: string, state: queued|reviewed|actioned }], openCount: integer, page: integer, pageCount: integer
 Errors: 401 (no operator session), 403 (an operator without the curator role), 503 (review service unavailable). Newest report first, one item per entry however many reports it holds. An item queued by the negative-feedback threshold rather than by a report carries `feedback_threshold` as its reason; the `reason` filter takes the report reasons only.
 
 ### C-015: GET /internal/review/entries/{entryId}
-Status: Frozen
+Status: Frozen (revision 1)
 Auth: operator identity carrying the curator role, multi-factor authenticated; never reachable from the reader client.
 Request: entryId: string (path)
-Response 200: entry: { entryId: string, lemma: string, senseLabel: string, glossPhrase: string, status: active|held|retired, clip: { url: string, durationSeconds: number, resolution: "360p", hasAudio: boolean } }, reports: [{ reportId: string, reason: string, note: string|null, createdAt: string }], feedback: [{ rating: helpful|not_helpful|wrong, createdAt: string }], state: queued|reviewed|actioned
+Response 200: entry: { entryId: string, lemma: string, senseLabel: string, glossPhrase: string, status: active|retired, clip: { url: string, durationSeconds: number, resolution: "360p", hasAudio: boolean } }, candidate: { url: string, durationSeconds: number, resolution: "360p", hasAudio: boolean }|null (the clip regenerated for the reporting reader, held for the curator), reports: [{ reportId: string, reason: string, note: string|null, createdAt: string }], feedback: [{ rating: helpful|not_helpful|wrong, createdAt: string }], state: queued|reviewed|actioned
 Errors: 401 (no operator session), 403 (an operator without the curator role), 404 (unknown entry, or an entry with nothing queued), 503 (review service unavailable).
 
 ### C-016: POST /internal/review/entries/{entryId}/actions
-Status: Frozen (revision 1)
+Status: Frozen (revision 2)
 Auth: operator identity carrying the curator role, multi-factor authenticated; never reachable from the reader client.
-Request: action: clear|hold|retire|replace|edit_phrase, phrase: string|null (the new generation phrase, for edit_phrase), notes: string|null (at most 500), expectedState: queued|reviewed|actioned (the state the curator acted on)
-Response 200: actionId: string, entryId: string, status: active|held|retired, state: reviewed|actioned (edit_phrase resolves the queue item as `reviewed`; every other action resolves it as `actioned`)
-Errors: 400 (unknown action; edit_phrase without a phrase; notes over 500 characters), 401 (no operator session), 403 (an operator without the curator role), 404 (unknown entry), 409 (the entry has already moved since the curator saw it), 503 (review service unavailable). Every action records a ModerationAction; `clear` returns the entry to serving, `hold` withholds it, `retire` stops serving it and the next lookup generates a replacement, `replace` retires it and regenerates, and `edit_phrase` records the new phrase and regenerates from it.
+Request: action: choose|retire|edit_phrase, chosenClip: serving|candidate|null (which clip serves every reader from now on, for choose), phrase: string|null (the new generation phrase, for edit_phrase), notes: string|null (at most 500), expectedState: queued|reviewed|actioned (the state the curator acted on)
+Response 200: actionId: string, entryId: string, status: active|retired, state: reviewed|actioned (edit_phrase resolves the queue item as `reviewed`; every other action resolves it as `actioned`)
+Errors: 400 (unknown action; choose without a clip; edit_phrase without a phrase; notes over 500 characters), 401 (no operator session), 403 (an operator without the curator role), 404 (unknown entry), 409 (the entry has already moved since the curator saw it), 503 (review service unavailable). Every action records a ModerationAction. `choose` makes the named clip the one served to every reader — the clip already serving, or the candidate regenerated for the reporting reader; `retire` stops serving the entry, and the next lookup generates a replacement; `edit_phrase` records the new phrase and regenerates from it. Until a `choose` or a `retire`, the entry keeps serving the clip it already serves.
 
 ### C-017: GET /internal/library/entries/{entryId}
-Status: Frozen
+Status: Frozen (revision 1)
 Auth: internal service identity; never reachable from the client
 Request: entryId: string (path)
-Response 200: entry: { entryId: string, lemma: string, senseLabel: string, partOfSpeech: string, glossPhrase: string, status: active|held|retired, clip: { url: string, durationSeconds: number, resolution: "360p", hasAudio: boolean } }
+Response 200: entry: { entryId: string, lemma: string, senseLabel: string, partOfSpeech: string, glossPhrase: string, status: active|retired, clip: { url: string, durationSeconds: number, resolution: "360p", hasAudio: boolean } }
 Errors: 401 (not an internal caller), 404 (unknown entry, code `entry_not_found`), 503 (library unavailable). The review service reads an entry by id for C-015's detail: the queue holds only an entry id, so the sense key C-010 uses is not at hand.
