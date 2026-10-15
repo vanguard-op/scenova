@@ -120,6 +120,24 @@ void main() {
       );
     });
 
+    test('maps a 503 to a retryable failure', () async {
+      // C-008: the registration store being unavailable is retryable — the
+      // registration is held and the reader is asked again.
+      final api = apiReturning((_) => http.Response('{}', 503));
+      await expectLater(
+        api.register(
+          token: 't',
+          platform: LookupPlatform.ios,
+          lookupId: 'lk_1',
+        ),
+        throwsA(
+          isA<PushRegistrationException>()
+              .having((e) => e.isRetryable, 'isRetryable', isTrue)
+              .having((e) => e.isRejected, 'isRejected', isFalse),
+        ),
+      );
+    });
+
     test('reads the {code, message} error body', () async {
       final api = apiReturning(
         (_) => http.Response(

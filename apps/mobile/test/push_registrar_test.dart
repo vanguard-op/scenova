@@ -1,9 +1,14 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:scenova/app.dart';
 import 'package:scenova/models/lookup.dart';
 import 'package:scenova/services/connectivity.dart';
 import 'package:scenova/services/push_registration_api.dart';
 import 'package:scenova/services/push_registrar.dart';
 import 'package:scenova/services/push_tokens.dart';
+import 'package:scenova/services/settings_controller.dart';
+
+import 'support/harness.dart';
 
 class _FixedTokens implements PushTokenProvider {
   _FixedTokens(this.outcome, {PushTokenOutcome? quietOutcome})
@@ -240,5 +245,69 @@ void main() {
     await pumpEventQueue();
     // Nothing was held, so the reconnect sends nothing.
     expect(api.tokens, isEmpty);
+  });
+
+  test(
+    'holds an unavailable registration and retries it on the next attempt',
+    () async {
+      // C-008: the registration store being unavailable is retryable, so the
+      // registration is held, lookup and all, rather than lost. The retry can come
+      // without a connection change — the store recovering is enough.
+      final api = MockPushRegistrationApi()..failStatus = 503;
+      final registrar = PushRegistrar(
+        api: api,
+        tokens: _FixedTokens(_deviceToken),
+        connectivity: ManualConnectivity(),
+      );
+      addTearDown(registrar.dispose);
+
+      expect(
+        await registrar.requestClipReadyNotice(lookupId: 'lk_1'),
+        PushNoticeResult.notRegistered,
+      );
+      expect(api.tokens, isEmpty);
+      expect(registrar.pendingRegistration, isTrue);
+
+      api.failStatus = null;
+      await registrar.flushPending();
+      expect(api.tokens, <String>['device-token']);
+      expect(api.lookupIds, <String>['lk_1']);
+      expect(registrar.pendingRegistration, isFalse);
+    },
+  );
+
+  testWidgets('a held registration is retried on the next foreground', (
+    tester,
+  ) async {
+    // The registration store recovers while the device stays online, so the
+    // app's own foreground is what retries the held registration (`C-008`).
+    usePhoneWindow(tester);
+    final api = MockPushRegistrationApi()..failStatus = 503;
+    final services = buildServices(
+      settings: SettingsController(onboardingComplete: true),
+      pushApi: api,
+    );
+
+    await tester.pumpWidget(ScenovaApp(services: services));
+    await tester.pump();
+
+    // The reader takes the notify offer while the store is unavailable; the
+    // registration is held rather than lost.
+    expect(
+      await services.pushRegistrar.requestClipReadyNotice(lookupId: 'lk_1'),
+      PushNoticeResult.notRegistered,
+    );
+    expect(services.pushRegistrar.pendingRegistration, isTrue);
+
+    api.failStatus = null;
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.pump();
+
+    expect(api.tokens, <String>['test-push-token']);
+    expect(api.lookupIds, <String>['lk_1']);
+    expect(services.pushRegistrar.pendingRegistration, isFalse);
+
+    await teardown(tester);
   });
 }

@@ -253,6 +253,25 @@ void main() {
       expect(api.sent, hasLength(1));
     });
 
+    test('an unavailable intake holds the batch for retry', () async {
+      // C-007: a 503 from the event intake is retryable — the batch is retained
+      // and sent again, never dropped, so the phase's events (a report, a
+      // purchase) are not lost to a brief outage.
+      final api = MockAnalyticsApi()..failStatus = 503;
+      final client = _client(api: api);
+      addTearDown(client.dispose);
+
+      client.appOpened(source: AppOpenSource.launch);
+      await client.flush();
+      expect(api.sent, isEmpty);
+      expect(client.pendingCount, 1);
+
+      api.failStatus = null;
+      await client.flush();
+      expect(client.pending, isEmpty);
+      expect(api.sent, hasLength(1));
+    });
+
     test('a rejected batch is dropped rather than retried', () async {
       final api = MockAnalyticsApi()..failStatus = 400;
       final client = _client(api: api);

@@ -104,6 +104,11 @@ class _ScenovaAppState extends State<ScenovaApp> with WidgetsBindingObserver {
           widget.services.analytics.appOpened(source: AppOpenSource.resume);
         }
         unawaited(widget.services.analytics.flush());
+        // A notice registration held while the registration store was
+        // unavailable is retried here, so a service that recovered while the
+        // device stayed online is not waited on for a connection change
+        // (`C-008`, 503 retryable).
+        unawaited(widget.services.pushRegistrar.flushPending());
         // A kill switch disabled while the app was backgrounded takes effect on
         // the next lookup rather than the next release, and a plan that changed
         // elsewhere — a purchase on another device — is re-read.

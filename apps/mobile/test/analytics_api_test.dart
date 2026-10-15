@@ -105,6 +105,20 @@ void main() {
       );
     });
 
+    test('maps a 503 to a retryable failure', () async {
+      // C-007: the event store being unavailable is retryable — the batch is
+      // retained rather than dropped.
+      final api = apiReturning((_) => http.Response('{}', 503));
+      await expectLater(
+        api.send(<AnalyticsEvent>[_event('launch')]),
+        throwsA(
+          isA<AnalyticsApiException>()
+              .having((e) => e.isRetryable, 'isRetryable', isTrue)
+              .having((e) => e.isRejected, 'isRejected', isFalse),
+        ),
+      );
+    });
+
     test('reads the {code, message} error body', () async {
       final api = apiReturning(
         (_) => http.Response(

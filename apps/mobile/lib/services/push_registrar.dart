@@ -34,13 +34,15 @@ enum PushNoticeResult {
 /// is waiting on, so the notification service can find its way back to the
 /// reader when that clip is ready.
 ///
-/// A registration that cannot be sent — the device dropped offline, or the
-/// intake asked the client to slow down — is held, with its lookup, and retried
-/// when the connection returns, matching the app's offline rule that work which
-/// needs the network is queued rather than lost. A rejected or unauthenticated
-/// registration is dropped, since resending it unchanged cannot succeed. A
-/// reader who refuses the notification permission is reported as a refusal and
-/// holds nothing: there is no later event for a device that cannot be reached.
+/// A registration that cannot be sent — the device dropped offline, the intake
+/// asked the client to slow down, or the registration store was unavailable
+/// (`C-008`, 503) — is held, with its lookup, and retried when the connection
+/// returns and when the app next comes to the foreground, matching the app's
+/// offline rule that work which needs the network is queued rather than lost. A
+/// rejected or unauthenticated registration is dropped, since resending it
+/// unchanged cannot succeed. A reader who refuses the notification permission is
+/// reported as a refusal and holds nothing: there is no later event for a device
+/// that cannot be reached.
 ///
 /// The registration can go out without raising the prompt: a phrase lookup
 /// takes that route, since its clip reaches the device only by the notice and
@@ -52,7 +54,7 @@ class PushRegistrar {
     required this.connectivity,
   }) {
     _connectivitySub = connectivity.changes.listen((online) {
-      if (online) unawaited(_flushPending());
+      if (online) unawaited(flushPending());
     });
   }
 
@@ -135,7 +137,15 @@ class PushRegistrar {
     _pendingPrompt = prompt;
   }
 
-  Future<void> _flushPending() async {
+  /// Retries the registration held for the connection or for the service to
+  /// come back.
+  ///
+  /// A registration the intake answered `503` to is held rather than dropped
+  /// (`C-008`): the registration store being briefly unavailable is not the
+  /// reader's to lose. It is retried when the connection returns and when the
+  /// app comes back to the foreground, so a service that recovers while the
+  /// device stays online is not left waiting for a connection that never drops.
+  Future<void> flushPending() async {
     final lookupId = _pendingLookupId;
     if (lookupId == null || _disposed) return;
     await requestClipReadyNotice(lookupId: lookupId, prompt: _pendingPrompt);
