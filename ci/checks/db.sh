@@ -65,7 +65,7 @@ migrate() { bash ci/db.sh "$@"; }
 expected_tables=(
   accounts clip_assets entitlements feedback generation_jobs library_entries
   lookup_generation_jobs lookup_senses lookups model_pins moderation_actions
-  purchases reports review_items
+  pending_notices purchases push_registrations reports review_items
 )
 app_table_count() {
   docker exec "$container" psql -U scenova -d scenova -tAc \
