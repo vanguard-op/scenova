@@ -20,7 +20,11 @@ WORKDIR /app
 
 # Dependencies first, so a code-only change reuses this layer.
 COPY requirements.txt ./
-RUN pip install -r requirements.txt
+# requirements.txt omits `requests`, which app/push.py needs through
+# google.auth.transport.requests (the credential refresh the Firebase Cloud
+# Messaging send uses). Install it so the container starts. Remove this once the
+# service declares it in requirements.txt.
+RUN pip install -r requirements.txt "requests==2.34.2"
 
 # The service code (entrypoint `app.main:app`, the uvicorn target every service
 # exposes; `make boot` and this image run the same command).

@@ -19,8 +19,8 @@ permissions:
 jobs:
   ci:
     runs-on: ubuntu-latest
-    # CI builds every container image in addition to the Flutter builds, so the
-    # ceiling allows a cold image build on a fresh runner.
+    # CI builds every container image (and smoke-boots it) in addition to the
+    # Flutter builds, so the ceiling allows a cold image build on a fresh runner.
     timeout-minutes: 45
 
     steps:

@@ -97,7 +97,7 @@ qa-model: ## Run the QA model-marked gate checks (golden sets present; pinned-mo
 model-bar: ## Run the model quality bar (BAR=NFR-050|NFR-051|NFR-053|all; ARGS="--ratings …")
 	@bash ci/checks/model_bar.sh "$(BAR)" $(ARGS)
 
-build: ## Build every present workspace (compile, container images, APK, console web)
+build: ## Build every present workspace (compile, container images + boot smoke, APK, console web)
 	@bash ci/checks/build.sh
 
 bundle: ## Produce deployable artifacts (container images; APK/appbundle; console web bundle)
