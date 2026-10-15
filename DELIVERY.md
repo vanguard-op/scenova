@@ -126,7 +126,11 @@ docs/           BPRD (product-shaper)
 | T-133 | FEAT-003 | backend-engineer | Backlog | C-001 |
 | T-134 | — | infra-engineer | Done | — |
 | T-136 | — | infra-engineer | Done | — |
-| T-135 | FEAT-008 | backend-engineer | In Progress | — |
+| T-135 | FEAT-008 | backend-engineer | Done | — |
+| T-138 | — | infra-engineer | Done | — |
+| T-137 | FEAT-011, FEAT-013 | frontend-engineer | In Progress | C-007, C-008 |
+| T-139 | — | backend-engineer | In Progress | — |
+
 
 ## Decisions Log
 | # | Decision | Rationale | By |
