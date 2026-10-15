@@ -247,7 +247,7 @@ class _VariantPalette {
     return switch (variant) {
       ScenovaButtonVariant.primary => _VariantPalette(
         background: colors.primary,
-        foreground: colors.onPrimary,
+        foreground: colors.onSolid,
       ),
       ScenovaButtonVariant.secondary => _VariantPalette(
         background: colors.primaryTint,
@@ -265,7 +265,7 @@ class _VariantPalette {
       ),
       ScenovaButtonVariant.destructive => _VariantPalette(
         background: colors.error.element,
-        foreground: colors.onFill,
+        foreground: colors.onSolid,
       ),
     };
   }

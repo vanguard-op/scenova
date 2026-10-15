@@ -315,7 +315,7 @@ class _CountPill extends StatelessWidget {
         '$count',
         textAlign: TextAlign.center,
         style: styles.caption.copyWith(
-          color: selected ? colors.onPrimary : colors.textSecondary,
+          color: selected ? colors.onSolid : colors.textSecondary,
           fontWeight: FontWeight.w600,
         ),
       ),

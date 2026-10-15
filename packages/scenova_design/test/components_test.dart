@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scenova_design/scenova_design.dart';
@@ -367,6 +369,44 @@ void main() {
     });
   });
 
+  group('ScenovaButton — solid contrast', () {
+    // The button table gives both solid variants the `on-solid` ink; the
+    // accessibility target holds the label to 4.5:1 in both themes. This reads
+    // the colours the button actually paints, not the token pair alone.
+    for (final brightness in Brightness.values) {
+      testWidgets('Primary and Destructive labels hold 4.5:1 ($brightness)', (
+        tester,
+      ) async {
+        for (final variant in <ScenovaButtonVariant>[
+          ScenovaButtonVariant.primary,
+          ScenovaButtonVariant.destructive,
+        ]) {
+          await pumpThemed(
+            tester,
+            ScenovaButton(label: 'Act', variant: variant, onPressed: () {}),
+            brightness: brightness,
+          );
+
+          final label = tester.widget<Text>(find.text('Act'));
+          final material = tester.widget<Material>(
+            find
+                .descendant(
+                  of: find.byType(ScenovaButton),
+                  matching: find.byType(Material),
+                )
+                .first,
+          );
+
+          expect(
+            _contrastRatio(label.style!.color!, material.color!),
+            greaterThanOrEqualTo(4.5),
+            reason: '$variant on $brightness',
+          );
+        }
+      });
+    }
+  });
+
   group('SkeletonList', () {
     testWidgets('holds still when reduce motion is on', (tester) async {
       await pumpThemed(tester, const SkeletonList(rows: 3), reduceMotion: true);
@@ -452,4 +492,22 @@ void main() {
       expect(opened, isTrue);
     });
   });
+}
+
+/// The WCAG 2.x contrast ratio between two opaque colours.
+double _contrastRatio(Color a, Color b) {
+  final la = _relativeLuminance(a);
+  final lb = _relativeLuminance(b);
+  final lighter = math.max(la, lb);
+  final darker = math.min(la, lb);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+double _relativeLuminance(Color color) {
+  double channel(double value) => value <= 0.03928
+      ? value / 12.92
+      : math.pow((value + 0.055) / 1.055, 2.4).toDouble();
+  return 0.2126 * channel(color.r) +
+      0.7152 * channel(color.g) +
+      0.0722 * channel(color.b);
 }

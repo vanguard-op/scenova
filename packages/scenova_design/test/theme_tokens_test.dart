@@ -156,6 +156,16 @@ void main() {
       expect(ScenovaColors.light.placeholder, ScenovaPalette.grey600Light);
       expect(ScenovaColors.dark.placeholder, ScenovaPalette.grey600Dark);
     });
+
+    test('on-solid flips from white in light to dark ink in dark', () {
+      // `on-solid` is the exception to the shade mapping: the element shades
+      // lighten in dark, so a fixed white would fall below the text target on
+      // them. It carries its own pair of values rather than one shade.
+      expect(ScenovaColors.light.onSolid, ScenovaPalette.onSolidLight);
+      expect(ScenovaColors.dark.onSolid, ScenovaPalette.onSolidDark);
+      expect(ScenovaPalette.onSolidLight, const Color(0xFFFFFFFF));
+      expect(ScenovaPalette.onSolidDark, const Color(0xFF1A1820));
+    });
   });
 
   group('contrast target', () {
@@ -207,9 +217,15 @@ void main() {
         }
       });
 
-      test('the filled primary action\'s label holds ($brightness)', () {
+      test('the solid actions\' labels hold 4.5:1 ($brightness)', () {
+        // The button table gives both solid variants the `on-solid` ink:
+        // Primary sits on `primary-500`, Destructive on `error-500`.
         expect(
-          _contrastRatio(colors.onPrimary, colors.primary),
+          _contrastRatio(colors.onSolid, colors.primary),
+          greaterThanOrEqualTo(4.5),
+        );
+        expect(
+          _contrastRatio(colors.onSolid, colors.error.element),
           greaterThanOrEqualTo(4.5),
         );
       });

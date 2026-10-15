@@ -112,8 +112,13 @@ abstract final class ScenovaPalette {
   static const Color accent900Light = Color(0xFF553F0C);
   static const Color accent900Dark = Color(0xFFF0E4C7);
 
-  /// White, used for text on filled primary and destructive surfaces.
-  static const Color onFill = Color(0xFFFFFFFF);
+  /// The `on-solid` ink: the text colour for a solid element.
+  ///
+  /// It does not inherit a single shade. It flips from white in light to
+  /// `#1A1820` in dark, because the element shades lighten in dark and a fixed
+  /// white would fall below the text target on them.
+  static const Color onSolidLight = Color(0xFFFFFFFF);
+  static const Color onSolidDark = Color(0xFF1A1820);
 
   /// No colour; used for outline and ghost surfaces.
   static const Color transparent = Color(0x00000000);
@@ -157,7 +162,7 @@ class ScenovaColors extends ThemeExtension<ScenovaColors> {
     required this.iconActive,
     required this.iconDisabled,
     required this.primary,
-    required this.onPrimary,
+    required this.onSolid,
     required this.primaryTint,
     required this.primaryDeep,
     required this.primaryPressed,
@@ -167,7 +172,6 @@ class ScenovaColors extends ThemeExtension<ScenovaColors> {
     required this.error,
     required this.info,
     required this.accent,
-    required this.onFill,
   });
 
   final Color surface;
@@ -181,7 +185,11 @@ class ScenovaColors extends ThemeExtension<ScenovaColors> {
   final Color iconActive;
   final Color iconDisabled;
   final Color primary;
-  final Color onPrimary;
+
+  /// The `on-solid` ink, resolved for this brightness: white in light,
+  /// `#1A1820` in dark. It labels every solid element, so a solid button's
+  /// text clears the 4.5:1 target in both themes.
+  final Color onSolid;
   final Color primaryTint;
   final Color primaryDeep;
   final Color primaryPressed;
@@ -202,8 +210,6 @@ class ScenovaColors extends ThemeExtension<ScenovaColors> {
   /// The resolved accent family: the target word highlighted.
   final ScenovaSemanticColors accent;
 
-  final Color onFill;
-
   static const ScenovaColors light = ScenovaColors(
     surface: ScenovaPalette.grey50Light,
     surfaceSecondary: ScenovaPalette.grey100Light,
@@ -220,7 +226,7 @@ class ScenovaColors extends ThemeExtension<ScenovaColors> {
     iconActive: ScenovaPalette.primary500Light,
     iconDisabled: ScenovaPalette.grey400Light,
     primary: ScenovaPalette.primary500Light,
-    onPrimary: ScenovaPalette.onFill,
+    onSolid: ScenovaPalette.onSolidLight,
     primaryTint: ScenovaPalette.primary100Light,
     primaryDeep: ScenovaPalette.primary700Light,
     primaryPressed: ScenovaPalette.primary600Light,
@@ -260,7 +266,6 @@ class ScenovaColors extends ThemeExtension<ScenovaColors> {
       pressed: ScenovaPalette.accent700Light,
       text: ScenovaPalette.accent900Light,
     ),
-    onFill: ScenovaPalette.onFill,
   );
 
   static const ScenovaColors dark = ScenovaColors(
@@ -275,7 +280,7 @@ class ScenovaColors extends ThemeExtension<ScenovaColors> {
     iconActive: ScenovaPalette.primary500Dark,
     iconDisabled: ScenovaPalette.grey400Dark,
     primary: ScenovaPalette.primary500Dark,
-    onPrimary: ScenovaPalette.grey50Dark,
+    onSolid: ScenovaPalette.onSolidDark,
     primaryTint: ScenovaPalette.primary100Dark,
     primaryDeep: ScenovaPalette.primary700Dark,
     primaryPressed: ScenovaPalette.primary600Dark,
@@ -315,7 +320,6 @@ class ScenovaColors extends ThemeExtension<ScenovaColors> {
       pressed: ScenovaPalette.accent700Dark,
       text: ScenovaPalette.accent900Dark,
     ),
-    onFill: ScenovaPalette.onFill,
   );
 
   static ScenovaColors of(BuildContext context) {
@@ -336,7 +340,7 @@ class ScenovaColors extends ThemeExtension<ScenovaColors> {
     );
     return base.copyWith(
       primary: primary,
-      onPrimary: onPrimary,
+      onPrimary: onSolid,
       primaryContainer: primaryTint,
       onPrimaryContainer: primaryDeep,
       surface: surface,
@@ -346,7 +350,7 @@ class ScenovaColors extends ThemeExtension<ScenovaColors> {
       outline: border,
       outlineVariant: border,
       error: error.element,
-      onError: onFill,
+      onError: onSolid,
       errorContainer: error.tint,
       onErrorContainer: error.text,
     );
@@ -365,7 +369,7 @@ class ScenovaColors extends ThemeExtension<ScenovaColors> {
     Color? iconActive,
     Color? iconDisabled,
     Color? primary,
-    Color? onPrimary,
+    Color? onSolid,
     Color? primaryTint,
     Color? primaryDeep,
     Color? primaryPressed,
@@ -375,7 +379,6 @@ class ScenovaColors extends ThemeExtension<ScenovaColors> {
     ScenovaSemanticColors? error,
     ScenovaSemanticColors? info,
     ScenovaSemanticColors? accent,
-    Color? onFill,
   }) {
     return ScenovaColors(
       surface: surface ?? this.surface,
@@ -389,7 +392,7 @@ class ScenovaColors extends ThemeExtension<ScenovaColors> {
       iconActive: iconActive ?? this.iconActive,
       iconDisabled: iconDisabled ?? this.iconDisabled,
       primary: primary ?? this.primary,
-      onPrimary: onPrimary ?? this.onPrimary,
+      onSolid: onSolid ?? this.onSolid,
       primaryTint: primaryTint ?? this.primaryTint,
       primaryDeep: primaryDeep ?? this.primaryDeep,
       primaryPressed: primaryPressed ?? this.primaryPressed,
@@ -399,7 +402,6 @@ class ScenovaColors extends ThemeExtension<ScenovaColors> {
       error: error ?? this.error,
       info: info ?? this.info,
       accent: accent ?? this.accent,
-      onFill: onFill ?? this.onFill,
     );
   }
 
