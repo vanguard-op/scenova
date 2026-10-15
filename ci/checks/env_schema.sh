@@ -140,6 +140,24 @@ for pair in "${ENTITLEMENT_CONSTANTS[@]}"; do
 done
 info "payments ok: ${#PAYMENT_KEYS[@]} keys; ${#ENTITLEMENT_CONSTANTS[@]} tier figures in step with Terraform"
 
+# The reader app's build path bakes the store client configuration at build time
+# (FEAT-013; monetization.md "Pricing Tiers"). Every key the build path defines
+# must be declared in the schema, so a build cannot silently ship an empty SDK key
+# or product id; no secret may be a build input, so a store credential never lands
+# in the app bundle (NFR-024, NFR-027); and no release flag may be a build input,
+# because a flag is a runtime kill switch (release.md) and a build that pinned
+# `enable_paid_tier` could not be reverted without a new store build.
+for key in "${MOBILE_DEFINE_KEYS[@]}"; do
+  grep -qE "^${key}=" "$SCHEMA" || die "$SCHEMA must declare the app build key $key"
+  case "$key" in
+    REVENUECAT_API_KEY | REVENUECAT_WEBHOOK_AUTH)
+      die "the app build must not carry the secret $key" ;;
+    FLAG_*)
+      die "the app build must not carry the release flag $key (a kill switch is a runtime value)" ;;
+  esac
+done
+info "app build store configuration ok: ${#MOBILE_DEFINE_KEYS[@]} keys, no secret, no flag"
+
 info "schema ok: ${#FLAG_DEFAULTS[@]} flags, ${#CLIP_STORE_KEYS[@]} clip-store keys"
 
 shopt -s nullglob

@@ -57,8 +57,11 @@ else
 fi
 
 if has_flutter; then
-  log "Build · flutter build apk --debug"
-  (cd apps/mobile && flutter build apk --debug)
+  # The reader app's build path carries the store client configuration (FEAT-013):
+  # one command, shared with `make bundle`, bakes the RevenueCat public keys and
+  # the store product catalog in so a build cannot ship without them.
+  log "Build · reader app (store client configuration baked in)"
+  bash "$REPO_ROOT/ci/build_app.sh" apk
   built_any=1
 fi
 

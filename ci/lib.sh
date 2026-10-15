@@ -83,6 +83,39 @@ console_dart_defines() {
   done
 }
 
+# The reader app's build-time store configuration (FEAT-013). RevenueCat wraps the
+# stores (D-008), so the client buys through its SDK and no card data reaches the
+# product (NFR-027). These are RevenueCat's *public* client SDK keys — one per
+# store — and the store product catalog from monetization.md "Pricing Tiers": the
+# Pro subscription (monthly and annual) and the one-time lookup top-up. They are
+# identifiers, not credentials, so they ship inside the app bundle the way the
+# Firebase client config does; the RevenueCat server API key and webhook
+# authorization are Secret Manager containers mounted on the entitlement service
+# alone and are never a build input. The values come from `.env` locally and from
+# the environment in CI, so the same build command describes the same app
+# everywhere. Prices are store-managed and localized (monetization.md "Payment &
+# Billing"), so none is baked in — only identifiers.
+#
+# The define names are the schema names: one name, one meaning, everywhere
+# (`.env.example`). `make env` holds this list to the schema and refuses a secret
+# or a release flag in it.
+MOBILE_DEFINE_KEYS=(
+  REVENUECAT_PUBLIC_SDK_KEY_APP_STORE
+  REVENUECAT_PUBLIC_SDK_KEY_PLAY_STORE
+  REVENUECAT_ENTITLEMENT_ID
+  REVENUECAT_OFFERING_ID
+  PRODUCT_PRO_MONTHLY
+  PRODUCT_PRO_ANNUAL
+  PRODUCT_TOPUP_LOOKUPS
+)
+
+mobile_dart_defines() {
+  local key
+  for key in "${MOBILE_DEFINE_KEYS[@]}"; do
+    printf -- '--dart-define=%s=%s\n' "$key" "${!key:-}"
+  done
+}
+
 py() { if [ -x "$VENV_DIR/bin/python" ]; then echo "$VENV_DIR/bin/python"; else echo "python3"; fi; }
 tool() {
   local name="$1"

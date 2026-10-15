@@ -102,7 +102,7 @@ build: ## Build every present workspace (compile, container images + boot smoke,
 
 bundle: ## Produce deployable artifacts (container images; APK/appbundle; console web bundle)
 	@bash ci/checks/build.sh
-	@if [ -f apps/mobile/pubspec.yaml ]; then (cd apps/mobile && flutter build appbundle --debug); else echo "skip: no Flutter app"; fi
+	@if [ -f apps/mobile/pubspec.yaml ]; then bash ci/build_app.sh appbundle; else echo "skip: no Flutter app"; fi
 
 boot: ## Boot the stack locally and assert each service serves /healthz
 	@bash ci/checks/boot.sh
