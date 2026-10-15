@@ -110,7 +110,7 @@ docs/           BPRD (product-shaper)
 | T-116 | FEAT-013 | infra-engineer | Done | — |
 | T-117 | FEAT-013 | frontend-engineer | Done | — |
 | T-118 | FEAT-013 | backend-engineer | Done | C-021 |
-| T-119 | FEAT-013 | frontend-engineer | In Progress | C-021 |
+| T-119 | FEAT-013 | frontend-engineer | Done | C-021 |
 | T-120 | FEAT-013 | infra-engineer | Done | — |
 | T-121 | FEAT-013 | backend-engineer | Done | — |
 | T-122 | FEAT-013 | frontend-engineer | Done | — |
