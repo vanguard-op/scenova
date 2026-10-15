@@ -7,11 +7,11 @@ feature acceptance criteria.
 
 The harness boots the services the same way the platform does — each as a
 `uvicorn` process started from its own workspace, with the documented module and
-ports — and hands the tests their base URLs over real HTTP. Three stacks are
+ports — and hands the tests their base URLs over real HTTP. Five stacks are
 provided:
 
-- `stack` — the client path: gateway, lookup, pipeline, library, and the model
-  service. `GEMINI_API_KEY` is left unset, so the model layer reports the
+- `stack` — the client path: gateway, lookup, pipeline, library, analytics, and
+  the model service. `GEMINI_API_KEY` is left unset, so the model layer reports the
   provider as unavailable, which is the shipped fallback path (nfr.md
   "Degradation when a dependency fails").
 - `loop_stack` — the generation loop: the same services with the external model
@@ -20,6 +20,11 @@ provided:
   reader (FEAT-006, FEAT-007).
 - `library_down_stack` — the client path with no library service, so the lookup's
   library read is refused (FEAT-006 edge case).
+- `notify_stack` — the client path plus the notification service and a push-provider
+  double, so a clip-ready notice is followed end to end (FEAT-008).
+- `review_stack` — the client path plus the feedback service and the model double,
+  so a reader can rate and report a served clip and a curator can work the review
+  queue (FEAT-010, FEAT-011, FEAT-015; C-012 to C-016).
 
 No stack reaches an external provider. The client-path stacks run without a
 model credential and the model-backed stacks point at a local double, and the
@@ -61,6 +66,7 @@ PORTS = {
     "lookup": 18081,
     "pipeline": 18082,
     "library": 18083,
+    "analytics": 18086,
     "model": 18090,
 }
 
@@ -98,6 +104,19 @@ NOTIFY_PORTS = {
     "push": 18391,
 }
 
+# The review-path stack boots the client path plus the feedback service, which
+# carries the reader's rating and report intake (C-012, C-013) and the curator's
+# review surface (C-014 to C-016). The generation path is served by the model
+# double, so a word lookup actually produces a clip a reader can rate and report.
+REVIEW_PORTS = {
+    "gateway": 18480,
+    "lookup": 18481,
+    "pipeline": 18482,
+    "library": 18483,
+    "feedback": 18485,
+    "model": 18490,
+}
+
 # name -> (working directory, uvicorn module). Mirrors ci/lib.sh's service
 # registry for the shippable services.
 SERVICES: dict[str, tuple[Path, str]] = {
@@ -106,6 +125,14 @@ SERVICES: dict[str, tuple[Path, str]] = {
     "pipeline": (REPO_ROOT / "services" / "pipeline", "app.main:app"),
     "library": (REPO_ROOT / "services" / "library", "app.main:app"),
 }
+
+# The feedback service: the reader's rating and report intake (C-012, C-013) and
+# the curator review surface (C-014 to C-016, FEAT-015). It reads the lookup
+# service to confirm a lookup and holds a reported entry through the library.
+FEEDBACK_SERVICE: tuple[Path, str] = (
+    REPO_ROOT / "services" / "feedback",
+    "app.main:app",
+)
 
 # The model-serving service, and the test double that replaces it in the
 # generation-loop stack. The double speaks the same internal endpoints (C-004,
@@ -120,6 +147,13 @@ NOTIFICATION_SERVICE: tuple[Path, str] = (
     "app.main:app",
 )
 PUSH_STUB: tuple[Path, str] = (REPO_ROOT / "tests", "push_stub:app")
+
+# The analytics event intake (C-007), booted on the client path so the shipped
+# gateway routes a reader's events to a real intake rather than an absent port.
+ANALYTICS_SERVICE: tuple[Path, str] = (
+    REPO_ROOT / "services" / "analytics",
+    "app.main:app",
+)
 
 INTERNAL_AUDIENCE = "scenova-internal"
 CORRELATION_HEADER = "x-correlation-id"
@@ -140,10 +174,30 @@ def _service_env(name: str, ports: Mapping[str, int]) -> dict[str, str]:
 
     env = dict(os.environ)
     env.pop("GEMINI_API_KEY", None)
+    # The gate exercises the pre-account dev verifier (D-011): every request
+    # presents a pseudonymous `dev:<subject>` token and the review surface a
+    # `dev:curator:mfa:<subject>` operator token. Pin the mode here so a
+    # developer's ambient environment, which may verify real Firebase ID tokens,
+    # cannot leak into the run and 401 the suite. `ci/checks/qa.sh` pins the same
+    # value for the same reason.
+    env["AUTH_MODE"] = "dev"
     if name == "gateway":
         env["LOOKUP_PORT"] = str(ports["lookup"])
+        if "analytics" in ports:
+            env["ANALYTICS_PORT"] = str(ports["analytics"])
         if "notification" in ports:
             env["NOTIFICATION_PORT"] = str(ports["notification"])
+        if "feedback" in ports:
+            # The gateway routes the reader's rating and report (C-012, C-013) and
+            # the curator's review calls (C-014 to C-016) to the feedback service.
+            env["FEEDBACK_PORT"] = str(ports["feedback"])
+    elif name == "feedback":
+        # The intake confirms a lookup (C-012, C-013) and holds a reported entry
+        # through the library (C-011); a curator's replace or edit_phrase hands a
+        # regeneration job to the pipeline (C-016).
+        env["LOOKUP_PORT"] = str(ports["lookup"])
+        env["LIBRARY_PORT"] = str(ports["library"])
+        env["PIPELINE_PORT"] = str(ports["pipeline"])
     elif name == "lookup":
         env["PIPELINE_PORT"] = str(ports["pipeline"])
         env["LIBRARY_PORT"] = str(ports["library"])
@@ -303,7 +357,7 @@ def _boot(
 def stack(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Stack]:
     """Boot the client-path stack; the model provider is unavailable."""
 
-    entries = {**SERVICES, "model": MODEL_SERVICE}
+    entries = {**SERVICES, "analytics": ANALYTICS_SERVICE, "model": MODEL_SERVICE}
     with _boot(entries, PORTS, tmp_path_factory) as booted:
         yield booted
 
@@ -338,6 +392,25 @@ def notify_stack(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Stack]:
         "push": PUSH_STUB,
     }
     with _boot(entries, NOTIFY_PORTS, tmp_path_factory) as booted:
+        yield booted
+
+
+@pytest.fixture(scope="session")
+def review_stack(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Stack]:
+    """Boot the review path: the client path plus the feedback service and a model double.
+
+    The feedback service carries the reader's rating and report intake (C-012,
+    C-013) and the curator review surface (C-014 to C-016). The model provider is
+    the local double, so a word lookup produces a real clip a reader can rate and
+    report, and a curator's replace or edit_phrase has a generation to hand off.
+    """
+
+    entries = {
+        **SERVICES,
+        "feedback": FEEDBACK_SERVICE,
+        "model": MODEL_STUB,
+    }
+    with _boot(entries, REVIEW_PORTS, tmp_path_factory) as booted:
         yield booted
 
 
@@ -434,4 +507,36 @@ def notify_library(notify_stack: Stack) -> Iterator[httpx2.Client]:
     """A library client for the notification-path stack."""
 
     with httpx2.Client(base_url=notify_stack.url("library"), timeout=10.0) as client:
+        yield client
+
+
+@pytest.fixture()
+def review_gateway(review_stack: Stack) -> Iterator[httpx2.Client]:
+    """A gateway client for the review-path stack (C-001, C-012, C-013, C-014 to C-016)."""
+
+    with httpx2.Client(base_url=review_stack.url("gateway"), timeout=10.0) as client:
+        yield client
+
+
+@pytest.fixture()
+def review_library(review_stack: Stack) -> Iterator[httpx2.Client]:
+    """A library client for the review-path stack (C-009, C-010, C-011)."""
+
+    with httpx2.Client(base_url=review_stack.url("library"), timeout=10.0) as client:
+        yield client
+
+
+@pytest.fixture()
+def review_model_stub(review_stack: Stack) -> Iterator[httpx2.Client]:
+    """A client for the review-path stack's model-provider double."""
+
+    with httpx2.Client(base_url=review_stack.url("model"), timeout=10.0) as client:
+        yield client
+
+
+@pytest.fixture()
+def review_feedback(review_stack: Stack) -> Iterator[httpx2.Client]:
+    """A client for the feedback service, addressed directly (C-012 to C-016)."""
+
+    with httpx2.Client(base_url=review_stack.url("feedback"), timeout=10.0) as client:
         yield client
