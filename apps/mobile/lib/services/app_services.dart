@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../config.dart';
@@ -32,6 +33,7 @@ import 'report_outbox.dart';
 import 'report_store.dart';
 import 'reported_clip_store.dart';
 import 'reported_clip_watch.dart';
+import 'revenuecat_store.dart';
 import 'saved_clip_keeper.dart';
 import 'settings_controller.dart';
 import 'settings_store.dart';
@@ -200,7 +202,24 @@ class ScenovaServices {
             baseUrl: AppConfig.apiBaseUrl,
             idTokenProvider: identity.idToken,
           );
-    final purchases = MockPurchaseService();
+    // The store (`FEAT-013`). A release build must carry the store client
+    // configuration the build path bakes in (`ci/build_app.sh`): without it every
+    // purchase would be scripted and nothing could be sold, so it fails here
+    // where the cause is visible. A development run without the configuration,
+    // and the preview gallery, use the scripted store so the purchasing,
+    // purchase-failed, and store-unreachable states can be viewed.
+    if (kReleaseMode && !AppConfig.useMockPurchases) {
+      StoreConfig.ensureConfigured();
+    }
+    final catalog = StoreConfig.catalog;
+    final purchases = AppConfig.useMockPurchases || catalog == null
+        ? MockPurchaseService()
+        : RevenueCatPurchaseService(
+            sdk: RevenueCatStoreSdk(),
+            apiKey: StoreConfig.sdkKey!,
+            catalog: catalog,
+            appUserId: identity.accountId,
+          );
 
     // The reader's plan (`C-018`): read from the entitlement service at launch
     // and on each return to the foreground, or fixed where a caller supplied one

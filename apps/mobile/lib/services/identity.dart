@@ -16,6 +16,16 @@ abstract interface class IdentityProvider {
   /// The token for the `Authorization: Bearer` header, or null when no identity
   /// is available. Refreshed per request.
   Future<String?> idToken();
+
+  /// The account the identity belongs to, as the services know it: the token's
+  /// subject, which is the account the entitlement service holds and the one a
+  /// store purchase is attributed to (`C-019` `accountId`). Null when no
+  /// identity is available.
+  ///
+  /// The reader's identity is upgraded in place at sign-in (D-011), so this is
+  /// the anonymous install's subject before sign-in and the account's after,
+  /// with no separate call to make at either point.
+  Future<String?> accountId();
 }
 
 /// The pre-account identity for local runs.
@@ -38,6 +48,9 @@ class AnonymousIdentity implements IdentityProvider {
 
   @override
   Future<String?> idToken() async => 'dev:$_subject';
+
+  @override
+  Future<String?> accountId() async => _subject;
 
   /// Adopts the reader's account subject at sign-in, so the identity the
   /// gateway sees is upgraded in place (D-011).
@@ -80,6 +93,13 @@ class FirebaseIdentity implements IdentityProvider {
     final auth = await _authInstance();
     final user = auth.currentUser ?? (await auth.signInAnonymously()).user;
     return user?.getIdToken();
+  }
+
+  @override
+  Future<String?> accountId() async {
+    final auth = await _authInstance();
+    final user = auth.currentUser ?? (await auth.signInAnonymously()).user;
+    return user?.uid;
   }
 
   Future<FirebaseAuth> _authInstance() async {

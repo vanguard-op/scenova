@@ -16,6 +16,7 @@ void main() {
       expect(AppConfig.useMockLookupApi, isFalse);
       expect(AppConfig.useMockAnalyticsApi, isFalse);
       expect(AppConfig.useMockPushApi, isFalse);
+      expect(AppConfig.useMockPurchases, isFalse);
     });
 
     test('the development wiring builds the live HTTP intakes', () {
@@ -86,6 +87,83 @@ void main() {
       expect(
         () => AppConfig.ensureSecureGateway('http://10.0.2.2:8080'),
         returnsNormally,
+      );
+    });
+  });
+
+  group('the store client configuration (FEAT-013)', () {
+    test('a build with no store configuration drives no store', () {
+      // A plain development run carries none of the defines the build path bakes
+      // in, so the scripted store stands in rather than a store with no key.
+      expect(StoreConfig.isConfigured, isFalse);
+      expect(StoreConfig.catalog, isNull);
+      expect(StoreConfig.sdkKey, isNull);
+    });
+
+    test('refuses a build that could sell nothing', () {
+      expect(() => StoreConfig.ensureConfigured(), throwsArgumentError);
+    });
+
+    test('takes the key for the store the build ships to', () {
+      expect(
+        StoreConfig.sdkKeyFor(
+          TargetPlatform.iOS,
+          appStoreKey: 'app-store-key',
+          playStoreKey: 'play-store-key',
+        ),
+        'app-store-key',
+      );
+      expect(
+        StoreConfig.sdkKeyFor(
+          TargetPlatform.android,
+          appStoreKey: 'app-store-key',
+          playStoreKey: 'play-store-key',
+        ),
+        'play-store-key',
+      );
+      // No store to buy from elsewhere, and no key is guessed.
+      expect(
+        StoreConfig.sdkKeyFor(
+          TargetPlatform.macOS,
+          appStoreKey: 'app-store-key',
+          playStoreKey: 'play-store-key',
+        ),
+        isNull,
+      );
+    });
+
+    test('a key and the two plans the Paywall sells are all required', () {
+      StoreCatalog? catalogWith({
+        String? key = 'public-key',
+        String proMonthly = 'com.scenova.pro.monthly',
+        String topUp = 'com.scenova.topup.lookups20',
+      }) => StoreConfig.catalogFrom(
+        sdkKey: key,
+        entitlementId: 'pro',
+        offeringId: 'default',
+        proMonthlyId: proMonthly,
+        proAnnualId: 'com.scenova.pro.annual',
+        topUpId: topUp,
+      );
+
+      final catalog = catalogWith();
+      expect(catalog?.proMonthlyId, 'com.scenova.pro.monthly');
+      expect(catalog?.proAnnualId, 'com.scenova.pro.annual');
+      expect(catalog?.topUpId, 'com.scenova.topup.lookups20');
+      expect(catalogWith(key: null), isNull);
+      expect(catalogWith(proMonthly: ''), isNull);
+      expect(catalogWith(topUp: ''), isNull);
+      // The annual plan is the store's option to offer, not a requirement.
+      expect(
+        StoreConfig.catalogFrom(
+          sdkKey: 'public-key',
+          entitlementId: 'pro',
+          offeringId: 'default',
+          proMonthlyId: 'com.scenova.pro.monthly',
+          proAnnualId: '',
+          topUpId: 'com.scenova.topup.lookups20',
+        )?.proAnnualId,
+        isNull,
       );
     });
   });

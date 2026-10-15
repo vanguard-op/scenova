@@ -4,10 +4,13 @@ import 'package:scenova/services/identity.dart';
 
 /// A Firebase user whose anonymous flag and ID token are scripted.
 class _FakeUser implements User {
-  _FakeUser({required this.anonymous, this.token});
+  _FakeUser({required this.anonymous, this.token, this.uid = ''});
 
   final bool anonymous;
   final String? token;
+
+  @override
+  final String uid;
 
   @override
   bool get isAnonymous => anonymous;
@@ -89,6 +92,14 @@ void main() {
       expect(identity.subject, 'account-9');
       expect(await identity.idToken(), 'dev:account-9');
     });
+
+    test('names the same account the gateway resolves the token to', () async {
+      // The subject the token carries is the account the entitlement service
+      // holds, which is what a store purchase is attributed to (C-019).
+      final identity = AnonymousIdentity(subject: 'reader-1');
+
+      expect(await identity.accountId(), 'reader-1');
+    });
   });
 
   group('FirebaseIdentity', () {
@@ -138,6 +149,28 @@ void main() {
       final identity = FirebaseIdentity(authOverride: auth);
 
       expect(await identity.isAccount(), isTrue);
+    });
+
+    test('names the user the store attributes a purchase to', () async {
+      final auth = _FakeAuth(
+        current: _FakeUser(anonymous: false, uid: 'account-9'),
+      );
+      final identity = FirebaseIdentity(authOverride: auth);
+
+      expect(await identity.accountId(), 'account-9');
+      expect(auth.signInCalls, 0);
+    });
+
+    test('adopts an anonymous identity to name the account', () async {
+      // The store is used before the reader has signed in too, so the anonymous
+      // install's own subject is the account until sign-in upgrades it (D-011).
+      final auth = _FakeAuth(
+        signsInAs: _FakeUser(anonymous: true, uid: 'anon-1'),
+      );
+      final identity = FirebaseIdentity(authOverride: auth);
+
+      expect(await identity.accountId(), 'anon-1');
+      expect(auth.signInCalls, 1);
     });
   });
 }

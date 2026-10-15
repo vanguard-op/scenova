@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scenova/services/app_services.dart';
 import 'package:scenova/services/identity.dart';
+import 'package:scenova/services/purchase_service.dart';
 import 'package:scenova/services/push_tokens.dart';
 
 void main() {
@@ -33,6 +34,16 @@ void main() {
       addTearDown(services.dispose);
 
       expect(await services.identity.idToken(), startsWith('dev:'));
+    });
+
+    test('carries the scripted store until the build carries one', () {
+      final services = ScenovaServices.development();
+      addTearDown(services.dispose);
+
+      // A laptop run carries none of the store defines the build path bakes in,
+      // so the purchase states are exercisable without a store; a build that
+      // carries the configuration drives the store client instead (FEAT-013).
+      expect(services.purchases, isA<MockPurchaseService>());
     });
   });
 }

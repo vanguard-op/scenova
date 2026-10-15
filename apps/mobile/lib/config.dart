@@ -84,6 +84,16 @@ abstract final class AppConfig {
     defaultValue: false,
   );
 
+  /// The store client (`FEAT-013`). The build's own store client is driven when
+  /// the build path baked its configuration in; opt into the scripted store with
+  /// `--dart-define=SCENOVA_USE_MOCK_PURCHASES=true`, so the purchasing,
+  /// purchase-failed, and store-unreachable states can be viewed and tested
+  /// without a store.
+  static const bool useMockPurchases = bool.fromEnvironment(
+    'SCENOVA_USE_MOCK_PURCHASES',
+    defaultValue: false,
+  );
+
   /// The hosts that resolve to the developer's own machine, where the local
   /// stack runs over plaintext. `10.0.2.2` is the Android emulator's alias for
   /// the host's loopback interface, so it reaches the same machine as
@@ -276,4 +286,156 @@ abstract final class AppConfig {
     'SCENOVA_ONBOARDING',
     defaultValue: true,
   );
+}
+
+/// The store client configuration the app build bakes in (`FEAT-013`).
+///
+/// RevenueCat wraps StoreKit and Play Billing (D-008), so the client buys through
+/// its SDK and no card data reaches the product (NFR-027). Every value here is an
+/// identifier, not a credential: the public client SDK key for each store, the
+/// entitlement a Pro subscription grants, the offering the Paywall reads, and the
+/// store product catalog from `docs/Scenova/monetization.md` → "Pricing Tiers".
+///
+/// The build path bakes them in as `--dart-define` values (`ci/build_app.sh`, run
+/// by `make build` and `make bundle`), and the define names are the `.env` schema
+/// names, so one name means one thing everywhere. Prices are store-managed and
+/// localized, so none is baked in.
+abstract final class StoreConfig {
+  /// RevenueCat's public client SDK key for the App Store.
+  static const String appStoreSdkKey = String.fromEnvironment(
+    'REVENUECAT_PUBLIC_SDK_KEY_APP_STORE',
+  );
+
+  /// RevenueCat's public client SDK key for the Play Store.
+  static const String playStoreSdkKey = String.fromEnvironment(
+    'REVENUECAT_PUBLIC_SDK_KEY_PLAY_STORE',
+  );
+
+  /// The entitlement a Pro subscription grants, as RevenueCat reports it. It is
+  /// what tells a restore whether the reader holds Pro.
+  static const String entitlementId = String.fromEnvironment(
+    'REVENUECAT_ENTITLEMENT_ID',
+  );
+
+  /// The offering the Paywall reads its packages from.
+  static const String offeringId = String.fromEnvironment(
+    'REVENUECAT_OFFERING_ID',
+  );
+
+  /// The Pro monthly subscription's store product identifier.
+  static const String proMonthlyProductId = String.fromEnvironment(
+    'PRODUCT_PRO_MONTHLY',
+  );
+
+  /// The Pro annual subscription's store product identifier, when the store
+  /// offers one.
+  static const String proAnnualProductId = String.fromEnvironment(
+    'PRODUCT_PRO_ANNUAL',
+  );
+
+  /// The one-time lookup pack's store product identifier.
+  static const String topUpProductId = String.fromEnvironment(
+    'PRODUCT_TOPUP_LOOKUPS',
+  );
+
+  /// The public SDK key for the store this build ships to: the App Store key on
+  /// iOS and the Play Store key on Android. Null elsewhere, where the app has no
+  /// store to buy from.
+  static String? get sdkKey => sdkKeyFor(defaultTargetPlatform);
+
+  /// The SDK key for [platform]'s store, from the keys the build carries.
+  @visibleForTesting
+  static String? sdkKeyFor(
+    TargetPlatform platform, {
+    String appStoreKey = appStoreSdkKey,
+    String playStoreKey = playStoreSdkKey,
+  }) => switch (platform) {
+    TargetPlatform.iOS => _nonEmpty(appStoreKey),
+    TargetPlatform.android => _nonEmpty(playStoreKey),
+    _ => null,
+  };
+
+  /// The catalog the store client reads, or null when this build carries no store
+  /// configuration: no key for its store, or no products to sell.
+  static StoreCatalog? get catalog => catalogFrom(
+    sdkKey: sdkKey,
+    entitlementId: entitlementId,
+    offeringId: offeringId,
+    proMonthlyId: proMonthlyProductId,
+    proAnnualId: proAnnualProductId,
+    topUpId: topUpProductId,
+  );
+
+  /// The catalog the values a build carries describe, or null when any of the
+  /// required ones is missing.
+  @visibleForTesting
+  static StoreCatalog? catalogFrom({
+    required String? sdkKey,
+    required String entitlementId,
+    required String offeringId,
+    required String proMonthlyId,
+    required String proAnnualId,
+    required String topUpId,
+  }) {
+    if (sdkKey == null ||
+        entitlementId.isEmpty ||
+        offeringId.isEmpty ||
+        proMonthlyId.isEmpty ||
+        topUpId.isEmpty) {
+      return null;
+    }
+    return StoreCatalog(
+      entitlementId: entitlementId,
+      offeringId: offeringId,
+      proMonthlyId: proMonthlyId,
+      proAnnualId: _nonEmpty(proAnnualId),
+      topUpId: topUpId,
+    );
+  }
+
+  /// Whether this build carries the store client configuration, so the store is
+  /// driven rather than the scripted stand-in.
+  static bool get isConfigured => catalog != null;
+
+  /// Refuses a build that carries no store configuration.
+  ///
+  /// A build with no key or no products would sell nothing, so it fails here
+  /// where the cause is visible rather than at the reader's first purchase.
+  static void ensureConfigured() {
+    if (isConfigured) return;
+    throw ArgumentError(
+      'The build carries no store client configuration, so nothing could be '
+      'sold. The build path bakes it in (ci/build_app.sh).',
+    );
+  }
+
+  static String? _nonEmpty(String value) => value.isEmpty ? null : value;
+}
+
+/// The store products a build was configured with
+/// (`docs/Scenova/monetization.md` → "Pricing Tiers").
+@immutable
+class StoreCatalog {
+  const StoreCatalog({
+    required this.entitlementId,
+    required this.offeringId,
+    required this.proMonthlyId,
+    required this.proAnnualId,
+    required this.topUpId,
+  });
+
+  /// The entitlement a Pro subscription grants.
+  final String entitlementId;
+
+  /// The offering the Paywall reads its packages from.
+  final String offeringId;
+
+  /// The Pro monthly subscription.
+  final String proMonthlyId;
+
+  /// The Pro annual subscription, or null when the store offers none.
+  final String? proAnnualId;
+
+  /// The one-time lookup pack.
+  final String topUpId;
 }

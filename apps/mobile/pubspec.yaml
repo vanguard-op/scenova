@@ -80,6 +80,18 @@ dependencies:
   # the compile SDK the Flutter toolchain pins.
   permission_handler: ^12.0.3
 
+  # The store client behind the purchase seam (`FEAT-013`): RevenueCat wraps
+  # StoreKit and Play Billing (D-008), so the client buys through its SDK and no
+  # card data reaches the product (NFR-027). The public client SDK key per store,
+  # the Pro entitlement and offering, and the product catalog are baked into the
+  # build as `--dart-define` values (`ci/build_app.sh`).
+  purchases_flutter: ^10.16.0
+
+  # Opens the store's own subscription management, which is where a reader
+  # cancels or changes their plan; the store is the merchant of record and owns
+  # that surface (`docs/Scenova/screens/08-account.md` → "Start or manage plan").
+  url_launcher: ^6.3.3
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
