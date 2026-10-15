@@ -3,15 +3,17 @@ import 'package:scenova_design/scenova_design.dart';
 
 import '../models/entitlement.dart';
 import '../services/app_services.dart';
+import '../widgets/delete_account_dialog.dart';
 import '../widgets/sign_in_sheet.dart';
 import 'account_controller.dart';
 
 /// Screen 8: Account (`docs/Scenova/screens/08-account.md`).
 ///
-/// Sign in, see the plan and the allowance left this month, and manage Pro or a
-/// top-up. The plan card is the visual focus. Every state from the screen spec
-/// is covered: loading, signed out, Free, Pro, Trial, purchasing, purchase
-/// failed, the store unreachable, and the entitlement read failing.
+/// Sign in, see the plan and the allowance left this month, manage Pro or a
+/// top-up, and delete the account. The plan card is the visual focus. Every
+/// state from the screen spec is covered: loading, signed out, Free, Pro,
+/// Trial, purchasing, purchase failed, deleting, the store unreachable, and the
+/// entitlement read failing.
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key, this.controller});
 
@@ -48,6 +50,10 @@ class _AccountScreenState extends State<AccountScreen> {
       session: services.accountSession,
       purchases: services.purchases,
       plan: services.entitlements,
+      accountApi: services.accountApi,
+      history: services.historyStore,
+      clips: services.clips,
+      posterFrames: services.posterFrames,
       accountPreferences: services.accountPreferences,
     );
     _controller = controller;
@@ -76,6 +82,28 @@ class _AccountScreenState extends State<AccountScreen> {
     final signedIn = await showSignInSheet(context);
     if (!mounted || !signedIn) return;
     await controller.signedIn();
+  }
+
+  /// Confirms the deletion, then leaves Account for the landing surface
+  /// (`docs/Scenova/user-flow.md` → Flow 8).
+  ///
+  /// The dialog holds the reader until the deletion resolves; a deletion that
+  /// did not complete stays in the dialog with a retry and the account is
+  /// unchanged. Once the account is gone the reader is signed out, so Account
+  /// is left and Home is the landing surface in its signed-out state.
+  Future<void> _confirmDeleteAccount() async {
+    final controller = _controller;
+    if (controller == null) return;
+    final outcome = await showDialog<AccountDeletionOutcome>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => DeleteAccountDialog(
+        hasActiveSubscription: controller.hasActiveSubscription,
+        onDelete: controller.deleteAccount,
+      ),
+    );
+    if (!mounted || outcome is! AccountDeleted) return;
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   @override
@@ -114,6 +142,7 @@ class _AccountScreenState extends State<AccountScreen> {
         return _Plan(
           controller: controller,
           entitlement: controller.entitlement ?? Entitlement.signedOut,
+          onDelete: _confirmDeleteAccount,
         );
     }
   }
@@ -159,13 +188,20 @@ class _SignedOut extends StatelessWidget {
   }
 }
 
-/// The signed-in state: the plan card, the primary action, and the two
-/// secondary rows (`docs/Scenova/screens/08-account.md` → Layout).
+/// The signed-in state: the plan card, the primary action, and the tertiary
+/// rows (`docs/Scenova/screens/08-account.md` → Layout).
 class _Plan extends StatelessWidget {
-  const _Plan({required this.controller, required this.entitlement});
+  const _Plan({
+    required this.controller,
+    required this.entitlement,
+    required this.onDelete,
+  });
 
   final AccountController controller;
   final Entitlement entitlement;
+
+  /// Confirms the account's deletion (`C-021`).
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -207,6 +243,13 @@ class _Plan extends StatelessWidget {
           variant: ScenovaButtonVariant.ghost,
           expanded: true,
           onPressed: controller.busy ? null : controller.signOut,
+        ),
+        SizedBox(height: tokens.spacing.sm),
+        ScenovaButton(
+          label: 'Delete account',
+          variant: ScenovaButtonVariant.ghost,
+          expanded: true,
+          onPressed: controller.busy ? null : onDelete,
         ),
       ],
     );

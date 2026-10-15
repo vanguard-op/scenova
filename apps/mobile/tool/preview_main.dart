@@ -62,6 +62,7 @@ import 'package:scenova/services/settings_controller.dart';
 import 'package:scenova/services/tier_gates.dart';
 import 'package:scenova/theme/app_theme.dart';
 import 'package:scenova/widgets/clear_history_dialog.dart';
+import 'package:scenova/widgets/delete_account_dialog.dart';
 import 'package:scenova/widgets/paywall_sheet.dart';
 import 'package:scenova/widgets/report_sheet.dart';
 import 'package:scenova/widgets/sign_in_sheet.dart';
@@ -507,6 +508,35 @@ List<(String, Widget)> _frames() {
         drive: _SignInDrive.attempt,
       ),
     ),
+    (
+      'Account — delete account (the confirmation)',
+      _deleteAccountDialog(plan: _freePreview),
+    ),
+    (
+      'Account — delete account, active subscription',
+      _deleteAccountDialog(plan: _proPreview),
+    ),
+    (
+      'Account — delete account, in flight',
+      _deleteAccountDialog(
+        plan: _freePreview,
+        accountApi: MockAccountApi(latency: const Duration(minutes: 5)),
+        drive: _DeleteDrive.confirm,
+      ),
+    ),
+    (
+      'Account — delete account, could not be deleted',
+      _deleteAccountDialog(
+        plan: _freePreview,
+        accountApi: MockAccountApi(
+          error: const AccountApiException(
+            503,
+            'Your account is unavailable right now.',
+          ),
+        ),
+        drive: _DeleteDrive.confirm,
+      ),
+    ),
     ('Paywall — allowance exhausted (default)', _paywall()),
     (
       'Paywall — purchasing',
@@ -785,6 +815,10 @@ Widget _account({
     session: services.accountSession,
     purchases: services.purchases,
     plan: services.entitlements,
+    accountApi: services.accountApi,
+    history: services.historyStore,
+    clips: services.clips,
+    posterFrames: services.posterFrames,
     accountPreferences: services.accountPreferences,
   );
   return ScenovaScope(
@@ -826,6 +860,140 @@ class _PreviewAccountState extends State<_PreviewAccount> {
   @override
   Widget build(BuildContext context) =>
       AccountScreen(controller: widget.controller);
+}
+
+/// The Free plan a signed-in reader sees, for the Account frames. Tooling only.
+const Entitlement _freePreview = Entitlement(
+  tier: PlanTier.free,
+  signedIn: true,
+  lookupsUsed: 12,
+  lookupsLimit: 20,
+);
+
+/// The Pro plan, for the frames that show an active store subscription.
+/// Tooling only.
+const Entitlement _proPreview = Entitlement(
+  tier: PlanTier.pro,
+  signedIn: true,
+  lookupsUsed: 8,
+  lookupsLimit: 50,
+);
+
+/// The Account screen with the delete-account confirmation over it
+/// (`docs/Scenova/screens/08-account.md` → Overlays).
+///
+/// [drive] confirms the deletion once the dialog is up, so the states that
+/// follow a confirmation — the deletion in flight and a deletion that did not
+/// complete — are on screen for the frame. Tooling only.
+Widget _deleteAccountDialog({
+  required Entitlement plan,
+  AccountApi? accountApi,
+  _DeleteDrive drive = _DeleteDrive.none,
+}) {
+  final services = _services(
+    entitlementsApi: MockEntitlementApi(plan: plan),
+    accountApi: accountApi,
+    accountSession: DevelopmentAccountSession(signedIn: true),
+  );
+  return ScenovaScope(
+    services: services,
+    child: _PreviewDeleteDialog(services: services, drive: drive),
+  );
+}
+
+/// What a delete-account preview does once the confirmation is up.
+enum _DeleteDrive { none, confirm }
+
+/// Opens the delete-account confirmation over the Account screen and drives it
+/// through the state the gallery needs to show. Tooling only.
+class _PreviewDeleteDialog extends StatefulWidget {
+  const _PreviewDeleteDialog({required this.services, required this.drive});
+
+  final ScenovaServices services;
+  final _DeleteDrive drive;
+
+  @override
+  State<_PreviewDeleteDialog> createState() => _PreviewDeleteDialogState();
+}
+
+class _PreviewDeleteDialogState extends State<_PreviewDeleteDialog> {
+  late final AccountController _controller = AccountController(
+    entitlements: widget.services.entitlementsApi,
+    session: widget.services.accountSession,
+    purchases: widget.services.purchases,
+    plan: widget.services.entitlements,
+    accountApi: widget.services.accountApi,
+    history: widget.services.historyStore,
+    clips: widget.services.clips,
+    posterFrames: widget.services.posterFrames,
+    accountPreferences: widget.services.accountPreferences,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _open());
+  }
+
+  Future<void> _open() async {
+    await _controller.load();
+    if (!mounted) return;
+    unawaited(
+      showDialog<AccountDeletionOutcome>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => DeleteAccountDialog(
+          hasActiveSubscription: _controller.hasActiveSubscription,
+          onDelete: _controller.deleteAccount,
+        ),
+      ),
+    );
+    if (widget.drive == _DeleteDrive.none) return;
+    // The dialog settles before its action is taken.
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    if (!mounted) return;
+    _tapDeleteAction();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AccountScreen(controller: _controller);
+}
+
+/// Taps the confirmation's own destructive action, so a frame can show the
+/// state that follows a confirmation. The search is scoped to the dialog, so
+/// the Delete-account row on the screen behind it is never the one taken.
+/// Tooling only.
+void _tapDeleteAction() {
+  Element? dialog;
+  void findDialog(Element element) {
+    if (dialog != null) return;
+    if (element.widget is DeleteAccountDialog) {
+      dialog = element;
+      return;
+    }
+    element.visitChildren(findDialog);
+  }
+
+  WidgetsBinding.instance.rootElement?.visitChildren(findDialog);
+  final root = dialog;
+  if (root == null) return;
+
+  void tap(Element element) {
+    final widget = element.widget;
+    if (widget is ScenovaButton && widget.label == 'Delete account') {
+      widget.onPressed?.call();
+      return;
+    }
+    element.visitChildren(tap);
+  }
+
+  root.visitChildren(tap);
 }
 
 /// The sign-in sheet over the Account screen's signed-out prompt

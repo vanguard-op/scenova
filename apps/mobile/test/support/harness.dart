@@ -286,6 +286,9 @@ Future<ScenovaServices> pumpAccount(
   AccountApi? accountApi,
   SettingsController? settings,
   PurchaseService? purchases,
+  HistoryStore? history,
+  ClipStore? clips,
+  PosterFrameStore? posterFrames,
   bool online = true,
 }) async {
   usePhoneWindow(tester);
@@ -295,6 +298,9 @@ Future<ScenovaServices> pumpAccount(
     accountApi: accountApi,
     settings: settings,
     purchases: purchases,
+    history: history,
+    clips: clips,
+    posterFrames: posterFrames,
     online: online,
   );
   await tester.pumpWidget(

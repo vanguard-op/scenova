@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 
 import '../config.dart';
 
-/// An account-write failure, mapped from `C-020`'s error set.
+/// An account failure, mapped from `C-020`, `C-021`, and `C-022`'s error sets.
 ///
 /// `statusCode` is `0` for a transport failure — no connection or a timeout —
 /// which the presentation layer reads as the account being unreachable.
@@ -19,11 +19,13 @@ class AccountApiException implements Exception {
   /// The machine-readable code when the service sends one.
   final String? code;
 
-  /// The caller holds no account (`C-020`, 401). The reader's choice is held on
-  /// the device alone, which is the signed-out case rather than a failure.
+  /// The caller holds no account (`C-020`/`C-021`, 401). The reader's choice is
+  /// held on the device alone, which is the signed-out case rather than a
+  /// failure.
   bool get isSignedOut => statusCode == 401;
 
-  /// The account store could not be reached (`C-020`, 503, or no connection).
+  /// The account store could not be reached (`C-020`/`C-021`, 503, or no
+  /// connection).
   bool get isUnavailable => statusCode == 0 || statusCode >= 500;
 
   /// The write was refused outright (`C-020`, 400).
@@ -74,6 +76,18 @@ abstract interface class AccountApi {
   /// A reader who is not signed in holds both on the device and never calls
   /// this; the service answers a token with no account with `C-022`'s 401.
   Future<AccountPreferences> read();
+
+  /// `DELETE /v1/account`. The account and its entitlement are removed and the
+  /// reader's personal data is deleted within the documented window; the shared
+  /// library is unchanged (`C-021`).
+  ///
+  /// An active store subscription is not cancelled by the product, so the
+  /// caller tells the reader to cancel it in the store. After deletion the
+  /// token's subject has no account, so the caller signs out and clears the
+  /// device history.
+  ///
+  /// Resolves the service's `deleted` flag.
+  Future<bool> deleteAccount();
 }
 
 /// Talks to the gateway over HTTP.
@@ -121,6 +135,17 @@ class HttpAccountApi implements AccountApi {
     return _decode(response);
   }
 
+  @override
+  Future<bool> deleteAccount() async {
+    final response = await _send(
+      () async => _client.delete(
+        Uri.parse('$baseUrl/v1/account'),
+        headers: await _headers(),
+      ),
+    );
+    return _decodeDeletion(response);
+  }
+
   Future<Map<String, String>> _headers() async {
     String? token;
     try {
@@ -160,6 +185,24 @@ class HttpAccountApi implements AccountApi {
       return AccountPreferences.fromJson(body);
     }
     throw _mapError(status, response.body);
+  }
+
+  /// Reads `C-021`'s 202 body. A 202 means the account was removed; a body the
+  /// client cannot read is not read as a failure, since the status already
+  /// answered.
+  bool _decodeDeletion(http.Response response) {
+    final status = response.statusCode;
+    if (status < 200 || status >= 300) {
+      throw _mapError(status, response.body);
+    }
+    if (response.body.isEmpty) return true;
+    try {
+      final body = jsonDecode(response.body);
+      if (body is! Map<String, dynamic>) return true;
+      return body['deleted'] as bool? ?? true;
+    } on FormatException {
+      return true;
+    }
   }
 
   /// Maps an error response to a failure, reading the contract's
@@ -224,6 +267,9 @@ class MockAccountApi implements AccountApi {
   /// How many reads the store answered (`C-022`).
   int reads = 0;
 
+  /// How many deletions reached the store (`C-021`).
+  int deletions = 0;
+
   @override
   Future<AccountPreferences> update({
     bool? consentModelProcessing,
@@ -266,5 +312,19 @@ class MockAccountApi implements AccountApi {
       consentModelProcessing: consentModelProcessing,
       locale: locale,
     );
+  }
+
+  @override
+  Future<bool> deleteAccount() async {
+    if (latency != Duration.zero) {
+      await Future<void>.delayed(latency);
+    }
+    if (signedOut) {
+      throw const AccountApiException(401, 'Sign in to delete your account.');
+    }
+    final failure = error;
+    if (failure != null) throw failure;
+    deletions++;
+    return true;
   }
 }

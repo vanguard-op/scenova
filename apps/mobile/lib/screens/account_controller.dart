@@ -1,10 +1,14 @@
 import 'package:flutter/foundation.dart';
 
 import '../models/entitlement.dart';
+import '../services/account_api.dart';
 import '../services/account_preferences_sync.dart';
 import '../services/account_session.dart';
+import '../services/clip_store.dart';
 import '../services/entitlement_api.dart';
 import '../services/entitlement_provider.dart';
+import '../services/history_store.dart';
+import '../services/poster_frame_store.dart';
 import '../services/purchase_service.dart';
 
 /// What the Account screen is showing.
@@ -22,25 +26,59 @@ enum AccountStatus {
   error,
 }
 
+/// The outcome of a deletion the reader confirmed (`C-021`).
+sealed class AccountDeletionOutcome {
+  const AccountDeletionOutcome();
+}
+
+/// The account and its entitlement were removed and the reader is signed out.
+final class AccountDeleted extends AccountDeletionOutcome {
+  const AccountDeleted();
+}
+
+/// The deletion did not complete, so the account is unchanged. [message] is the
+/// reader-facing reason the confirmation offers a retry against.
+final class AccountDeletionFailed extends AccountDeletionOutcome {
+  const AccountDeletionFailed(this.message);
+
+  final String message;
+}
+
 /// Owns the Account screen's state (`docs/Scenova/screens/08-account.md`).
 ///
 /// It reads the entitlement from the service (`C-018`), drives the store's
-/// purchase, management, and restore through [PurchaseService], and signs in
-/// and out through [AccountSession]. A purchase the store could not complete
-/// leaves the plan on screen unchanged and carries a reader-facing message and
-/// a retry.
+/// purchase, management, and restore through [PurchaseService], signs in and
+/// out through [AccountSession], and deletes the account through [AccountApi]
+/// (`C-021`). A purchase the store could not complete leaves the plan on screen
+/// unchanged and carries a reader-facing message and a retry.
 class AccountController extends ChangeNotifier {
   AccountController({
     required this.entitlements,
     required this.session,
     required this.purchases,
     required this.plan,
+    required this.accountApi,
+    required this.history,
+    required this.clips,
+    required this.posterFrames,
     this.accountPreferences,
   });
 
   final EntitlementApi entitlements;
   final AccountSession session;
   final PurchaseService purchases;
+
+  /// The account store, for the reader's own deletion (`C-021`).
+  final AccountApi accountApi;
+
+  /// The device's lookup history, which a confirmed deletion clears.
+  final HistoryStore history;
+
+  /// The clips the device keeps beside the history, cleared with it.
+  final ClipStore clips;
+
+  /// The poster frames the device derives for the history, cleared with it.
+  final PosterFrameStore posterFrames;
 
   /// Reads the account's stored consent and selection-action language onto this
   /// device when the reader signs in (`C-022`). Absent in a bare controller
@@ -79,6 +117,19 @@ class AccountController extends ChangeNotifier {
 
   /// Whether the reader can retry the last action that failed.
   bool get canRetry => _retry != null;
+
+  /// Whether the reader holds a plan the store granted, so the deletion
+  /// confirmation says billing continues there until the subscription is
+  /// cancelled.
+  ///
+  /// The plan the entitlement service reports is the one the store set
+  /// (`C-019`): Pro and its trial are store subscriptions, while a Free reader
+  /// holds none. The product never cancels a subscription itself, so the
+  /// reader is told to cancel it in the store (`C-021`).
+  bool get hasActiveSubscription {
+    final entitlement = _entitlement;
+    return entitlement != null && (entitlement.isPro || entitlement.isTrial);
+  }
 
   /// Reads the entitlement (`C-018`).
   ///
@@ -126,6 +177,70 @@ class AccountController extends ChangeNotifier {
       _fail('Signing out did not work. Try again.');
     } finally {
       _endAction();
+    }
+  }
+
+  /// Deletes the reader's account and its entitlement (`C-021`).
+  ///
+  /// On confirmation the account is removed, the reader's device history — the
+  /// saved lookups, their clips, and their poster frames — is cleared, and the
+  /// reader is signed out; the shared library is untouched
+  /// (`docs/Scenova/user-flow.md` → Flow 8). The plan cache is dropped so the
+  /// device-local guest allowance applies, and the screen returns to its
+  /// signed-out state.
+  ///
+  /// A deletion that does not complete leaves the account unchanged and
+  /// resolves with the reader-facing reason, so the confirmation can offer a
+  /// retry.
+  Future<AccountDeletionOutcome> deleteAccount() async {
+    _beginAction();
+    try {
+      final deleted = await accountApi.deleteAccount();
+      if (!deleted) return const AccountDeletionFailed(_deleteFailed);
+      // The device's own copy is cleared after the account is gone, so a
+      // deletion that did not complete leaves the reader's history intact.
+      await _clearDeviceHistory();
+      await session.signOut();
+      _entitlement = Entitlement.signedOut;
+      _status = AccountStatus.signedOut;
+      // The gates fall back to the signed-out plan at once, so the device-local
+      // guest allowance applies without waiting on the service (`FEAT-013`).
+      plan.clear();
+      return const AccountDeleted();
+    } on AccountApiException catch (error) {
+      // The account service could not be reached, or the caller no longer holds
+      // an account: the deletion did not complete and the reader can retry
+      // (`docs/Scenova/screens/08-account.md` → Edge Cases).
+      return AccountDeletionFailed(
+        error.isUnavailable ? _deleteUnreachable : _deleteFailed,
+      );
+    } on Object {
+      return const AccountDeletionFailed(_deleteFailed);
+    } finally {
+      _endAction();
+    }
+  }
+
+  /// The reader-facing reason a deletion did not complete.
+  static const String _deleteFailed =
+      'Your account could not be deleted. Try again.';
+
+  /// The same, for a device or account store that could not be reached.
+  static const String _deleteUnreachable =
+      'Your account could not be deleted. Check your connection and try again.';
+
+  /// Removes the lookups, clips, and poster frames the device holds.
+  ///
+  /// Best-effort: the account is already gone by the time this runs, so a
+  /// device that refuses its own write never turns a completed deletion into a
+  /// failure the reader is told about.
+  Future<void> _clearDeviceHistory() async {
+    try {
+      await history.clear();
+      await clips.clear();
+      await posterFrames.clear();
+    } on Object {
+      // The reader is still signed out; the local copy is the device's own.
     }
   }
 

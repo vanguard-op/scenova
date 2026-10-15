@@ -195,6 +195,88 @@ void main() {
         );
       },
     );
+
+    test('deletes the account with the bearer token', () async {
+      late http.Request captured;
+      final api = apiReturning((request) async {
+        captured = request;
+        return http.Response(
+          jsonEncode(<String, dynamic>{'deleted': true}),
+          202,
+        );
+      });
+
+      final deleted = await api.deleteAccount();
+
+      expect(captured.method, 'DELETE');
+      expect(captured.url.toString(), 'https://gateway.test/v1/account');
+      expect(captured.headers['authorization'], 'Bearer token-1');
+      expect(deleted, isTrue);
+    });
+
+    test(
+      'a deletion the service answered with no body still deleted',
+      () async {
+        final api = apiReturning((_) async => http.Response('', 202));
+
+        expect(await api.deleteAccount(), isTrue);
+      },
+    );
+
+    test('a deletion a 401 answers reads as signed out', () async {
+      final api = apiReturning((_) async => http.Response('{}', 401));
+
+      await expectLater(
+        api.deleteAccount(),
+        throwsA(
+          isA<AccountApiException>().having(
+            (error) => error.isSignedOut,
+            'isSignedOut',
+            isTrue,
+          ),
+        ),
+      );
+    });
+
+    test(
+      'a deletion the account store cannot answer reads as unavailable',
+      () async {
+        final api = apiReturning((_) async => http.Response('{}', 503));
+
+        await expectLater(
+          api.deleteAccount(),
+          throwsA(
+            isA<AccountApiException>().having(
+              (error) => error.isUnavailable,
+              'isUnavailable',
+              isTrue,
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'a deletion that never reached the service reads as unavailable',
+      () async {
+        final api = HttpAccountApi(
+          baseUrl: 'https://gateway.test',
+          idTokenProvider: () async => 'token-1',
+          client: MockClient(
+            (_) async => throw http.ClientException('no route'),
+          ),
+        );
+
+        await expectLater(
+          api.deleteAccount(),
+          throwsA(
+            isA<AccountApiException>()
+                .having((error) => error.isUnavailable, 'isUnavailable', isTrue)
+                .having((error) => error.isSignedOut, 'isSignedOut', isFalse),
+          ),
+        );
+      },
+    );
   });
 
   group('MockAccountApi', () {
@@ -232,6 +314,31 @@ void main() {
           ),
         ),
       );
+    });
+
+    test('records a deletion and answers it', () async {
+      final api = MockAccountApi();
+
+      expect(await api.deleteAccount(), isTrue);
+      expect(api.deletions, 1);
+    });
+
+    test('answers a deletion with the failure it was given', () async {
+      final api = MockAccountApi(
+        error: const AccountApiException(503, 'Your account is unavailable.'),
+      );
+
+      await expectLater(
+        api.deleteAccount(),
+        throwsA(
+          isA<AccountApiException>().having(
+            (error) => error.isUnavailable,
+            'isUnavailable',
+            isTrue,
+          ),
+        ),
+      );
+      expect(api.deletions, 0);
     });
   });
 }
