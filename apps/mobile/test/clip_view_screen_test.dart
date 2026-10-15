@@ -11,6 +11,7 @@ import 'package:scenova/screens/clip_view_screen.dart';
 import 'package:scenova/services/app_services.dart';
 import 'package:scenova/services/capture_intake.dart';
 import 'package:scenova/services/clip_notice_source.dart';
+import 'package:scenova/services/clip_store.dart';
 import 'package:scenova/services/feature_flags.dart';
 import 'package:scenova/services/history_store.dart';
 import 'package:scenova/services/lookup_api.dart';
@@ -134,6 +135,73 @@ void main() {
     await tester.pump();
 
     expect((await services.historyStore.all()).single.posterLocalKey, isNull);
+    await teardown(tester);
+  });
+
+  testWidgets('a lookup that resolves keeps the clip on the device', (
+    tester,
+  ) async {
+    final clips = InMemoryClipStore(
+      onSave: (clipUrl) async => 'file:///device/come.mp4',
+    );
+    final services = buildServices(api: MockLookupApi(), clips: clips);
+    final controller = controllerFor(services, 'come');
+    addTearDown(controller.dispose);
+
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+    await tester.pump();
+
+    final saved = (await services.historyStore.all()).single;
+    // The clip itself is kept as the entry is stored and keyed to it, so it
+    // replays with no connection (`FEAT-009`).
+    expect(saved.clipLocalKey, saved.id);
+    expect(await clips.source(saved.id), 'file:///device/come.mp4');
+    await teardown(tester);
+  });
+
+  testWidgets('a clip the device cannot keep leaves the entry on its source', (
+    tester,
+  ) async {
+    // The default in-memory store keeps nothing, as a fetch the device cannot
+    // complete does not; the entry still carries the source it was served from.
+    final services = buildServices(api: MockLookupApi());
+    final controller = controllerFor(services, 'come');
+    addTearDown(controller.dispose);
+
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+    await tester.pump();
+
+    final saved = (await services.historyStore.all()).single;
+    expect(saved.clipLocalKey, isNull);
+    expect(saved.clipUrl, isNotNull);
+    await teardown(tester);
+  });
+
+  testWidgets('an entry whose clip the device no longer holds falls back', (
+    tester,
+  ) async {
+    // The entry names a clip the device store does not hold and has no source
+    // to fall back on, so there is nothing to replay.
+    final services = buildServices(api: MockLookupApi());
+    final controller = ClipViewController(
+      services: services,
+      selection: CaptureSelection.parse('come'),
+      savedEntry: seededEntry(
+        word: 'come',
+        phrase: 'to move towards someone',
+        clipLocalKey: 'gone',
+      ),
+    );
+    addTearDown(controller.dispose);
+
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+    await tester.pump();
+
+    expect(controller.phase, ClipPhase.fallback);
+    expect(find.text('No clip for this word yet.'), findsOneWidget);
     await teardown(tester);
   });
 
@@ -567,15 +635,19 @@ void main() {
   testWidgets('offline with a saved clip replays it from the device', (
     tester,
   ) async {
+    // The device kept the clip itself, so it replays with no connection.
     final services = buildServices(
       api: MockLookupApi(),
       online: false,
+      clips: InMemoryClipStore(
+        seed: <String, String>{'seed-come': 'file:///device/come.mp4'},
+      ),
       history: InMemoryHistoryStore(
         seed: <HistoryEntry>[
           seededEntry(
             word: 'come',
             phrase: 'to move towards someone',
-            clipUrl: 'device://come',
+            clipLocalKey: 'seed-come',
           ),
         ],
       ),
@@ -588,6 +660,7 @@ void main() {
     await tester.pump();
 
     expect(controller.phase, ClipPhase.playing);
+    expect(controller.clip?.url, 'file:///device/come.mp4');
     expect(find.text('to move towards someone'), findsOneWidget);
     await teardown(tester);
   });
@@ -601,12 +674,15 @@ void main() {
     final services = buildServices(
       api: MockLookupApi(),
       online: false,
+      clips: InMemoryClipStore(
+        seed: <String, String>{'seed-come': 'file:///device/come.mp4'},
+      ),
       history: InMemoryHistoryStore(
         seed: <HistoryEntry>[
           seededEntry(
             word: 'come',
             phrase: 'to move towards someone',
-            clipUrl: 'device://come',
+            clipLocalKey: 'seed-come',
           ),
         ],
       ),
@@ -904,13 +980,18 @@ void main() {
     final services = buildServices(
       api: MockLookupApi(),
       online: false,
+      clips: InMemoryClipStore(
+        seed: <String, String>{
+          'seed-once in a while': 'file:///device/once-in-a-while.mp4',
+        },
+      ),
       history: InMemoryHistoryStore(
         seed: <HistoryEntry>[
           seededEntry(
             word: 'once in a while',
             phrase: 'once in a while',
             kind: LookupKind.phrase,
-            clipUrl: 'device://once-in-a-while',
+            clipLocalKey: 'seed-once in a while',
           ),
         ],
       ),
@@ -923,6 +1004,7 @@ void main() {
     await tester.pump();
 
     expect(controller.phase, ClipPhase.playing);
+    expect(controller.clip?.url, 'file:///device/once-in-a-while.mp4');
     expect(find.text('once in a while'), findsWidgets);
     await teardown(tester);
   });

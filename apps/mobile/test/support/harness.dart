@@ -19,6 +19,7 @@ import 'package:scenova/services/app_services.dart';
 import 'package:scenova/services/capture_channel.dart';
 import 'package:scenova/services/clip_notice_inbox.dart';
 import 'package:scenova/services/clip_notice_source.dart';
+import 'package:scenova/services/clip_store.dart';
 import 'package:scenova/services/connectivity.dart';
 import 'package:scenova/services/entitlement_provider.dart';
 import 'package:scenova/services/feature_flags.dart';
@@ -58,6 +59,7 @@ ScenovaServices buildServices({
   ReportApi? reportApi,
   PendingReportStore? reportStore,
   PosterFrameStore? posterFrames,
+  ClipStore? clips,
   String locale = 'en',
 }) {
   final connectivity = ManualConnectivity(online: online);
@@ -101,6 +103,7 @@ ScenovaServices buildServices({
       connectivity: connectivity,
     ),
     posterFrames: posterFrames ?? InMemoryPosterFrameStore(),
+    clips: clips ?? InMemoryClipStore(),
     locale: locale,
   );
 }
@@ -191,6 +194,7 @@ Future<Harness> pumpHistory(
   LookupApi? api,
   HistoryStore? history,
   PosterFrameStore? posterFrames,
+  ClipStore? clips,
   bool online = true,
   FeatureFlags? featureFlags,
 }) async {
@@ -199,6 +203,7 @@ Future<Harness> pumpHistory(
     api: api,
     history: history,
     posterFrames: posterFrames,
+    clips: clips,
     online: online,
     featureFlags: featureFlags,
   );
@@ -482,6 +487,7 @@ HistoryEntry seededEntry({
   required String word,
   required String phrase,
   String? clipUrl,
+  String? clipLocalKey,
   String? posterLocalKey,
   bool hasAudio = false,
   LookupKind kind = LookupKind.word,
@@ -495,6 +501,7 @@ HistoryEntry seededEntry({
     kind: kind,
     savedAt: DateTime.now().subtract(age),
     clipUrl: clipUrl,
+    clipLocalKey: clipLocalKey,
     posterLocalKey: posterLocalKey,
     hasAudio: hasAudio,
     lookupId: lookupId,

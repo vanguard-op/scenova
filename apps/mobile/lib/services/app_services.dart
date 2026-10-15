@@ -9,6 +9,7 @@ import 'analytics_api.dart';
 import 'capture_channel.dart';
 import 'clip_notice_inbox.dart';
 import 'clip_notice_source.dart';
+import 'clip_store.dart';
 import 'connectivity.dart';
 import 'entitlement_provider.dart';
 import 'feature_flags.dart';
@@ -49,6 +50,7 @@ class ScenovaServices {
     required this.feedbackOutbox,
     required this.reportOutbox,
     required this.posterFrames,
+    required this.clips,
     this.locale = 'en',
   });
 
@@ -93,6 +95,10 @@ class ScenovaServices {
   /// (`FEAT-009`). The History row draws its thumbnail from here.
   final PosterFrameStore posterFrames;
 
+  /// The clips kept on the device, one per saved lookup, so a saved clip
+  /// replays with no connection (`FEAT-009`).
+  final ClipStore clips;
+
   /// The reader's locale, sent with a lookup.
   final String locale;
 
@@ -108,6 +114,7 @@ class ScenovaServices {
     PendingFeedbackStore? feedbackStore,
     PendingReportStore? reportStore,
     PosterFrameStore? posterFrames,
+    ClipStore? clips,
   }) {
     // The live intakes carry reader input over the network, so the gateway must
     // be reached over TLS (`NFR-022`). A build that points at a plaintext remote
@@ -216,6 +223,7 @@ class ScenovaServices {
         connectivity: connectivity,
       ),
       posterFrames: posterFrames ?? DevicePosterFrameStore(),
+      clips: clips ?? DeviceClipStore(),
       locale: locale,
     );
   }

@@ -75,7 +75,7 @@ class DevicePosterFrameStore implements PosterFrameStore {
     required String clipUrl,
     required String key,
   }) async {
-    if (!_isStream(clipUrl)) return null;
+    if (!_isReadableSource(clipUrl)) return null;
     final Uint8List? bytes;
     try {
       bytes = await FcNativeVideoThumbnail().saveThumbnailToBytes(
@@ -132,12 +132,16 @@ class DevicePosterFrameStore implements PosterFrameStore {
 
   /// Whether [url] is a source the platform's decoder can read.
   ///
-  /// The product's clips are served over http(s). A saved placeholder or a
-  /// scripted source is not a stream, so it is never handed to the decoder.
-  static bool _isStream(String url) {
+  /// The product's clips are served over http(s), and a clip the device kept
+  /// replays from the device's own store over `file`, so both are handed to the
+  /// decoder. A saved placeholder or a scripted source is neither, so it is
+  /// never handed over.
+  static bool _isReadableSource(String url) {
     final uri = Uri.tryParse(url);
     if (uri == null) return false;
-    return uri.scheme == 'http' || uri.scheme == 'https';
+    return uri.scheme == 'http' ||
+        uri.scheme == 'https' ||
+        uri.scheme == 'file';
   }
 }
 

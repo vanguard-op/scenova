@@ -5,8 +5,8 @@ import 'lookup.dart';
 /// A lookup kept on the device.
 ///
 /// Device history lives only on the device (`docs/Scenova/nfr.md` → "Data
-/// lifecycle") and carries the word, its gloss phrase, the clip when one was
-/// saved, and the poster frame derived from that clip.
+/// lifecycle") and carries the word, its gloss phrase, the clip itself when it
+/// was kept, and the poster frame derived from that clip.
 @immutable
 class HistoryEntry {
   const HistoryEntry({
@@ -16,6 +16,7 @@ class HistoryEntry {
     required this.kind,
     required this.savedAt,
     this.clipUrl,
+    this.clipLocalKey,
     this.posterLocalKey,
     this.hasAudio = false,
     this.lookupId,
@@ -26,7 +27,20 @@ class HistoryEntry {
   final String phrase;
   final LookupKind kind;
   final DateTime savedAt;
+
+  /// The clip's source URL, as the service served it.
+  ///
+  /// It is the source the device fetches the clip from, and the fallback a
+  /// replay uses while online when no local copy could be kept.
   final String? clipUrl;
+
+  /// The key of the saved clip in the device store; null when the device kept
+  /// none (`FEAT-009`; `docs/Scenova/schema.md` → "DeviceHistoryEntry").
+  ///
+  /// The clip itself is kept with the entry, so it replays with no connection.
+  /// When it is null the entry replays from [clipUrl] while online, and shows
+  /// the still-frame stand-in when there is none.
+  final String? clipLocalKey;
 
   /// The key of the poster frame derived from the saved clip, in the device
   /// store; null when no frame could be derived (`FEAT-009`).
@@ -46,7 +60,8 @@ class HistoryEntry {
   /// seeded or pre-existing one) has none.
   final String? lookupId;
 
-  bool get hasClip => clipUrl != null;
+  /// Whether the entry has a clip to replay, on the device or from its source.
+  bool get hasClip => clipLocalKey != null || clipUrl != null;
 
   /// The stored form of this entry.
   ///
@@ -62,6 +77,7 @@ class HistoryEntry {
           DateTime.tryParse(json['savedAt'] as String? ?? '')?.toLocal() ??
           DateTime.fromMillisecondsSinceEpoch(0),
       clipUrl: json['clipUrl'] as String?,
+      clipLocalKey: json['clipLocalKey'] as String?,
       posterLocalKey: json['posterLocalKey'] as String?,
       hasAudio: json['hasAudio'] as bool? ?? false,
       lookupId: json['lookupId'] as String?,
@@ -75,6 +91,7 @@ class HistoryEntry {
     'kind': kind.wire,
     'savedAt': savedAt.toUtc().toIso8601String(),
     'clipUrl': clipUrl,
+    'clipLocalKey': clipLocalKey,
     'posterLocalKey': posterLocalKey,
     'hasAudio': hasAudio,
     'lookupId': lookupId,
@@ -86,6 +103,7 @@ class HistoryEntry {
     LookupKind? kind,
     DateTime? savedAt,
     String? clipUrl,
+    String? clipLocalKey,
     String? posterLocalKey,
     bool? hasAudio,
     String? lookupId,
@@ -97,6 +115,7 @@ class HistoryEntry {
       kind: kind ?? this.kind,
       savedAt: savedAt ?? this.savedAt,
       clipUrl: clipUrl ?? this.clipUrl,
+      clipLocalKey: clipLocalKey ?? this.clipLocalKey,
       posterLocalKey: posterLocalKey ?? this.posterLocalKey,
       hasAudio: hasAudio ?? this.hasAudio,
       lookupId: lookupId ?? this.lookupId,

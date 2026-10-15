@@ -260,7 +260,7 @@ class ClipViewController extends ChangeNotifier {
         _serveSavedEntryOffline(saved);
         return;
       }
-      _serveSavedEntry(saved);
+      await _serveSavedEntry(saved);
       return;
     }
 
@@ -282,7 +282,7 @@ class ClipViewController extends ChangeNotifier {
       final saved = await _savedEntryFor(_selection);
       if (_disposed) return;
       if (saved != null) {
-        _serveSavedClip(saved);
+        await _serveSavedClip(saved);
         return;
       }
     }
@@ -757,7 +757,7 @@ class ClipViewController extends ChangeNotifier {
       final saved = await _savedEntryFor(_selection);
       if (_disposed) return;
       if (saved != null) {
-        _serveSavedClip(saved);
+        await _serveSavedClip(saved);
         return;
       }
     }
@@ -771,12 +771,20 @@ class ClipViewController extends ChangeNotifier {
   /// saved from is still at hand: a clip replayed with no connection can still
   /// be rated, and the rating goes out when the connection returns
   /// (`FEAT-010`, Edge Cases).
-  void _serveSavedClip(HistoryEntry entry) {
+  Future<void> _serveSavedClip(HistoryEntry entry) async {
     _fromHistory = true;
     _savedEntry = entry;
-    final result = _resultFromEntry(entry, includeClip: true);
+    final source = await _deviceClipSource(entry);
+    if (_disposed) return;
+    final result = _resultFromEntry(entry, clipUrl: source);
     _result = result;
     _chosenSense = result.senses.first;
+    if (source == null) {
+      // The clip the entry named is no longer on the device, so there is
+      // nothing to replay; the word and phrase still show.
+      _setPhase(ClipPhase.fallback);
+      return;
+    }
     _setPhase(ClipPhase.playing);
     _autoplayOrHold();
   }
@@ -787,9 +795,11 @@ class ClipViewController extends ChangeNotifier {
   /// plays without a lookup — so a saved lookup replays with no connection
   /// (`FEAT-009`). A saved lookup whose clip the device no longer holds shows
   /// the word and phrase with the clip unavailable, which is the fallback state.
-  void _serveSavedEntry(HistoryEntry entry) {
+  Future<void> _serveSavedEntry(HistoryEntry entry) async {
     _fromHistory = true;
-    final result = _resultFromEntry(entry, includeClip: true);
+    final source = await _deviceClipSource(entry);
+    if (_disposed) return;
+    final result = _resultFromEntry(entry, clipUrl: source);
     _result = result;
     _chosenSense = result.senses.first;
     _setPhase(
@@ -807,26 +817,37 @@ class ClipViewController extends ChangeNotifier {
   /// withheld, so the reader keeps their history with no connection.
   void _serveSavedEntryOffline(HistoryEntry entry) {
     _fromHistory = true;
-    final result = _resultFromEntry(entry, includeClip: false);
+    final result = _resultFromEntry(entry);
     _result = result;
     _chosenSense = result.senses.first;
     _setPhase(ClipPhase.offline);
   }
 
+  /// The clip the device holds for [entry], or the source it was saved from.
+  ///
+  /// A kept clip replays from the device with no connection (`FEAT-009`); an
+  /// entry whose clip the device no longer holds falls back to the source URL,
+  /// which replays while online.
+  Future<String?> _deviceClipSource(HistoryEntry entry) async {
+    final key = entry.clipLocalKey;
+    if (key != null) {
+      final source = await services.clips.source(key);
+      if (_disposed) return null;
+      if (source != null) return source;
+    }
+    return entry.clipUrl;
+  }
+
   /// The saved lookup as a result, with or without the clip the device holds.
-  LookupResult _resultFromEntry(
-    HistoryEntry entry, {
-    required bool includeClip,
-  }) {
-    final url = includeClip ? entry.clipUrl : null;
+  LookupResult _resultFromEntry(HistoryEntry entry, {String? clipUrl}) {
     final sense = Sense(
       senseLabel: '1',
       partOfSpeech: '',
       glossPhrase: entry.phrase,
-      clip: url == null
+      clip: clipUrl == null
           ? null
           : Clip(
-              url: url,
+              url: clipUrl,
               durationSeconds: AppConfig.clipDurationFallback.inSeconds
                   .toDouble(),
               resolution: '360p',
@@ -838,7 +859,7 @@ class ClipViewController extends ChangeNotifier {
       kind: entry.kind,
       rawSelection: entry.word,
       normalisedLemma: entry.word,
-      status: url == null ? LookupStatus.fallback : LookupStatus.served,
+      status: clipUrl == null ? LookupStatus.fallback : LookupStatus.served,
       senses: <Sense>[sense],
       notice: null,
       correlationId: 'local',
@@ -856,7 +877,7 @@ class ClipViewController extends ChangeNotifier {
           (entry) =>
               entry.kind == selection.kind &&
               entry.word.toLowerCase() == selection.text.toLowerCase() &&
-              entry.clipUrl != null,
+              entry.hasClip,
         )
         .firstOrNull;
   }
@@ -871,25 +892,45 @@ class ClipViewController extends ChangeNotifier {
     // (`FEAT-007`).
     if (result.status != LookupStatus.served && (sense?.clip == null)) return;
     // The entry is stored first, so the reader's lookup is durable before the
-    // frame is derived from the clip; the frame is added beside it after.
+    // clip is fetched and the frame derived from it; both are added beside it
+    // after.
     final entry = historyEntryFrom(
       result,
       savedAt: DateTime.now(),
       sense: sense,
     );
     await services.historyStore.save(entry);
-    await _keepPoster(entry);
+    final kept = await _keepClip(entry);
+    await _keepPoster(kept);
+  }
+
+  /// Fetches the clip for [entry] and keeps it on the device.
+  ///
+  /// The clip itself is kept beside the entry (`FEAT-009`), so a saved lookup
+  /// replays with no connection. A clip the device cannot fetch or keep leaves
+  /// the entry on its source, which still replays while online, and returns the
+  /// entry unchanged.
+  Future<HistoryEntry> _keepClip(HistoryEntry entry) async {
+    final clipUrl = entry.clipUrl;
+    if (clipUrl == null) return entry;
+    final key = await services.clips.save(clipUrl: clipUrl, key: entry.id);
+    if (key == null || _disposed) return entry;
+    final kept = entry.copyWith(clipLocalKey: key);
+    await services.historyStore.save(kept);
+    return kept;
   }
 
   /// Derives the poster frame for [entry] and keeps it with the stored entry.
   ///
   /// The frame is derived from the clip and kept beside the entry on the device
-  /// (`FEAT-009`), so the History row draws it without opening the clip. A clip
-  /// the platform cannot read keeps no frame, and the row falls back to the
-  /// shared still-frame stand-in.
+  /// (`FEAT-009`), so the History row draws it without opening the clip. The
+  /// kept clip is the source when the device holds one, so the frame derives
+  /// from the saved clip rather than reaching for the source again; a clip the
+  /// platform cannot read keeps no frame, and the row falls back to the shared
+  /// still-frame stand-in.
   Future<void> _keepPoster(HistoryEntry entry) async {
-    final clipUrl = entry.clipUrl;
-    if (clipUrl == null) return;
+    final clipUrl = await _deviceClipSource(entry);
+    if (clipUrl == null || _disposed) return;
     final key = await services.posterFrames.capture(
       clipUrl: clipUrl,
       key: entry.id,

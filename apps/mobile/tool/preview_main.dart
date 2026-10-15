@@ -27,6 +27,7 @@ import 'package:scenova/services/capture_channel.dart';
 import 'package:scenova/services/capture_intake.dart';
 import 'package:scenova/services/clip_notice_inbox.dart';
 import 'package:scenova/services/clip_notice_source.dart';
+import 'package:scenova/services/clip_store.dart';
 import 'package:scenova/services/connectivity.dart';
 import 'package:scenova/services/entitlement_provider.dart';
 import 'package:scenova/services/feature_flags.dart';
@@ -180,15 +181,27 @@ List<(String, Widget)> _frames() {
       ),
     ),
     (
-      'History — loaded (poster frames kept)',
-      _history(history: _savedLookups(), posters: _posterFrames()),
+      'History — loaded (clips and poster frames kept)',
+      _history(
+        history: _savedLookups(),
+        posters: _posterFrames(),
+        clips: _clips(),
+      ),
     ),
     (
       'History — poster frame could not be derived',
       _history(history: _savedLookups()),
     ),
     ('History — empty', _history(history: const <HistoryEntry>[])),
-    ('History — offline', _history(history: _savedLookups(), online: false)),
+    (
+      'History — offline (saved clips still replay)',
+      _history(
+        history: _savedLookups(),
+        online: false,
+        posters: _posterFrames(),
+        clips: _clips(),
+      ),
+    ),
     ('Clip — serving from library (playing)', _clip('come')),
     ('Clip — sense choice', _clip('bank')),
     ('Clip — rating noted', _clip('come', rating: ClipRating.helpful)),
@@ -199,6 +212,7 @@ List<(String, Widget)> _frames() {
         online: false,
         rating: ClipRating.notHelpful,
         history: <HistoryEntry>[_savedLibraryHit()],
+        clips: _clips(),
       ),
     ),
     (
@@ -246,6 +260,7 @@ List<(String, Widget)> _frames() {
       'Clip — phrase replayed from the device',
       _clip(
         'once in a while',
+        clips: _clips(),
         history: <HistoryEntry>[
           HistoryEntry(
             id: 'phrase',
@@ -253,7 +268,7 @@ List<(String, Widget)> _frames() {
             phrase: 'once in a while',
             kind: LookupKind.phrase,
             savedAt: DateTime.now(),
-            clipUrl: 'device://once-in-a-while',
+            clipLocalKey: 'phrase',
           ),
         ],
       ),
@@ -301,6 +316,7 @@ List<(String, Widget)> _frames() {
         'come',
         online: false,
         history: <HistoryEntry>[_savedLibraryHit()],
+        clips: _clips(),
         openReport: true,
       ),
     ),
@@ -357,16 +373,18 @@ Widget _home({
   );
 }
 
-/// The History screen, with the poster frames the device keeps.
+/// The History screen, with the clips and poster frames the device keeps.
 Widget _history({
   required List<HistoryEntry> history,
   bool online = true,
   PosterFrameStore? posters,
+  ClipStore? clips,
 }) {
   final services = _services(
     history: history,
     online: online,
     posterFrames: posters,
+    clips: clips,
   );
   return ScenovaScope(
     services: services,
@@ -376,8 +394,8 @@ Widget _history({
 
 /// Two saved lookups for the History frames.
 ///
-/// The first carries the poster frame a device derived from its clip; the
-/// second carries none, so the row falls back to the shared still-frame
+/// The first carries the clip and the poster frame a device kept from it; the
+/// second carries neither, so the row falls back to the shared still-frame
 /// stand-in (`FEAT-009` → Edge Cases).
 List<HistoryEntry> _savedLookups() {
   final now = DateTime.now();
@@ -389,6 +407,7 @@ List<HistoryEntry> _savedLookups() {
       kind: LookupKind.word,
       savedAt: now.subtract(const Duration(minutes: 6)),
       clipUrl: 'https://clips.example/come.mp4',
+      clipLocalKey: 'come-1',
       posterLocalKey: 'come-1',
     ),
     HistoryEntry(
@@ -401,6 +420,21 @@ List<HistoryEntry> _savedLookups() {
     ),
   ];
 }
+
+/// The clips the History frames hold, keyed by the entry that owns them.
+///
+/// The gallery runs on the web, where there is no device store, so a kept clip
+/// is the bundled walkthrough clip's own URL: the replay frames play something
+/// real rather than a source the browser cannot open. Tooling only.
+ClipStore _clips() => InMemoryClipStore(
+  seed: <String, String>{'come-1': _keptClipSource, 'phrase': _keptClipSource},
+);
+
+/// A source the preview can actually play, standing in for a clip the device
+/// kept. Tooling only.
+String get _keptClipSource => Uri.base
+    .resolve('assets/assets/motion/first-run-walkthrough.mp4')
+    .toString();
 
 /// The poster frames the History frames draw, keyed by the entry that owns
 /// them. Tooling only: a device derives its own from the clip.
@@ -423,6 +457,7 @@ Widget _clip(
   Duration? pollInterval,
   Duration? noticeThreshold,
   List<HistoryEntry> history = const <HistoryEntry>[],
+  ClipStore? clips,
   FeatureFlags featureFlags = const FixedFeatureFlags(),
   Clip? noticeClip,
   FeedbackApi? feedbackApi,
@@ -437,6 +472,7 @@ Widget _clip(
     entitlement: entitlement,
     settings: settings,
     history: history,
+    clips: clips,
     featureFlags: featureFlags,
     clipNoticeSource: noticeSource,
     feedbackApi: feedbackApi,
@@ -468,6 +504,7 @@ HistoryEntry _savedLibraryHit() {
     kind: LookupKind.word,
     savedAt: DateTime.now(),
     clipUrl: 'mock://clip/library-hit',
+    clipLocalKey: 'come-1',
     lookupId: 'lookup-come',
   );
 }
@@ -544,6 +581,7 @@ ScenovaServices _services({
   ReportApi? reportApi,
   PendingReportStore? reportStore,
   PosterFrameStore? posterFrames,
+  ClipStore? clips,
 }) {
   final connectivity = ManualConnectivity(online: online);
   final settingsController = settings ?? SettingsController();
@@ -584,6 +622,7 @@ ScenovaServices _services({
       connectivity: connectivity,
     ),
     posterFrames: posterFrames ?? InMemoryPosterFrameStore(),
+    clips: clips ?? InMemoryClipStore(),
     locale: 'en-GB',
   );
 }

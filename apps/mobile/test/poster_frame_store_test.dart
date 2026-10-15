@@ -82,6 +82,28 @@ void main() {
     },
   );
 
+  test('a clip the device kept is handed to the decoder', () async {
+    final calls = <MethodCall>[];
+    mockDecoder((call) async {
+      calls.add(call);
+      return frame;
+    });
+
+    final store = DevicePosterFrameStore();
+    final key = await store.capture(
+      clipUrl:
+          'file:///data/user/0/app.scenova.scenova/files/clips/clip_come-1',
+      key: 'come-1',
+    );
+
+    expect(key, 'come-1');
+    expect(
+      calls.single.arguments['srcFile'],
+      'file:///data/user/0/app.scenova.scenova/files/clips/clip_come-1',
+    );
+    expect(await store.frame('come-1'), frame);
+  });
+
   test('a derivation that produces no frame keeps none', () async {
     final store = DevicePosterFrameStore();
 

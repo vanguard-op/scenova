@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scenova/models/history_entry.dart';
 import 'package:scenova/screens/clip_view_screen.dart';
+import 'package:scenova/services/clip_store.dart';
 import 'package:scenova/services/feature_flags.dart';
 import 'package:scenova/services/history_store.dart';
 import 'package:scenova/services/lookup_api.dart';
@@ -192,6 +193,35 @@ void main() {
     await teardown(tester);
   });
 
+  testWidgets('clips for entries the device no longer keeps are swept', (
+    tester,
+  ) async {
+    final clips = InMemoryClipStore(
+      seed: <String, String>{
+        'seed-come': 'file:///device/come.mp4',
+        'seed-gone': 'file:///device/gone.mp4',
+      },
+    );
+    await pumpHistory(
+      tester,
+      clips: clips,
+      history: InMemoryHistoryStore(
+        seed: <HistoryEntry>[
+          seededEntry(
+            word: 'come',
+            phrase: 'to arrive',
+            clipLocalKey: 'seed-come',
+          ),
+        ],
+      ),
+    );
+    await tester.pump();
+
+    expect(await clips.source('seed-come'), isNotNull);
+    expect(await clips.source('seed-gone'), isNull);
+    await teardown(tester);
+  });
+
   testWidgets('a long word truncates to two lines', (tester) async {
     const long = 'antidisestablishmentarianismcontinuingonandonandon';
     await pumpHistory(
@@ -304,6 +334,35 @@ void main() {
     await teardown(tester);
   });
 
+  testWidgets('removing an entry deletes its clip', (tester) async {
+    final clips = InMemoryClipStore(
+      seed: <String, String>{'seed-come': 'file:///device/come.mp4'},
+    );
+    await pumpHistory(
+      tester,
+      clips: clips,
+      history: InMemoryHistoryStore(
+        seed: <HistoryEntry>[
+          seededEntry(
+            word: 'come',
+            phrase: 'to arrive',
+            clipLocalKey: 'seed-come',
+          ),
+        ],
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.byTooltip('Remove come'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Remove'));
+    await tester.pumpAndSettle();
+
+    // The item and its clip are deleted from the device (`FEAT-009`).
+    expect(await clips.source('seed-come'), isNull);
+    await teardown(tester);
+  });
+
   testWidgets('keeping a lookup leaves it in the list', (tester) async {
     final store = InMemoryHistoryStore(
       seed: <HistoryEntry>[seededEntry(word: 'come', phrase: 'to arrive')],
@@ -385,19 +444,57 @@ void main() {
     await teardown(tester);
   });
 
-  testWidgets('opening a saved lookup replays it from the device', (
+  testWidgets('clearing history deletes every clip', (tester) async {
+    final clips = InMemoryClipStore(
+      seed: <String, String>{
+        'seed-come': 'file:///device/come.mp4',
+        'seed-bank': 'file:///device/bank.mp4',
+      },
+    );
+    final store = InMemoryHistoryStore(
+      seed: <HistoryEntry>[
+        seededEntry(
+          word: 'come',
+          phrase: 'to arrive',
+          clipLocalKey: 'seed-come',
+        ),
+        seededEntry(
+          word: 'bank',
+          phrase: 'a place for money',
+          clipLocalKey: 'seed-bank',
+        ),
+      ],
+      storageFull: true,
+    );
+    await pumpHistory(tester, history: store, clips: clips);
+    await tester.pump();
+
+    await tester.tap(find.text('Clear history'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Clear'));
+    await tester.pumpAndSettle();
+
+    expect(await clips.source('seed-come'), isNull);
+    expect(await clips.source('seed-bank'), isNull);
+    await teardown(tester);
+  });
+
+  testWidgets('opening a saved lookup replays the clip the device kept', (
     tester,
   ) async {
     final api = RecordingLookupApi(MockLookupApi());
     await pumpHistory(
       tester,
       api: api,
+      clips: InMemoryClipStore(
+        seed: <String, String>{'seed-come': 'file:///device/come.mp4'},
+      ),
       history: InMemoryHistoryStore(
         seed: <HistoryEntry>[
           seededEntry(
             word: 'come',
             phrase: 'to move towards someone',
-            clipUrl: 'https://clips.example/come.mp4',
+            clipLocalKey: 'seed-come',
           ),
         ],
       ),
@@ -417,12 +514,15 @@ void main() {
     await pumpHistory(
       tester,
       online: false,
+      clips: InMemoryClipStore(
+        seed: <String, String>{'seed-come': 'file:///device/come.mp4'},
+      ),
       history: InMemoryHistoryStore(
         seed: <HistoryEntry>[
           seededEntry(
             word: 'come',
             phrase: 'to move towards someone',
-            clipUrl: 'https://clips.example/come.mp4',
+            clipLocalKey: 'seed-come',
           ),
         ],
       ),
@@ -451,12 +551,15 @@ void main() {
     await pumpHistory(
       tester,
       online: false,
+      clips: InMemoryClipStore(
+        seed: <String, String>{'seed-come': 'file:///device/come.mp4'},
+      ),
       history: InMemoryHistoryStore(
         seed: <HistoryEntry>[
           seededEntry(
             word: 'come',
             phrase: 'to move towards someone',
-            clipUrl: 'https://clips.example/come.mp4',
+            clipLocalKey: 'seed-come',
           ),
         ],
       ),

@@ -78,7 +78,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     try {
       final entries = await _scope.historyStore.all();
       final storage = await _scope.historyStore.storageState();
-      await _prunePosters(entries);
+      await _pruneDeviceMedia(entries);
       if (!mounted) return;
       setState(() {
         _entries = entries;
@@ -93,16 +93,25 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
-  /// Drops the poster frames of entries the device no longer keeps.
+  /// Drops the clips and poster frames of entries the device no longer keeps.
   ///
   /// History keeps only the most recent lookups, so an entry that drops off
-  /// must not leave its frame behind. A sweep that fails costs the reader
-  /// nothing, so it never surfaces as an error.
-  Future<void> _prunePosters(List<HistoryEntry> entries) async {
+  /// must not leave its clip or frame behind. A sweep that fails costs the
+  /// reader nothing, so it never surfaces as an error.
+  Future<void> _pruneDeviceMedia(List<HistoryEntry> entries) async {
+    final clipKeys = entries
+        .map((entry) => entry.clipLocalKey)
+        .whereType<String>();
+    final posterKeys = entries
+        .map((entry) => entry.posterLocalKey)
+        .whereType<String>();
     try {
-      await _scope.posterFrames.pruneTo(
-        entries.map((entry) => entry.posterLocalKey).whereType<String>(),
-      );
+      await _scope.clips.pruneTo(clipKeys);
+    } on Object {
+      // The clips stay until the next sweep.
+    }
+    try {
+      await _scope.posterFrames.pruneTo(posterKeys);
     } on Object {
       // The frames stay until the next sweep.
     }
@@ -149,7 +158,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       _showMessage('That lookup could not be removed. Try again.');
       return;
     }
-    await _removePoster(entry);
+    await _removeDeviceMedia(entry);
     if (!mounted) return;
     setState(() {
       _deletingId = null;
@@ -160,16 +169,24 @@ class _HistoryScreenState extends State<HistoryScreen> {
     });
   }
 
-  /// Deletes the frame kept for [entry], best-effort.
+  /// Deletes the clip and frame kept for [entry], best-effort.
   ///
-  /// The entry is already gone from the list, so a frame the device refuses to
+  /// The entry is already gone from the list, so media the device refuses to
   /// delete is swept on the next load rather than surfacing as an error
   /// (`FEAT-009` → "the item and its clip are deleted from the device").
-  Future<void> _removePoster(HistoryEntry entry) async {
-    final key = entry.posterLocalKey;
-    if (key == null) return;
+  Future<void> _removeDeviceMedia(HistoryEntry entry) async {
+    final clipKey = entry.clipLocalKey;
+    if (clipKey != null) {
+      try {
+        await _scope.clips.remove(clipKey);
+      } on Object {
+        // The clip is swept when history is next loaded.
+      }
+    }
+    final posterKey = entry.posterLocalKey;
+    if (posterKey == null) return;
     try {
-      await _scope.posterFrames.remove(key);
+      await _scope.posterFrames.remove(posterKey);
     } on Object {
       // The frame is swept when history is next loaded.
     }
@@ -187,6 +204,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     if (!confirmed) return;
     try {
       await _scope.historyStore.clear();
+      await _scope.clips.clear();
       await _scope.posterFrames.clear();
     } on Object {
       if (!mounted) return;
