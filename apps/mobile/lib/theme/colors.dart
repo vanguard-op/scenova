@@ -209,7 +209,10 @@ class ScenovaColors extends ThemeExtension<ScenovaColors> {
     textPrimary: ScenovaPalette.grey900Light,
     textSecondary: ScenovaPalette.grey600Light,
     textDisabled: ScenovaPalette.grey500Light,
-    placeholder: ScenovaPalette.grey400Light,
+    // The neutral scale puts placeholder text in `grey-600`, the same shade as
+    // secondary text; `grey-400` is the disabled-icon role and reads below the
+    // contrast target on the input surface.
+    placeholder: ScenovaPalette.grey600Light,
     border: ScenovaPalette.grey300Light,
     // The iconography direction puts the default state in `text-secondary`.
     iconDefault: ScenovaPalette.grey600Light,
@@ -265,7 +268,7 @@ class ScenovaColors extends ThemeExtension<ScenovaColors> {
     textPrimary: ScenovaPalette.grey900Dark,
     textSecondary: ScenovaPalette.grey600Dark,
     textDisabled: ScenovaPalette.grey500Dark,
-    placeholder: ScenovaPalette.grey400Dark,
+    placeholder: ScenovaPalette.grey600Dark,
     border: ScenovaPalette.grey300Dark,
     iconDefault: ScenovaPalette.grey600Dark,
     iconActive: ScenovaPalette.primary500Dark,

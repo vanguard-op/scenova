@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -130,6 +132,27 @@ void main() {
       expect(dark.iconActive, ScenovaPalette.primary500Dark);
       expect(dark.iconDisabled, ScenovaPalette.grey400Dark);
     });
+
+    test('the placeholder role is the neutral scale\'s grey-600', () {
+      // The neutral scale gives `grey-600` the placeholder role alongside
+      // secondary text; `grey-400` is the disabled-icon shade.
+      expect(ScenovaColors.light.placeholder, ScenovaPalette.grey600Light);
+      expect(ScenovaColors.dark.placeholder, ScenovaPalette.grey600Dark);
+    });
+
+    test('hint text clears WCAG AA on the input surface in both themes', () {
+      // branding.md → "Accessibility": normal text meets 4.5:1. Hint text is
+      // body-sized and sits on the input's fill (`surface-secondary`).
+      for (final colors in <ScenovaColors>[
+        ScenovaColors.light,
+        ScenovaColors.dark,
+      ]) {
+        expect(
+          _contrastRatio(colors.placeholder, colors.surfaceSecondary),
+          greaterThanOrEqualTo(4.5),
+        );
+      }
+    });
   });
 
   group('AppTheme', () {
@@ -191,4 +214,22 @@ void main() {
       }
     });
   });
+}
+
+/// The WCAG 2.x contrast ratio between two opaque colours.
+double _contrastRatio(Color a, Color b) {
+  final la = _relativeLuminance(a);
+  final lb = _relativeLuminance(b);
+  final lighter = math.max(la, lb);
+  final darker = math.min(la, lb);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+double _relativeLuminance(Color color) {
+  double channel(double value) => value <= 0.03928
+      ? value / 12.92
+      : math.pow((value + 0.055) / 1.055, 2.4).toDouble();
+  return 0.2126 * channel(color.r) +
+      0.7152 * channel(color.g) +
+      0.0722 * channel(color.b);
 }
