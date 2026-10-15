@@ -109,11 +109,12 @@ docs/           BPRD (product-shaper)
 | T-115 | FEAT-009, FEAT-013 | frontend-engineer | Backlog | C-018 |
 | T-116 | FEAT-013 | infra-engineer | Done | — |
 | T-117 | FEAT-013 | frontend-engineer | Backlog | — |
-| T-118 | FEAT-013 | backend-engineer | In Progress | C-021 |
+| T-118 | FEAT-013 | backend-engineer | Done | C-021 |
 | T-119 | FEAT-013 | frontend-engineer | Backlog | C-021 |
 | T-120 | FEAT-013 | infra-engineer | Backlog | — |
 | T-121 | FEAT-013 | backend-engineer | Backlog | — |
 | T-122 | FEAT-013 | frontend-engineer | Backlog | — |
+| T-123 | FEAT-013 | backend-engineer | In Progress | — |
 
 ## Decisions Log
 | # | Decision | Rationale | By |
