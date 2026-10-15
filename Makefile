@@ -41,12 +41,12 @@ PYTEST    := $(VENV)/bin/pytest
 
 .PHONY: help setup auth fmt lint env typecheck test qa qa-model model-bar build bundle boot security \
         infra-init infra-fmt infra-validate infra-plan infra-apply \
-        deploy deploy-console curator promote rollback ci clean
+        deploy deploy-console curator promote rollback flag ci clean
 
 help: ## Show the documented commands
 	@printf '\nScenova platform commands (env=%s, venv=%s)\n\n' "$(ENVIRONMENT)" "$(VENV)"
 	@awk 'BEGIN{FS=":.*## "} /^[a-zA-Z0-9_-]+:.*## /{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
-	@printf '\nTargets: make setup · make auth · make ci · make qa · make model-bar · make deploy ENV=staging · make deploy-console ENV=staging · make curator OPERATOR=…\n\n'
+	@printf '\nTargets: make setup · make auth · make ci · make qa · make model-bar · make deploy ENV=staging · make promote ENV=staging SVC=gateway · make rollback ENV=staging SVC=gateway · make flag ENV=prod FLAG=FLAG_ENABLE_GENERATION VALUE=false · make curator OPERATOR=…\n\n'
 
 # --- Setup -------------------------------------------------------------------
 
@@ -130,7 +130,7 @@ infra-apply: ## Apply infrastructure for an environment (ENV=dev|staging|prod)
 
 # --- Release -----------------------------------------------------------------
 
-deploy: ## Deploy services to an environment (ENV=dev|staging|prod)
+deploy: ## Deploy container images to an environment (ENV=dev|staging|prod)
 	@bash ci/deploy.sh $(ENV)
 
 deploy-console: ## Deploy the review console to Firebase Hosting (ENV=dev|staging|prod)
@@ -144,6 +144,9 @@ promote: ## Promote a canary service to full traffic (ENV=… SVC=…)
 
 rollback: ## Roll a service back to its previous revision (ENV=… SVC=…)
 	@bash ci/rollback.sh $(ENV) $(SVC)
+
+flag: ## Set a release flag on an environment's services (ENV=… FLAG=… VALUE=true|false)
+	@bash ci/flag.sh $(ENV) $(FLAG) $(VALUE)
 
 # --- Composite ---------------------------------------------------------------
 

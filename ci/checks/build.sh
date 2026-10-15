@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Build every present workspace so a broken build fails here, not at deploy.
 #   Python  : byte-compile the workspace (catches syntax/import-time breakage)
-#   Services: container image build (Dockerfile in the service directory)
+#   Images  : container image build (services/<name>/Dockerfile, and the
+#             model-serving image from infra/docker/model.Dockerfile)
 #   Flutter : debug APK build
 set -euo pipefail
 . "$(dirname "$0")/../lib.sh"
@@ -18,15 +19,16 @@ else
   skip "no Python workspace to compile"
 fi
 
-for dir in services/*/; do
-  [ -d "$dir" ] || continue
-  if [ -f "${dir}Dockerfile" ]; then
-    name="$(basename "$dir")"
-    log "Build · docker image for service '$name'"
-    docker build -t "scenova/${name}:${GIT_SHA:-local}" "$dir"
+if command -v docker >/dev/null 2>&1; then
+  while IFS='|' read -r name context dockerfile; do
+    [ -n "$name" ] || continue
+    log "Build · docker image $(image_ref "$name")"
+    docker build -f "$dockerfile" -t "$(image_ref "$name")" "$context"
     built_any=1
-  fi
-done
+  done < <(container_images)
+else
+  skip "docker not available — skipping container image builds"
+fi
 
 if has_flutter; then
   log "Build · flutter build apk --debug"

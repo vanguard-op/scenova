@@ -7,7 +7,8 @@
 #
 # Usage: ci/deploy.sh <env> [service ...]
 #   env      dev | staging | prod
-#   service  optional subset; default is every service directory present.
+#   service  optional subset; default is every container image in the shared
+#            registry (ci/lib.sh) — each service plus the model-serving image.
 #
 # Non-secret configuration comes from infra/terraform/environments/<env>.tfvars —
 # the single per-environment source of truth. Secrets are never read here; Cloud
@@ -40,38 +41,54 @@ REGISTRY="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO}"
 [ -n "$REGION" ] || die "no region in $TFVARS"
 [ -n "$REPO" ] || die "no artifact_repo in $TFVARS"
 
-if [ "$#" -gt 0 ]; then
-  services=("$@")
-else
-  services=()
-  for dir in services/*/; do
-    [ -d "$dir" ] || continue
-    services+=("$(basename "$dir")")
-  done
-fi
+# The images to ship come from the shared registry (ci/lib.sh): every service
+# directory carrying a Dockerfile, plus the model-serving image. An explicit
+# service list on the command line narrows it; an unknown name is an error, not a
+# silent skip, so a typo never deploys a partial release.
+declare -A image_context image_dockerfile
+image_names=()
+while IFS='|' read -r name context dockerfile; do
+  [ -n "$name" ] || continue
+  image_names+=("$name")
+  image_context[$name]="$context"
+  image_dockerfile[$name]="$dockerfile"
+done < <(container_images)
 
-[ "${#services[@]}" -gt 0 ] || die "no services to deploy (services/*/ is empty)"
+[ "${#image_names[@]}" -gt 0 ] \
+  || die "no container images to deploy (services/*/Dockerfile, infra/docker/model.Dockerfile)"
+
+if [ "$#" -gt 0 ]; then
+  services=()
+  for svc in "$@"; do
+    [ -n "${image_context[$svc]:-}" ] || die "unknown service '$svc' (known: ${image_names[*]})"
+    services+=("$svc")
+  done
+else
+  services=("${image_names[@]}")
+fi
 
 log "Deploy · env=$ENV project=$PROJECT_ID region=$REGION tag=$GIT_SHA"
 info "services: ${services[*]}"
 
 for svc in "${services[@]}"; do
-  dir="services/$svc"
-  [ -f "$dir/Dockerfile" ] || { warn "no Dockerfile for '$svc' — skipped"; continue; }
   image="${REGISTRY}/${svc}:${GIT_SHA}"
 
   log "Deploy · build and push $image"
-  docker build -t "$image" "$dir"
+  docker build -f "${image_dockerfile[$svc]}" -t "$image" "${image_context[$svc]}"
   docker push "$image"
 
   log "Deploy · Cloud Run '$svc' (no traffic) + 5% canary"
+  # --update-env-vars merges, so the Terraform-managed configuration on the
+  # service (data stores, clip store, model pins, flags) survives the deploy;
+  # --set-env-vars would remove every existing variable first and ship a service
+  # with no configuration. Secrets are untouched (they are mounted separately).
   gcloud run deploy "$svc" \
     --project "$PROJECT_ID" \
     --region "$REGION" \
     --image "$image" \
     --no-traffic \
     --tag candidate \
-    --set-env-vars "ENVIRONMENT=$ENV,GIT_SHA=$GIT_SHA" \
+    --update-env-vars "ENVIRONMENT=$ENV,GIT_SHA=$GIT_SHA" \
     --quiet
 
   gcloud run services update-traffic "$svc" \

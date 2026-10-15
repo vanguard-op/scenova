@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Promote canary revisions to full traffic (release.md roll-forward).
 # A roll-forward requires the release owner; the on-call engineer uses rollback.sh.
-# Usage: ci/promote.sh <env> [service ...]   (default: every service directory)
+# Usage: ci/promote.sh <env> [service ...]   (default: every container image)
 set -euo pipefail
-. "$(dirname "$0")/../lib.sh"
+. "$(dirname "$0")/lib.sh"
 
 ENV="${1:?usage: ci/promote.sh <env> [service ...]}"
 shift || true
@@ -16,16 +16,24 @@ tfvar() { sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*\"\(.*\)\".*/\1/p" "
 PROJECT_ID="${DEPLOY_PROJECT_ID:-$(tfvar project_id)}"
 REGION="${GCP_REGION:-$(tfvar region)}"
 
+declare -A known=()
+image_names=()
+while IFS='|' read -r name _context _dockerfile; do
+  [ -n "$name" ] || continue
+  known[$name]=1
+  image_names+=("$name")
+done < <(container_images)
+[ "${#image_names[@]}" -gt 0 ] || die "no container images to promote"
+
 if [ "$#" -gt 0 ]; then
-  services=("$@")
-else
   services=()
-  for dir in services/*/; do
-    [ -d "$dir" ] || continue
-    services+=("$(basename "$dir")")
+  for svc in "$@"; do
+    [ -n "${known[$svc]:-}" ] || die "unknown service '$svc' (known: ${image_names[*]})"
+    services+=("$svc")
   done
+else
+  services=("${image_names[@]}")
 fi
-[ "${#services[@]}" -gt 0 ] || die "no services to promote (services/*/ is empty)"
 
 for svc in "${services[@]}"; do
   log "Promote · $svc → 100% in $ENV ($PROJECT_ID/$REGION)"

@@ -19,7 +19,9 @@ permissions:
 jobs:
   ci:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # CI builds every container image in addition to the Flutter builds, so the
+    # ceiling allows a cold image build on a fresh runner.
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v4

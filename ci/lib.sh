@@ -108,3 +108,33 @@ MODEL_MODULE="app.main:app"
 MODEL_PORT_VAR="MODEL_PORT"
 
 port_for() { local var="$1"; echo "${!var:-}"; }
+
+# --- Container images --------------------------------------------------------
+# Every runtime component the deployment topology defines, as the single source
+# of truth for what is built, booted, and shipped. Format: name|context|dockerfile.
+#
+#   - Each service carries its own Dockerfile in its directory
+#     (`services/<name>/Dockerfile`), so the build context is the service itself.
+#   - The model-serving component's code is `ai/`; its build definition is
+#     platform-owned (`infra/docker/model.Dockerfile`) because the container is a
+#     platform artifact. It is built with the `ai/` context so the service's own
+#     code, bundled data, and prompt artifacts are what go into the image.
+#
+# `make build` builds these, `make deploy` ships them, and the deploy script tags
+# each with the commit sha, so the image validated in CI is the one promoted.
+has_model() { [ -d ai ] && find ai -name '*.py' -not -path '*/.*' -print -quit 2>/dev/null | grep -q .; }
+
+container_images() {
+  local dir name
+  for dir in services/*/; do
+    [ -f "${dir}Dockerfile" ] || continue
+    name="$(basename "$dir")"
+    printf '%s|%s|%s\n' "$name" "$dir" "${dir}Dockerfile"
+  done
+  if has_model && [ -f infra/docker/model.Dockerfile ]; then
+    printf '%s|%s|%s\n' "model" "ai/" "infra/docker/model.Dockerfile"
+  fi
+}
+
+# Local image reference; the deploy path overrides the registry and tag.
+image_ref() { printf 'scenova/%s:%s\n' "$1" "${GIT_SHA:-local}"; }
