@@ -101,6 +101,45 @@ console_project="$(sed -n 's/^CONSOLE_FIREBASE_PROJECT_ID=//p' "$SCHEMA" | head 
   || die "$SCHEMA has CONSOLE_FIREBASE_PROJECT_ID=$console_project but GCP_PROJECT_ID=$project_id; they must agree"
 info "console environment ok: CONSOLE_FIREBASE_PROJECT_ID=$console_project"
 
+# Payments and store products (FEAT-013). RevenueCat wraps the stores (D-008), so
+# no card data reaches the product (NFR-027). The RevenueCat identifiers and the
+# store product catalog are declared here; the tier figures the entitlement
+# service meters against (C-018, C-019) must also match its Terraform
+# environment, so an allowance cannot mean one thing locally and another in the
+# cloud. Prices are store-managed and localized (monetization.md "Payment &
+# Billing"), so they are never declared.
+PAYMENT_KEYS=(
+  REVENUECAT_API_KEY
+  REVENUECAT_WEBHOOK_AUTH
+  REVENUECAT_PUBLIC_SDK_KEY_APP_STORE
+  REVENUECAT_PUBLIC_SDK_KEY_PLAY_STORE
+  REVENUECAT_ENTITLEMENT_ID
+  REVENUECAT_OFFERING_ID
+  PRODUCT_PRO_MONTHLY
+  PRODUCT_PRO_ANNUAL
+  PRODUCT_TOPUP_LOOKUPS
+)
+# What each tier grants, read by the entitlement service (C-018, C-019). The
+# Terraform environment must carry the same values, so the allowance a reader is
+# metered against cannot differ between a laptop and the cloud.
+ENTITLEMENT_CONSTANTS=(
+  "ENTITLEMENT_FREE_LOOKUPS=20"
+  "ENTITLEMENT_PRO_LOOKUPS=50"
+  "ENTITLEMENT_TOPUP_LOOKUPS=20"
+  "ENTITLEMENT_TRIAL_DAYS=7"
+)
+for key in "${PAYMENT_KEYS[@]}"; do
+  grep -qE "^${key}=" "$SCHEMA" || die "$SCHEMA is missing the payments key $key"
+done
+for pair in "${ENTITLEMENT_CONSTANTS[@]}"; do
+  key="${pair%%=*}"
+  value="${pair#*=}"
+  grep -qxF "$pair" "$SCHEMA" || die "$SCHEMA must declare '$pair'"
+  grep -qE "^[[:space:]]*${key}[[:space:]]*=[[:space:]]*\"${value}\"" infra/terraform/main.tf \
+    || die "infra/terraform/main.tf must carry ${key} = \"${value}\" for the entitlement service"
+done
+info "payments ok: ${#PAYMENT_KEYS[@]} keys; ${#ENTITLEMENT_CONSTANTS[@]} tier figures in step with Terraform"
+
 info "schema ok: ${#FLAG_DEFAULTS[@]} flags, ${#CLIP_STORE_KEYS[@]} clip-store keys"
 
 shopt -s nullglob

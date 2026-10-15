@@ -164,6 +164,18 @@ locals {
       CIRCUIT_BREAKER_FAILURE_THRESHOLD = "5"
       CIRCUIT_BREAKER_RESET_SECONDS     = "60"
     }
+    # The entitlement service meters a lookup against the reader's tier and
+    # applies a store purchase (C-018, C-019, FEAT-013). It reads what each tier
+    # grants (monetization.md "Pricing Tiers") from the environment, so a pricing
+    # change is a configuration change and not a code change; the values are
+    # declared once in `.env.example` and held in step by `make env`. The
+    # RevenueCat webhook secret is mounted separately (service_secret_env).
+    entitlement = {
+      ENTITLEMENT_FREE_LOOKUPS  = "20"
+      ENTITLEMENT_PRO_LOOKUPS   = "50"
+      ENTITLEMENT_TOPUP_LOOKUPS = "20"
+      ENTITLEMENT_TRIAL_DAYS    = "7"
+    }
   }
 
   service_secret_env = {
