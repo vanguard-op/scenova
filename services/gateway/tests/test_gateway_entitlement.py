@@ -1,5 +1,5 @@
-"""Gateway tests for the entitlement read, the account update, and the account
-deletion (C-018, C-020, C-021).
+"""Gateway tests for the entitlement read, the account settings read, the account
+update, and the account deletion (C-018, C-020, C-021, C-022).
 
 The gateway authenticates the reader's token before it forwards the call to the
 entitlement service and passes the service's status and body back unchanged, so a
@@ -53,6 +53,12 @@ class _FakeEntitlementClient:
     ) -> UpstreamResponse:
         self.last_method = "GET"
         self.last_path = "/v1/entitlement"
+        self.last_authorization = authorization
+        return self._respond()
+
+    async def get_account(self, authorization: str | None, correlation_id: str) -> UpstreamResponse:
+        self.last_method = "GET"
+        self.last_path = "/v1/account"
         self.last_authorization = authorization
         return self._respond()
 
@@ -174,6 +180,20 @@ def test_the_entitlement_read_passes_through_with_the_reader_token() -> None:
     assert entitlement.last_authorization == _READER["Authorization"]
 
 
+def test_the_account_read_passes_through_with_the_reader_token() -> None:
+    entitlement = _FakeEntitlementClient(body=b'{"consentModelProcessing":true,"locale":"en-GB"}')
+
+    with _client(entitlement) as client:
+        response = client.get("/v1/account", headers={**_READER, "x-correlation-id": "corr-3"})
+
+    assert response.status_code == 200
+    assert response.json() == {"consentModelProcessing": True, "locale": "en-GB"}
+    assert response.headers["x-correlation-id"] == "corr-3"
+    assert entitlement.last_method == "GET"
+    assert entitlement.last_path == "/v1/account"
+    assert entitlement.last_authorization == _READER["Authorization"]
+
+
 def test_the_account_update_passes_through_with_its_body() -> None:
     entitlement = _FakeEntitlementClient(body=b'{"consentModelProcessing":true,"locale":"en"}')
 
@@ -207,10 +227,12 @@ def test_a_missing_token_is_unauthorized_before_the_service_is_called() -> None:
 
     with _client(entitlement) as client:
         read = client.get("/v1/entitlement")
+        account = client.get("/v1/account")
         update = client.patch("/v1/account", json={"locale": "en"})
         delete = client.delete("/v1/account")
 
     assert read.status_code == 401
+    assert account.status_code == 401
     assert update.status_code == 401
     assert delete.status_code == 401
     assert read.json()["code"] == "unauthorized"

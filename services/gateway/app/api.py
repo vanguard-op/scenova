@@ -1,12 +1,16 @@
-"""Client HTTP API for the gateway (C-001, C-002, C-007, C-008, C-012, C-013, C-018, C-020, C-021).
+"""Client HTTP API for the gateway.
+
+Contracts: C-001, C-002, C-007, C-008, C-012, C-013, C-018, C-020, C-021,
+C-022.
 
 The gateway authenticates the caller, rate-limits lookups, events, push
 registrations, ratings, and reports, validates the request body, and passes the
 downstream service's response through unchanged, so the frozen contract's status
 codes and error codes reach the client as they are produced. The entitlement
-read, the account update, and the account deletion carry no rate limit of their
-own; the account screen reads the plan, writes the consent choice, and deletes
-the account, none of which is a flood surface.
+read, the account settings read, the account update, and the account deletion
+carry no rate limit of their own; the account screen reads the plan and the saved
+choices, writes the consent choice, and deletes the account, none of which is a
+flood surface.
 
 An account deletion is the one place the gateway sequences more than one
 service: once the entitlement service has removed the account, the gateway
@@ -221,6 +225,14 @@ def create_app(
         await resolved_verifier.verify(authorization)
         correlation_id = _correlation_id(resolved_settings, request)
         upstream = await resolved_entitlement.get_entitlement(authorization, correlation_id)
+        return _passthrough(upstream, correlation_id, resolved_settings)
+
+    @app.get("/v1/account")
+    async def get_account(request: Request) -> Response:
+        authorization = request.headers.get("authorization")
+        await resolved_verifier.verify(authorization)
+        correlation_id = _correlation_id(resolved_settings, request)
+        upstream = await resolved_entitlement.get_account(authorization, correlation_id)
         return _passthrough(upstream, correlation_id, resolved_settings)
 
     @app.patch("/v1/account")

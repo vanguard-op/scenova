@@ -9,6 +9,11 @@ reader is metered on the device and carries no allowance here.
 the choice follows them to a new device (C-020). Before sign-in the client holds
 both on the device alone and never reaches this service.
 
+`account_settings` reads that choice and locale back from the account (C-022), so
+a reader who made them on one device finds them on another. It reads the same
+account `update_account` writes, and refuses an anonymous or deleted token the
+same way.
+
 `delete_account` removes the reader's account and its entitlement (C-021): the
 account is marked deleted and the entitlement dropped, so the token's subject has
 no account from then on and the reader is a new reader with no account. The
@@ -121,6 +126,24 @@ class EntitlementService:
         account = await self._account_for(subject)
         record = await self._entitlement_for(account)
         return _response(self._served(record))
+
+    async def account_settings(self, subject: Subject) -> AccountResponse:
+        """The reader's stored consent choice and locale (C-022).
+
+        Both live on the account the reader's identity subject owns, so a choice
+        made on one device reads back here on another (FEAT-012). A reader who is
+        not signed in holds both on the device and never reaches this: an
+        anonymous token has no account, which is the contract's 401.
+        """
+
+        account = await self._account_for(
+            subject,
+            no_account_message="Sign in to read the choices saved on your account.",
+        )
+        return AccountResponse(
+            consentModelProcessing=account.consent_model_processing,
+            locale=account.locale,
+        )
 
     async def update_account(
         self, subject: Subject, request: AccountUpdateRequest
@@ -262,16 +285,22 @@ class EntitlementService:
 
     # --- Accounts and entitlements -------------------------------------------
 
-    async def _account_for(self, subject: Subject) -> AccountRecord:
+    async def _account_for(
+        self,
+        subject: Subject,
+        *,
+        no_account_message: str = "Sign in to see your plan and allowance.",
+    ) -> AccountRecord:
         """The reader's account, created on first sight, or 401 when unsigned.
 
         An anonymous token belongs to a reader who has not signed in; their
         allowance is device-local, so there is no account to meter and the
-        contract's 401 applies (C-018, C-020).
+        contract's 401 applies (C-018, C-020, C-022). The message names what the
+        caller was asking for, so each read or write refuses in its own words.
         """
 
         if subject.is_anonymous:
-            raise NoAccountError("Sign in to see your plan and allowance.")
+            raise NoAccountError(no_account_message)
 
         account = await self._store.account(subject.id)
         if account is not None and account.deleted_at is not None:
