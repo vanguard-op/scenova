@@ -22,9 +22,11 @@ provided:
   library read is refused (FEAT-006 edge case).
 - `notify_stack` — the client path plus the notification service and a push-provider
   double, so a clip-ready notice is followed end to end (FEAT-008).
-- `review_stack` — the client path plus the feedback service and the model double,
-  so a reader can rate and report a served clip and a curator can work the review
-  queue (FEAT-010, FEAT-011, FEAT-015; C-012 to C-016).
+- `review_stack` — the client path plus the feedback service, the notification
+  service, a push-provider double, and the model double, so a reader can rate and
+  report a served clip, the regenerated clip reaches the reporting reader by the
+  clip-ready notice, and a curator can work the review queue (FEAT-010, FEAT-011,
+  FEAT-015; C-008, C-012 to C-016).
 
 No stack reaches an external provider. The client-path stacks run without a
 model credential and the model-backed stacks point at a local double, and the
@@ -108,13 +110,18 @@ NOTIFY_PORTS = {
 # carries the reader's rating and report intake (C-012, C-013) and the curator's
 # review surface (C-014 to C-016). The generation path is served by the model
 # double, so a word lookup actually produces a clip a reader can rate and report.
+# The notification service and the push-provider double are included too, so a
+# report's regenerated clip can be followed to the reporting reader by the
+# clip-ready notice it reaches them on (C-008, FEAT-011).
 REVIEW_PORTS = {
     "gateway": 18480,
     "lookup": 18481,
     "pipeline": 18482,
     "library": 18483,
     "feedback": 18485,
+    "notification": 18487,
     "model": 18490,
+    "push": 18491,
 }
 
 # name -> (working directory, uvicorn module). Mirrors ci/lib.sh's service
@@ -397,18 +404,23 @@ def notify_stack(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Stack]:
 
 @pytest.fixture(scope="session")
 def review_stack(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Stack]:
-    """Boot the review path: the client path plus the feedback service and a model double.
+    """Boot the review path: the client path, the feedback service, and a model double.
 
     The feedback service carries the reader's rating and report intake (C-012,
     C-013) and the curator review surface (C-014 to C-016). The model provider is
     the local double, so a word lookup produces a real clip a reader can rate and
-    report, and a curator's replace or edit_phrase has a generation to hand off.
+    report, and a curator's choose or edit_phrase has a generation to hand off.
+    The notification service and the push double are booted beside it, so a
+    report's regenerated clip can be followed to the reporting reader by the
+    clip-ready notice (C-008, FEAT-011).
     """
 
     entries = {
         **SERVICES,
         "feedback": FEEDBACK_SERVICE,
+        "notification": NOTIFICATION_SERVICE,
         "model": MODEL_STUB,
+        "push": PUSH_STUB,
     }
     with _boot(entries, REVIEW_PORTS, tmp_path_factory) as booted:
         yield booted
@@ -531,6 +543,14 @@ def review_model_stub(review_stack: Stack) -> Iterator[httpx2.Client]:
     """A client for the review-path stack's model-provider double."""
 
     with httpx2.Client(base_url=review_stack.url("model"), timeout=10.0) as client:
+        yield client
+
+
+@pytest.fixture()
+def review_push(review_stack: Stack) -> Iterator[httpx2.Client]:
+    """A client for the review-path stack's push-provider double (C-008, FEAT-011)."""
+
+    with httpx2.Client(base_url=review_stack.url("push"), timeout=10.0) as client:
         yield client
 
 

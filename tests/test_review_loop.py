@@ -2,15 +2,27 @@
 
 Verifies FEAT-010 (clip feedback, C-012), FEAT-011 (report a clip, C-013), and
 FEAT-015 (library review console, C-014 to C-016) end to end across the shipped
-services: a reader looks a word up, is served a clip from the shared library, rates
-or reports it through the gateway, the entry is queued and held, and a curator
-works the queue and moves the entry.
+services: a reader looks a word up, is served a clip from the shared library,
+rates or reports it through the gateway, the entry is queued for review and keeps
+serving while a fresh clip is regenerated for the reporting reader, and a curator
+works the queue and chooses which clip serves the entry.
 
-The stack boots the feedback service beside the lookup, library, and pipeline
-services (the services the C-012 to C-016 contracts name), with the model provider
-as a local double so a word lookup actually produces a clip to rate and report.
-Each test uses its own invented word, so the shared library, lookup store, and
-review queue carry no state between tests.
+The moderation change is the semantics these tests assert: a report does not
+withdraw the clip other readers are using. It regenerates one clip for the entry,
+held on the entry's queue item as the curator's candidate and delivered to the
+reporting reader; the entry keeps serving the clip it already serves until the
+curator chooses a clip or retires it. There is no `held` entry status and no
+`hold`, `clear`, or `replace` action: the library moves between `active` and
+`retired`, and a curator resolves an item with `choose` (naming the serving clip
+or the candidate), `retire`, or `edit_phrase`.
+
+The stack boots the feedback service beside the lookup, library, pipeline,
+notification, and analytics services, with the model provider and the push
+provider as local doubles, so a word lookup produces a clip to rate and report, a
+report's regenerated clip reaches the reporting reader by the clip-ready notice
+(C-008), and a curator's action has a generation to hand off. Each test uses its
+own invented word, so the shared library, lookup store, and review queue carry no
+state between tests.
 """
 
 from __future__ import annotations
@@ -97,12 +109,20 @@ def _serve_word(
     return body
 
 
-def _served_entry_id(body: dict[str, Any]) -> str:
-    served: list[str] = [
-        sense["entryId"] for sense in body["senses"] if sense.get("clip") and sense.get("entryId")
+def _served_sense(body: dict[str, Any]) -> dict[str, Any]:
+    served: list[dict[str, Any]] = [
+        sense for sense in body["senses"] if sense.get("clip") and sense.get("entryId")
     ]
     assert served, f"the lookup served no entry: {body}"
     return served[0]
+
+
+def _served_entry_id(body: dict[str, Any]) -> str:
+    return str(_served_sense(body)["entryId"])
+
+
+def _served_clip_url(body: dict[str, Any]) -> str:
+    return str(_served_sense(body)["clip"]["url"])
 
 
 def _feedback(
@@ -145,6 +165,21 @@ def _report(
     )
 
 
+def _register(
+    gateway: httpx2.Client,
+    *,
+    lookup_id: str,
+    token: str = "fcm-token-1",
+    platform: str = "android",
+    subject: str = "reader-1",
+) -> httpx2.Response:
+    return gateway.post(
+        "/v1/push-registrations",
+        headers=_auth(subject),
+        json={"token": token, "platform": platform, "lookupId": lookup_id},
+    )
+
+
 def _queue(
     gateway: httpx2.Client,
     *,
@@ -175,10 +210,13 @@ def _act(
     action: str,
     *,
     expected_state: str = "queued",
+    chosen_clip: str | None = None,
     phrase: str | None = None,
     notes: str | None = None,
 ) -> httpx2.Response:
     payload: dict[str, Any] = {"action": action, "expectedState": expected_state}
+    if chosen_clip is not None:
+        payload["chosenClip"] = chosen_clip
     if phrase is not None:
         payload["phrase"] = phrase
     if notes is not None:
@@ -203,6 +241,25 @@ def _find_entry(library: httpx2.Client, lemma: str) -> dict[str, Any] | None:
     return entry
 
 
+def _wait_for_candidate(
+    gateway: httpx2.Client,
+    entry_id: str,
+    *,
+    attempts: int = 80,
+    delay: float = 0.25,
+) -> dict[str, Any]:
+    """Wait until the report-triggered clip is held as the entry's candidate."""
+
+    for _ in range(attempts):
+        response = _entry_detail(gateway, entry_id)
+        assert response.status_code == 200, response.text
+        detail: dict[str, Any] = response.json()
+        if detail.get("candidate") is not None:
+            return detail
+        time.sleep(delay)
+    pytest.fail(f"no candidate clip was regenerated for entry {entry_id}")
+
+
 def _wait_for_replacement(
     library: httpx2.Client,
     *,
@@ -217,6 +274,21 @@ def _wait_for_replacement(
             return entry
         time.sleep(delay)
     pytest.fail(f"the library never replaced entry {old_entry_id} for '{lemma}'")
+
+
+def _notices(push: httpx2.Client) -> list[dict[str, Any]]:
+    body: dict[str, Any] = push.get("/test/notices").json()
+    notices = body.get("notices", [])
+    return [notice for notice in notices if isinstance(notice, dict)]
+
+
+def _wait_for_notice(push: httpx2.Client, lookup_id: str, *, attempts: int = 60) -> dict[str, Any]:
+    for _ in range(attempts):
+        for notice in _notices(push):
+            if notice.get("notification", {}).get("data", {}).get("lookupId") == lookup_id:
+                return notice
+        time.sleep(0.25)
+    pytest.fail(f"no clip-ready notice reached the push provider for lookup {lookup_id}")
 
 
 # --- FEAT-010: clip feedback (C-012) -----------------------------------------
@@ -298,6 +370,25 @@ def test_a_repeated_rating_from_one_reader_replaces_the_earlier_one(
     assert queued["items"] == [], "only the reader's latest rating may count"
 
 
+def test_a_rating_on_a_retired_entry_is_recorded_and_changes_nothing_served(
+    review_gateway: httpx2.Client, review_library: httpx2.Client
+) -> None:
+    # FEAT-010 edge case: a rating on a clip whose entry has since been retired is
+    # still recorded, but it changes nothing served.
+    body = _serve_word(review_gateway, "frobnicate")
+    entry_id = _served_entry_id(body)
+    retired = review_library.patch(
+        f"/internal/library/entries/{entry_id}", headers=INTERNAL, json={"status": "retired"}
+    )
+    assert retired.status_code == 200, retired.text
+
+    response = _feedback(review_gateway, body["lookupId"], "not_helpful")
+
+    assert response.status_code == 202, response.text
+    assert response.json() == {"recorded": True}
+    assert _library_entry(review_library, entry_id).json()["entry"]["status"] == "retired"
+
+
 def test_a_phrase_lookup_rating_never_touches_the_shared_library(
     review_gateway: httpx2.Client, review_library: httpx2.Client
 ) -> None:
@@ -366,43 +457,85 @@ def test_a_rating_without_a_token_is_unauthorized(review_gateway: httpx2.Client)
 # --- FEAT-011: report a clip (C-013) -----------------------------------------
 
 
-def test_reporting_a_served_clip_queues_and_holds_the_entry(
+def test_reporting_a_served_clip_queues_and_keeps_the_entry_serving(
     review_gateway: httpx2.Client, review_library: httpx2.Client
 ) -> None:
     # FEAT-011 acceptance: a report records the entry and queues it for review,
-    # and holds the reported clip from new readers until it is reviewed.
+    # and the entry keeps serving the clip it already serves to other readers —
+    # a report does not withdraw it before a curator has judged it (D-030).
     body = _serve_word(review_gateway, "quorvex")
     entry_id = _served_entry_id(body)
+    served_url = _served_clip_url(body)
 
     response = _report(review_gateway, body["lookupId"], reason="offensive", note="graphic")
 
     assert response.status_code == 202, response.text
-    assert response.json()["status"] == "queued"
+    assert response.json()["state"] == "queued"
 
-    held = _library_entry(review_library, entry_id)
-    assert held.status_code == 200, held.text
-    assert held.json()["entry"]["status"] == "held", "a reported entry is held from new readers"
+    kept = _library_entry(review_library, entry_id)
+    assert kept.status_code == 200, kept.text
+    assert kept.json()["entry"]["status"] == "active", "a reported entry keeps serving"
 
     queued = _queue(review_gateway, word="quorvex").json()
     assert [item["entryId"] for item in queued["items"]] == [entry_id]
     assert queued["items"][0]["reason"] == "offensive"
 
+    later = _serve_word(review_gateway, "quorvex", subject="reader-2")
+    assert _served_entry_id(later) == entry_id, "other readers keep the entry"
+    assert _served_clip_url(later) == served_url, "and the clip it was serving"
 
-def test_a_reported_clip_is_not_served_to_a_new_reader(
-    review_gateway: httpx2.Client, review_library: httpx2.Client
+
+def test_a_report_regenerates_one_candidate_beside_the_serving_clip(
+    review_gateway: httpx2.Client,
 ) -> None:
-    # FEAT-011 acceptance: the reported clip is held from new readers. A later
-    # reader's lookup does not serve it; the entry is superseded by a replacement.
+    # FEAT-011 acceptance: the report regenerates one clip for the entry, held as
+    # the curator's candidate, while the entry keeps serving the clip it already
+    # serves (C-015 `candidate`).
     body = _serve_word(review_gateway, "vandrel", subject="reader-1")
     entry_id = _served_entry_id(body)
+    served_url = _served_clip_url(body)
     assert _report(review_gateway, body["lookupId"]).status_code == 202
 
-    later = _serve_word(review_gateway, "vandrel", subject="reader-2")
+    detail = _wait_for_candidate(review_gateway, entry_id)
 
-    assert entry_id not in {sense.get("entryId") for sense in later["senses"]}
-    assert (
-        _library_entry(review_library, entry_id).status_code == 404
-    ), "the reported entry no longer exists once a replacement is generated"
+    assert detail["candidate"]["url"] != served_url, "a fresh clip was regenerated"
+    assert detail["entry"]["status"] == "active"
+    assert detail["entry"]["clip"]["url"] == served_url, "the serving clip is unchanged"
+    assert [report["reason"] for report in detail["reports"]] == ["offensive"]
+
+
+def test_a_reports_regenerated_clip_reaches_the_reporting_reader(
+    review_gateway: httpx2.Client,
+    review_push: httpx2.Client,
+    review_library: httpx2.Client,
+    review_model_stub: httpx2.Client,
+) -> None:
+    # FEAT-011 acceptance: the regenerated clip is delivered to the reporting
+    # reader, by the clip-ready notice the report's generation raises (C-008),
+    # while the entry keeps serving the clip it already serves to other readers.
+    review_model_stub.post("/test/reset")
+    review_push.post("/test/reset")
+
+    body = _serve_word(review_gateway, "wondermint", subject="reader-1")
+    entry_id = _served_entry_id(body)
+    served_url = _served_clip_url(body)
+
+    registered = _register(review_gateway, lookup_id=body["lookupId"], token="tok-reporter")
+    assert registered.status_code == 202, registered.text
+    assert registered.json() == {"registered": True}
+
+    assert _report(review_gateway, body["lookupId"]).status_code == 202
+
+    notice = _wait_for_notice(review_push, body["lookupId"])
+    assert notice["token"] == "tok-reporter"
+    candidate_url = notice["notification"]["data"]["clipUrl"]
+    assert candidate_url != served_url
+
+    detail = _wait_for_candidate(review_gateway, entry_id)
+    assert detail["candidate"]["url"] == candidate_url, "the notice carried the candidate"
+
+    later = _serve_word(review_gateway, "wondermint", subject="reader-2")
+    assert _served_clip_url(later) == served_url, "other readers keep the serving clip"
 
 
 def test_a_duplicate_report_from_one_reader_is_refused(
@@ -420,19 +553,40 @@ def test_a_duplicate_report_from_one_reader_is_refused(
     assert second.json()["code"] == "already_reported"
 
 
-def test_a_report_on_an_entry_already_under_review_joins_the_same_item(
+def test_a_replayed_report_is_idempotent_and_a_changed_one_conflicts(
     review_gateway: httpx2.Client,
 ) -> None:
+    # FEAT-011 edge case: a report queued offline and resent is recorded once; the
+    # same client key with a different report is a conflict (C-013 409).
+    body = _serve_word(review_gateway, "shamblewick")
+    key = f"rp-{uuid4().hex}"
+
+    first = _report(review_gateway, body["lookupId"], reason="offensive", client_id=key)
+    replay = _report(review_gateway, body["lookupId"], reason="offensive", client_id=key)
+    conflict = _report(review_gateway, body["lookupId"], reason="low_quality", client_id=key)
+
+    assert first.status_code == 202, first.text
+    assert replay.status_code == 202, replay.text
+    assert replay.json()["reportId"] == first.json()["reportId"]
+    assert conflict.status_code == 409, conflict.text
+
+
+def test_a_report_on_an_entry_already_under_review_joins_the_item_and_reuses_the_candidate(
+    review_gateway: httpx2.Client,
+    review_model_stub: httpx2.Client,
+) -> None:
     # FEAT-011 / FEAT-015 edge case: an entry reported more than once holds one
-    # queue item with every report against it. Both readers are served the entry
-    # before the first report holds it; a lookup made after the hold is a fresh
-    # generation, so the second report must come from an already-served lookup.
+    # queue item with every report against it and reuses the one candidate the
+    # first report produced, so the entry costs one generation however many
+    # readers report it. The entry keeps serving between the two reports.
+    review_model_stub.post("/test/reset")
     first = _serve_word(review_gateway, "morblex", subject="reader-1")
     entry_id = _served_entry_id(first)
-    second = _serve_word(review_gateway, "morblex", subject="reader-2")
-    assert _served_entry_id(second) == entry_id, "both readers are served the same entry"
 
     assert _report(review_gateway, first["lookupId"], reason="low_quality").status_code == 202
+
+    second = _serve_word(review_gateway, "morblex", subject="reader-2")
+    assert _served_entry_id(second) == entry_id, "the entry still serves after a report"
     assert (
         _report(
             review_gateway, second["lookupId"], reason="wrong_meaning", subject="reader-2"
@@ -440,12 +594,20 @@ def test_a_report_on_an_entry_already_under_review_joins_the_same_item(
         == 202
     )
 
+    detail = _wait_for_candidate(review_gateway, entry_id)
+    candidate_url = detail["candidate"]["url"]
+    # Give any erroneous second candidate generation time to land before counting.
+    time.sleep(0.5)
+    reread = _entry_detail(review_gateway, entry_id).json()
+    assert reread["candidate"]["url"] == candidate_url, "the candidate is reused, not regenerated"
+
     queued = _queue(review_gateway, word="morblex").json()
     assert [item["entryId"] for item in queued["items"]] == [entry_id], "one item per entry"
-
-    detail = _entry_detail(review_gateway, entry_id).json()
-    reasons = {report["reason"] for report in detail["reports"]}
+    reasons = {report["reason"] for report in reread["reports"]}
     assert reasons == {"low_quality", "wrong_meaning"}, "every report joins the item"
+
+    calls = review_model_stub.get("/test/calls").json()
+    assert calls["clip"] == 2, "one generation for the word and one candidate, however many reports"
 
 
 def test_a_report_on_a_phrase_lookup_has_no_shared_effect(
@@ -507,11 +669,12 @@ def test_the_review_surface_refuses_a_caller_without_the_curator_role(
     assert curator_with_mfa.status_code == 200, curator_with_mfa.text
 
 
-def test_a_queued_entry_shows_its_word_sense_reason_and_phrase(
+def test_a_queued_entry_shows_its_word_sense_reason_phrase_and_candidate(
     review_gateway: httpx2.Client,
 ) -> None:
     # FEAT-015 acceptance: a queued entry appears with its word, sense, reason,
-    # and generation phrase; C-015 carries the clip and the evidence behind it.
+    # and generation phrase; C-015 carries the clip serving it beside the
+    # candidate regenerated for the reporting reader, and the evidence behind it.
     body = _serve_word(review_gateway, "flarnic")
     entry_id = _served_entry_id(body)
     assert (
@@ -528,11 +691,12 @@ def test_a_queued_entry_shows_its_word_sense_reason_and_phrase(
     assert item["reason"] == "wrong_meaning"
     assert item["state"] == "queued"
 
-    detail = _entry_detail(review_gateway, entry_id).json()
+    detail = _wait_for_candidate(review_gateway, entry_id)
     assert detail["entry"]["entryId"] == entry_id
     assert detail["entry"]["glossPhrase"], "the generation phrase travels with the entry"
-    assert detail["entry"]["status"] == "held"
+    assert detail["entry"]["status"] == "active", "an entry under review keeps serving"
     assert detail["entry"]["clip"]["resolution"] == "360p"
+    assert detail["candidate"]["resolution"] == "360p"
     assert detail["reports"] == [
         {
             "reportId": detail["reports"][0]["reportId"],
@@ -544,47 +708,62 @@ def test_a_queued_entry_shows_its_word_sense_reason_and_phrase(
     assert detail["state"] == "queued"
 
 
-def test_the_curator_clears_an_entry_and_it_returns_to_serving(
+def test_the_curator_chooses_the_serving_clip_and_resolves_the_item(
     review_gateway: httpx2.Client, review_library: httpx2.Client
 ) -> None:
-    # FEAT-015 acceptance: clearing a queued entry returns it to serving and
-    # resolves its queue item (C-016 `clear`).
+    # FEAT-015 acceptance: the curator chooses the clip that is serving as the one
+    # served to every reader; the entry keeps serving it and the queue item is
+    # resolved (C-016 `choose` with `chosenClip=serving`).
     body = _serve_word(review_gateway, "glorpish", subject="reader-1")
     entry_id = _served_entry_id(body)
+    served_url = _served_clip_url(body)
     assert _report(review_gateway, body["lookupId"]).status_code == 202
+    _wait_for_candidate(review_gateway, entry_id)
 
-    response = _act(review_gateway, entry_id, "clear")
+    response = _act(review_gateway, entry_id, "choose", chosen_clip="serving")
 
     assert response.status_code == 200, response.text
     assert response.json()["status"] == "active"
     assert response.json()["state"] == "actioned"
-    assert _library_entry(review_library, entry_id).json()["entry"]["status"] == "active"
+    entry = _library_entry(review_library, entry_id).json()["entry"]
+    assert entry["status"] == "active"
+    assert entry["clip"]["url"] == served_url
 
     later = _serve_word(review_gateway, "glorpish", subject="reader-2")
-    assert _served_entry_id(later) == entry_id, "a cleared entry is served again"
+    assert _served_entry_id(later) == entry_id
+    assert _served_clip_url(later) == served_url
 
     queued = _queue(review_gateway, word="glorpish", state="queued").json()
     assert queued["items"] == [], "the resolved item leaves the open queue"
 
 
-def test_the_curator_holds_an_entry_and_it_is_withheld(
+def test_the_curator_chooses_the_candidate_and_it_serves_every_reader(
     review_gateway: httpx2.Client, review_library: httpx2.Client
 ) -> None:
-    # FEAT-015 acceptance: holding a queued entry withholds it from new readers
-    # until it is cleared or replaced (C-016 `hold`).
-    body = _serve_word(review_gateway, "dremmel", subject="reader-1")
+    # FEAT-015 acceptance: the curator chooses the candidate regenerated for the
+    # reporting reader; it becomes the clip served to every reader (C-016
+    # `choose` with `chosenClip=candidate`).
+    body = _serve_word(review_gateway, "gribble", subject="reader-1")
     entry_id = _served_entry_id(body)
     assert _report(review_gateway, body["lookupId"]).status_code == 202
+    detail = _wait_for_candidate(review_gateway, entry_id)
+    candidate_url = detail["candidate"]["url"]
 
-    response = _act(review_gateway, entry_id, "hold")
+    response = _act(review_gateway, entry_id, "choose", chosen_clip="candidate")
 
     assert response.status_code == 200, response.text
-    assert response.json()["status"] == "held"
+    assert response.json()["status"] == "active"
     assert response.json()["state"] == "actioned"
-    assert _library_entry(review_library, entry_id).json()["entry"]["status"] == "held"
+    entry = _library_entry(review_library, entry_id).json()["entry"]
+    assert entry["status"] == "active"
+    assert entry["clip"]["url"] == candidate_url, "the candidate is the serving clip now"
 
-    later = _serve_word(review_gateway, "dremmel", subject="reader-2")
-    assert entry_id not in {sense.get("entryId") for sense in later["senses"]}
+    later = _serve_word(review_gateway, "gribble", subject="reader-2")
+    assert _served_entry_id(later) == entry_id
+    assert _served_clip_url(later) == candidate_url
+
+    queued = _queue(review_gateway, word="gribble", state="queued").json()
+    assert queued["items"] == [], "the resolved item leaves the open queue"
 
 
 def test_the_curator_retires_an_entry_and_the_next_lookup_regenerates(
@@ -607,30 +786,12 @@ def test_the_curator_retires_an_entry_and_the_next_lookup_regenerates(
     assert replacement != entry_id, "a retired entry is not served; a replacement is"
 
 
-def test_the_curator_replaces_an_entry_and_it_regenerates(
-    review_gateway: httpx2.Client, review_library: httpx2.Client
-) -> None:
-    # FEAT-015 acceptance: replacing a queued entry retires it and regenerates it
-    # (C-016 `replace`).
-    body = _serve_word(review_gateway, "hobblecrank", subject="reader-1")
-    entry_id = _served_entry_id(body)
-    assert _report(review_gateway, body["lookupId"]).status_code == 202
-
-    response = _act(review_gateway, entry_id, "replace")
-
-    assert response.status_code == 200, response.text
-    assert response.json()["status"] == "retired"
-    assert response.json()["state"] == "actioned"
-
-    replacement = _wait_for_replacement(review_library, lemma="hobblecrank", old_entry_id=entry_id)
-    assert replacement["status"] == "active"
-
-
 def test_the_curator_edits_the_generation_phrase_and_it_regenerates(
     review_gateway: httpx2.Client, review_library: httpx2.Client
 ) -> None:
     # FEAT-015 acceptance: editing the generation phrase records the new phrase and
-    # regenerates the entry from it (C-016 `edit_phrase`).
+    # regenerates the entry from it; the queue item stays under review (C-016
+    # `edit_phrase` resolves the item as `reviewed`).
     body = _serve_word(review_gateway, "quillfeather", subject="reader-1")
     entry_id = _served_entry_id(body)
     assert _report(review_gateway, body["lookupId"]).status_code == 202
@@ -654,12 +815,56 @@ def test_a_second_curator_is_told_the_entry_has_already_moved(
     entry_id = _served_entry_id(body)
     assert _report(review_gateway, body["lookupId"]).status_code == 202
 
-    first = _act(review_gateway, entry_id, "clear", expected_state="queued")
+    first = _act(review_gateway, entry_id, "choose", chosen_clip="serving", expected_state="queued")
     second = _act(review_gateway, entry_id, "retire", expected_state="queued")
 
     assert first.status_code == 200, first.text
     assert second.status_code == 409, second.text
     assert second.json()["code"] == "review_conflict"
+
+
+def test_the_queue_state_filter_narrows_to_the_review_state(
+    review_gateway: httpx2.Client,
+) -> None:
+    # C-014: the queue is filterable by state; an actioned item leaves the open
+    # queue and is reachable only under its own state.
+    body = _serve_word(review_gateway, "wobblefin", subject="reader-1")
+    entry_id = _served_entry_id(body)
+    assert _report(review_gateway, body["lookupId"]).status_code == 202
+    assert _act(review_gateway, entry_id, "choose", chosen_clip="serving").status_code == 200
+
+    open_items = _queue(review_gateway, word="wobblefin", state="queued").json()["items"]
+    actioned_items = _queue(review_gateway, word="wobblefin", state="actioned").json()["items"]
+
+    assert open_items == []
+    assert [item["entryId"] for item in actioned_items] == [entry_id]
+
+
+def test_the_queue_reason_filter_takes_report_reasons_only(
+    review_gateway: httpx2.Client,
+) -> None:
+    # C-014: an item queued by the negative-feedback threshold carries
+    # `feedback_threshold` as its reason, which is not a report reason, so the
+    # `reason` filter never selects it.
+    first = _serve_word(review_gateway, "thistlewick", subject="reader-1")
+    entry_id = _served_entry_id(first)
+    for index, subject in enumerate(("reader-1", "reader-2", "reader-3")):
+        lookup = (
+            first if index == 0 else _serve_word(review_gateway, "thistlewick", subject=subject)
+        )
+        assert (
+            _feedback(
+                review_gateway, lookup["lookupId"], "not_helpful", subject=subject
+            ).status_code
+            == 202
+        )
+
+    all_items = _queue(review_gateway, word="thistlewick").json()["items"]
+    assert [item["entryId"] for item in all_items] == [entry_id]
+    assert all_items[0]["reason"] == "feedback_threshold"
+
+    by_report_reason = _queue(review_gateway, word="thistlewick", reason="wrong_meaning").json()
+    assert by_report_reason["items"] == []
 
 
 def test_an_entry_with_nothing_queued_is_not_found(review_gateway: httpx2.Client) -> None:
@@ -674,15 +879,30 @@ def test_an_entry_with_nothing_queued_is_not_found(review_gateway: httpx2.Client
 
 
 def test_an_unknown_review_action_is_refused(review_gateway: httpx2.Client) -> None:
-    # C-016 400: an unknown action, and an edit_phrase without a phrase, are
-    # refused before anything is recorded.
+    # C-016 400: an unknown action, a choose without a clip, and an edit_phrase
+    # without a phrase are refused before anything is recorded.
     body = _serve_word(review_gateway, "clotterby", subject="reader-1")
     entry_id = _served_entry_id(body)
     assert _report(review_gateway, body["lookupId"]).status_code == 202
 
     unknown = _act(review_gateway, entry_id, "obliterate")
+    missing_clip = _act(review_gateway, entry_id, "choose")
     missing_phrase = _act(review_gateway, entry_id, "edit_phrase")
 
     assert unknown.status_code == 400, unknown.text
+    assert missing_clip.status_code == 400, missing_clip.text
+    assert missing_clip.json()["code"] == "invalid_request"
     assert missing_phrase.status_code == 400, missing_phrase.text
     assert missing_phrase.json()["code"] == "invalid_request"
+
+
+def test_curator_notes_over_the_bound_are_refused(review_gateway: httpx2.Client) -> None:
+    # C-016 400: a curator note over 500 characters is refused.
+    body = _serve_word(review_gateway, "plumbago", subject="reader-1")
+    entry_id = _served_entry_id(body)
+    assert _report(review_gateway, body["lookupId"]).status_code == 202
+
+    response = _act(review_gateway, entry_id, "retire", notes="x" * 501)
+
+    assert response.status_code == 400, response.text
+    assert response.json()["code"] == "invalid_request"

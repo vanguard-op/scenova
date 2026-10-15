@@ -2,8 +2,9 @@
 
 Verifies FEAT-006 end to end against the frozen internal contracts C-009
 (`POST /internal/library/entries`), C-010 (`GET /internal/library/entries`), and
-C-011 (`PATCH /internal/library/entries/{entryId}`), and the acceptance criteria
-and edge cases in the feature doc.
+C-011 (`PATCH /internal/library/entries/{entryId}`), plus C-017
+(`GET /internal/library/entries/{entryId}`, the review service's by-id read), and
+the acceptance criteria and edge cases in the feature doc.
 
 The library is exercised two ways:
 
@@ -271,12 +272,14 @@ def test_a_retired_entry_is_not_served_and_is_regenerated(
     assert sense["clip"] is None
 
 
-def test_a_held_entry_is_withheld_from_new_readers(
+def test_a_held_status_is_refused_and_the_entry_keeps_serving(
     gateway: httpx2.Client,
     library: httpx2.Client,
 ) -> None:
-    # FEAT-006 edge case: a clip judged wrong is held from new readers until it is
-    # replaced.
+    # The library holds only `active` and `retired`: an entry under review keeps
+    # serving while a curator decides, so there is no `held` status (FEAT-006
+    # edge case, FEAT-015, C-011). The superseded status is refused rather than
+    # accepted, and the entry it named is untouched.
     _store(
         library,
         _entry(
@@ -292,21 +295,22 @@ def test_a_held_entry_is_withheld_from_new_readers(
         headers=INTERNAL,
         json={"status": "held"},
     )
-    assert held.status_code == 200, held.text
-    assert held.json()["status"] == "held"
 
-    body = _create(gateway, "happier", client_id="lib-held-happier").json()
+    assert held.status_code == 400, held.text
+    assert held.json()["code"] == "invalid_request"
 
-    assert body["status"] == "generating"
-    assert all(sense["clip"] is None for sense in body["senses"])
-    assert all(sense["entryId"] is None for sense in body["senses"])
+    found = _find(library, lemma="happy", sense_label="glad", part_of_speech="adjective")
+    assert found.json()["entry"]["status"] == "active"
+    body = _create(gateway, "happier", client_id="lib-review-happier").json()
+    assert body["status"] == "served", "the entry under review still serves"
+    assert body["senses"][0]["entryId"] == "le_happy"
 
 
-def test_a_held_entry_is_kept_and_reported_by_the_library(
+def test_a_retired_entry_is_kept_and_reported_by_the_library(
     library: httpx2.Client,
 ) -> None:
-    # The lookup must tell a held entry from an absent one, so the library keeps
-    # it and reports its status rather than dropping it (FEAT-006, C-010).
+    # The lookup must tell a retired entry from an absent one, so the library keeps
+    # it and reports its status rather than dropping it (FEAT-006, C-010, C-011).
     _store(
         library,
         _entry(
@@ -316,7 +320,7 @@ def test_a_held_entry_is_kept_and_reported_by_the_library(
             part_of_speech="verb",
         ),
     )
-    library.patch("/internal/library/entries/le_read", headers=INTERNAL, json={"status": "held"})
+    library.patch("/internal/library/entries/le_read", headers=INTERNAL, json={"status": "retired"})
 
     found = _find(library, lemma="read", sense_label="look_at_words", part_of_speech="verb")
 
@@ -324,7 +328,7 @@ def test_a_held_entry_is_kept_and_reported_by_the_library(
     entry = found.json()["entry"]
     assert entry is not None
     assert entry["entryId"] == "le_read"
-    assert entry["status"] == "held"
+    assert entry["status"] == "retired"
 
 
 # --- C-009: POST /internal/library/entries -----------------------------------
@@ -618,6 +622,73 @@ def test_a_status_outside_the_review_states_is_refused(library: httpx2.Client) -
 
     assert response.status_code == 400, response.text
     assert response.json()["code"] == "invalid_request"
+
+
+# --- C-017: GET /internal/library/entries/{entryId} --------------------------
+
+
+def test_the_by_id_entry_read_conforms_to_contract_c017(library: httpx2.Client) -> None:
+    # C-017 freezes the by-id read the review service uses for an entry's detail:
+    # the queue holds only an entry id, so the sense key C-010 needs is not at
+    # hand. It carries the word, sense, phrase, status, and clip.
+    _store(
+        library,
+        _entry(
+            "le_phone",
+            lemma="phone",
+            sense_label="device",
+            part_of_speech="noun",
+            gloss="a device for talking to someone far away",
+        ),
+    )
+
+    response = library.get("/internal/library/entries/le_phone", headers=INTERNAL)
+
+    assert response.status_code == 200, response.text
+    entry = response.json()["entry"]
+    assert set(entry) == {
+        "entryId",
+        "lemma",
+        "senseLabel",
+        "partOfSpeech",
+        "glossPhrase",
+        "status",
+        "clip",
+    }, f"C-017 entry fields differ: {sorted(entry)}"
+    assert set(entry["clip"]) == {"url", "durationSeconds", "resolution", "hasAudio"}
+    assert entry["entryId"] == "le_phone"
+    assert entry["lemma"] == "phone"
+    assert entry["senseLabel"] == "device"
+    assert entry["partOfSpeech"] == "noun"
+    assert entry["status"] == "active"
+
+
+def test_an_unknown_entry_id_reads_as_not_found(library: httpx2.Client) -> None:
+    # C-017 404: an unknown id is a not-found, with the frozen code.
+    response = library.get("/internal/library/entries/le_missing", headers=INTERNAL)
+
+    assert response.status_code == 404, response.text
+    assert response.json()["code"] == "entry_not_found"
+
+
+def test_the_by_id_entry_read_requires_the_internal_audience(
+    library: httpx2.Client,
+) -> None:
+    # C-017: internal service identity only; never reachable from the client.
+    _store(
+        library,
+        _entry(
+            "le_secret",
+            lemma="secret",
+            sense_label="hidden",
+            part_of_speech="adjective",
+        ),
+    )
+
+    response = library.get("/internal/library/entries/le_secret")
+
+    assert response.status_code == 401, response.text
+    assert response.json()["code"] == "unauthorized"
 
 
 # --- FEAT-006 across the generation loop (provider as a test double) ---------
