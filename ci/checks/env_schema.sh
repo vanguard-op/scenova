@@ -9,6 +9,8 @@
 #   - a tfvars carries no FLAG_* key the doc does not define (a typo would
 #     silently disable a kill switch);
 #   - the clip-store variables the AI layer resolves are declared;
+#   - the primary-database keys are declared and stay wired to the Terraform
+#     that provides the store;
 #   - no schema key is declared twice.
 #
 # It runs before the build in `make ci`, so a drifted schema fails fast.
@@ -55,6 +57,33 @@ done
 for key in "${CLIP_STORE_KEYS[@]}"; do
   grep -qE "^${key}=" "$SCHEMA" || die "$SCHEMA is missing the clip-store key $key"
 done
+
+# architecture.md "Data Architecture" (Primary Database): the environment the
+# services and the migration toolchain read. DATABASE_URL is the one name for the
+# connection string — the local docker-compose Postgres locally, injected from
+# Secret Manager in the cloud — and the DB_* parts describe the local instance
+# docker-compose starts. The schema must stay wired to the platform it describes:
+# the services receive DATABASE_URL, and the Cloud SQL instance keeps
+# point-in-time recovery so account and entitlement data meets the 1-hour RPO
+# (nfr.md "Availability & Reliability").
+DB_KEYS=(
+  DATABASE_URL
+  DB_HOST
+  DB_PORT
+  DB_NAME
+  DB_USER
+  DB_PASSWORD
+)
+for key in "${DB_KEYS[@]}"; do
+  grep -qE "^${key}=" "$SCHEMA" || die "$SCHEMA is missing the database key $key"
+done
+if [ -f infra/terraform/main.tf ]; then
+  grep -qE '^[[:space:]]*DATABASE_URL[[:space:]]*=' infra/terraform/main.tf \
+    || die "infra/terraform/main.tf must wire DATABASE_URL into the services"
+  grep -q 'point_in_time_recovery_enabled = true' infra/terraform/modules/data/main.tf \
+    || die "the Cloud SQL instance must keep point-in-time recovery for the 1-hour RPO (nfr.md)"
+fi
+info "database ok: ${#DB_KEYS[@]} keys; DATABASE_URL wired; point-in-time recovery on"
 
 # One project, three names (architecture.md "Identity provider"; D-005): the
 # Firebase project — the token audience the services verify and the FCM target

@@ -40,13 +40,14 @@ MYPY      := $(VENV)/bin/mypy
 PYTEST    := $(VENV)/bin/pytest
 
 .PHONY: help setup auth fmt lint env typecheck test qa qa-model model-bar build bundle boot security \
+        db-up db-migrate db-rollback db-reset db-status db-check db-migrate-cloud \
         infra-init infra-fmt infra-validate infra-plan infra-apply \
         deploy deploy-console curator promote rollback flag ci clean
 
 help: ## Show the documented commands
 	@printf '\nScenova platform commands (env=%s, venv=%s)\n\n' "$(ENVIRONMENT)" "$(VENV)"
 	@awk 'BEGIN{FS=":.*## "} /^[a-zA-Z0-9_-]+:.*## /{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
-	@printf '\nTargets: make setup · make auth · make ci · make qa · make model-bar · make deploy ENV=staging · make promote ENV=staging SVC=gateway · make rollback ENV=staging SVC=gateway · make flag ENV=prod FLAG=FLAG_ENABLE_GENERATION VALUE=false · make curator OPERATOR=…\n\n'
+	@printf '\nTargets: make setup · make auth · make ci · make qa · make model-bar · make db-up · make db-migrate · make deploy ENV=staging · make promote ENV=staging SVC=gateway · make rollback ENV=staging SVC=gateway · make flag ENV=prod FLAG=FLAG_ENABLE_GENERATION VALUE=false · make curator OPERATOR=…\n\n'
 
 # --- Setup -------------------------------------------------------------------
 
@@ -57,7 +58,7 @@ setup: ## Create .venv, install pinned dev tooling, seed .env, fetch Flutter dep
 	$$PYBIN -m venv $(VENV); \
 	$(PIP) install --quiet --upgrade pip; \
 	$(PIP) install --quiet -r requirements-dev.txt; \
-	for req in $$(find services ai -maxdepth 2 -name requirements.txt 2>/dev/null | sort); do \
+	for req in $$(find services ai infra/db -maxdepth 2 -name requirements.txt 2>/dev/null | sort); do \
 		echo "==> deps $$req"; $(PIP) install --quiet -r "$$req"; \
 	done; \
 	if [ ! -f .env ]; then cp .env.example .env; echo "==> created .env from .env.example"; fi; \
@@ -109,6 +110,29 @@ boot: ## Boot the stack locally and assert each service serves /healthz
 
 security: ## Dependency scan (pip-audit) and secret scan
 	@bash ci/checks/security.sh
+
+# --- Primary database --------------------------------------------------------
+
+db-up: ## Start the local PostgreSQL (docker compose) for development
+	@bash ci/db.sh up
+
+db-migrate: ## Apply database migrations to the local DATABASE_URL
+	@bash ci/db.sh migrate
+
+db-rollback: ## Roll back one database migration (REV=… to target another revision)
+	@bash ci/db.sh rollback $(REV)
+
+db-reset: ## Rebuild the local schema (downgrade to base, then migrate to head)
+	@bash ci/db.sh reset
+
+db-status: ## Show the applied database revision and the migration head
+	@bash ci/db.sh status
+
+db-check: ## Apply, roll back, and re-apply the migrations against a throwaway PostgreSQL
+	@bash ci/checks/db.sh
+
+db-migrate-cloud: ## Run an environment's Cloud SQL migration job (ENV=dev|staging|prod)
+	@bash ci/db.sh cloud $(ENV)
 
 # --- Infrastructure ----------------------------------------------------------
 

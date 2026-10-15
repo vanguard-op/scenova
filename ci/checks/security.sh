@@ -12,7 +12,7 @@ while IFS= read -r req; do
   [ -n "$req" ] || continue
   log "Security · pip-audit ($req)"
   "$(tool pip-audit)" -r "$req"
-done < <(find services ai -maxdepth 2 -name requirements.txt 2>/dev/null | sort)
+done < <(find services ai infra/db -maxdepth 2 -name requirements.txt 2>/dev/null | sort)
 
 log "Security · secret scan"
 bash "$(dirname "$0")/secret_scan.sh"

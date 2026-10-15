@@ -28,6 +28,11 @@ output "db_connection_name" {
   value       = module.data.db_connection_name
 }
 
+output "db_migrate_job" {
+  description = "Cloud Run job that applies the primary database migrations."
+  value       = module.db_migrate.job_name
+}
+
 output "redis_host" {
   description = "Memorystore Redis host (private)."
   value       = module.data.redis_host

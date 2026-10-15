@@ -52,6 +52,16 @@ if command -v docker >/dev/null 2>&1; then
     smoke_image "$name"
     built_any=1
   done < <(container_images)
+
+  # The migration job image (infra/db) is built too, so a broken Dockerfile or an
+  # unbootable toolchain fails here rather than at deploy. It is a job, not a
+  # server, so it is not smoke-booted.
+  if has_db_migrations && [ -f infra/db/Dockerfile ]; then
+    IFS='|' read -r name context dockerfile < <(db_migrate_image)
+    log "Build · docker image $(image_ref "$name") (migration job)"
+    docker build -f "$dockerfile" -t "$(image_ref "$name")" "$context"
+    built_any=1
+  fi
 else
   skip "docker not available — skipping container image builds"
 fi

@@ -171,3 +171,13 @@ container_images() {
 
 # Local image reference; the deploy path overrides the registry and tag.
 image_ref() { printf 'scenova/%s:%s\n' "$1" "${GIT_SHA:-local}"; }
+
+# The primary database migration image (infra/db). It is a Cloud Run job, not a
+# service: it is built and shipped but never smoke-booted as a server. It is kept
+# out of container_images() for exactly that reason.
+has_db_migrations() {
+  [ -d infra/db/migrations ] \
+    && find infra/db/migrations -name '*.py' -not -path '*/.*' -print -quit 2>/dev/null | grep -q .
+}
+
+db_migrate_image() { printf '%s|%s|%s\n' "db-migrate" "infra/db" "infra/db/Dockerfile"; }

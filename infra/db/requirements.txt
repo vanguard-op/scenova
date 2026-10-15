@@ -1,0 +1,11 @@
+# Primary database migration toolchain (architecture.md "Data Architecture":
+# Cloud SQL for PostgreSQL). Pinned exactly for reproducible CI and a clean
+# dependency scan (NFR-028).
+#
+# Alembic is the migration runner: the schema is its migration history, applied
+# by `make db-migrate` locally and by the migration job in the cloud, so the same
+# revisions run against the local docker-compose Postgres and Cloud SQL.
+# psycopg is the PostgreSQL driver Alembic's engine uses, pinned to the same
+# version the services use so one venv and one image carry one driver.
+alembic==1.20.0
+psycopg[binary]==3.2.10

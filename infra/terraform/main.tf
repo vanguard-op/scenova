@@ -26,6 +26,14 @@ resource "google_service_account" "deploy" {
   display_name = "Scenova deploy pipeline (${var.environment})"
 }
 
+# The migration job's identity: it reads DATABASE_URL and reaches Cloud SQL over
+# the VPC connector, and it can do nothing else (least privilege, NFR-020).
+resource "google_service_account" "migrate" {
+  project      = var.project_id
+  account_id   = "scenova-migrate"
+  display_name = "Scenova database migration job (${var.environment})"
+}
+
 locals {
   runtime_emails     = { for k, sa in google_service_account.runtime : k => sa.email }
   all_runtime_emails = values(local.runtime_emails)
@@ -53,7 +61,7 @@ module "secrets" {
   secret_ids  = var.secret_ids
 
   accessors = {
-    "database-url"            = local.all_runtime_emails
+    "database-url"            = concat(local.all_runtime_emails, [google_service_account.migrate.email])
     "db-password"             = local.all_runtime_emails
     "gemini-api-key"          = [local.runtime_emails["model"]]
     "revenuecat-api-key"      = [local.runtime_emails["entitlement"]]
@@ -90,6 +98,24 @@ module "data" {
   ]
 
   secret_container_ids = module.secrets.secret_ids
+}
+
+# --- Primary database migrations (FEAT-006, FEAT-010, FEAT-011, FEAT-013) ------
+
+# The migration job applies the revisions under infra/db/migrations against Cloud
+# SQL from inside the VPC; `make deploy` runs it before service traffic shifts,
+# and `make db-migrate-cloud ENV=…` runs it on its own.
+module "db_migrate" {
+  source = "./modules/db_migrate"
+
+  project_id            = var.project_id
+  region                = var.region
+  environment           = var.environment
+  labels                = var.labels
+  connector_id          = module.network.connector_id
+  service_account_email = google_service_account.migrate.email
+  database_url_secret   = module.secrets.secret_ids["database-url"]
+  image                 = local.bootstrap_image
 }
 
 # --- Queue --------------------------------------------------------------------
@@ -235,6 +261,22 @@ resource "google_project_iam_member" "runtime_cloudsql" {
   project = var.project_id
   role    = "roles/cloudsql.client"
   member  = "serviceAccount:${each.value.email}"
+}
+
+# The migration job reaches Cloud SQL over the VPC connector and nothing else.
+resource "google_project_iam_member" "migrate_cloudsql" {
+  project = var.project_id
+  role    = "roles/cloudsql.client"
+  member  = "serviceAccount:${google_service_account.migrate.email}"
+}
+
+# The deploy pipeline runs the migration job as the migrate identity, so
+# `gcloud run jobs execute` (from `make deploy` / `make db-migrate-cloud`) works
+# without a separate grant.
+resource "google_service_account_iam_member" "deploy_act_as_migrate" {
+  service_account_id = google_service_account.migrate.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.deploy.email}"
 }
 
 resource "google_project_iam_member" "pipeline_tasks_enqueuer" {

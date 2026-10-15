@@ -70,6 +70,30 @@ fi
 log "Deploy · env=$ENV project=$PROJECT_ID region=$REGION tag=$GIT_SHA"
 info "services: ${services[*]}"
 
+# Apply the primary database migrations before any service traffic shifts, so a
+# schema change lands before the code that expects it (release.md "Data
+# migrations"). The job is Terraform-owned (modules/db_migrate); this replaces its
+# image and runs it to completion — a failed migration stops the deploy.
+if has_db_migrations && [ -f infra/db/Dockerfile ]; then
+  migrate_image="${REGISTRY}/db-migrate:${GIT_SHA}"
+  log "Deploy · build and push $migrate_image"
+  docker build -f infra/db/Dockerfile -t "$migrate_image" infra/db
+  docker push "$migrate_image"
+
+  if ! gcloud run jobs describe scenova-db-migrate --project "$PROJECT_ID" --region "$REGION" >/dev/null 2>&1; then
+    die "Cloud Run job 'scenova-db-migrate' not found in $PROJECT_ID; run 'make infra-apply ENV=$ENV' first"
+  fi
+  log "Deploy · update migration job scenova-db-migrate"
+  gcloud run jobs update scenova-db-migrate \
+    --project "$PROJECT_ID" \
+    --region "$REGION" \
+    --image "$migrate_image" \
+    --quiet
+
+  log "Deploy · run database migrations"
+  bash "$(dirname "$0")/db.sh" cloud "$ENV"
+fi
+
 for svc in "${services[@]}"; do
   image="${REGISTRY}/${svc}:${GIT_SHA}"
 

@@ -84,6 +84,14 @@ resource "google_sql_database_instance" "primary" {
       }
     }
 
+    # Planned work runs in a weekly low-traffic window (nfr.md "Maintenance
+    # windows"); the generation path is drained separately before the window.
+    maintenance_window {
+      day          = 7
+      hour         = 4
+      update_track = "stable"
+    }
+
     ip_configuration {
       ipv4_enabled    = false
       private_network = var.network_id
