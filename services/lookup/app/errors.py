@@ -52,3 +52,14 @@ class LookupNotFoundError(LookupError):
 
     status_code = 404
     code = "lookup_not_found"
+
+
+class LookupUnavailableError(LookupError):
+    """The primary database could not be reached, so the lookup was not recorded.
+
+    The client's 503 is retryable: the lookup is served from the same durable
+    record on the retry rather than lost (C-001, C-002).
+    """
+
+    status_code = 503
+    code = "lookup_unavailable"

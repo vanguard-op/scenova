@@ -31,3 +31,15 @@ class EntryNotFoundError(LibraryError):
 
     status_code = 404
     code = "entry_not_found"
+
+
+class LibraryUnavailableError(LibraryError):
+    """The primary database could not be reached or did not accept the write.
+
+    The internal contracts answer 503 and the caller retries; the lookup falls
+    back to generation rather than failing the reader (C-009 to C-011, C-017;
+    FEAT-006 edge).
+    """
+
+    status_code = 503
+    code = "library_unavailable"

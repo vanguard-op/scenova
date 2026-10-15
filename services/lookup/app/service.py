@@ -40,6 +40,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from .config import CLIP_MODEL_PIN, Settings
+from .db import create_engine
 from .entitlement import (
     EntitlementPort,
     EntitlementUnavailableError,
@@ -87,7 +88,7 @@ from .models import (
     Sense,
 )
 from .normalisation import MAX_PHRASE_WORDS, tokenise
-from .store import InMemoryLookupStore, LookupStore, StoredLookup
+from .store import InMemoryLookupStore, LookupStore, PostgresLookupStore, StoredLookup
 
 GENERATION_UNAVAILABLE_NOTICE = (
     "We couldn't start a clip for this one. Please try again in a moment."
@@ -202,8 +203,9 @@ class LookupService:
             return await self._store.anonymize_subject(subject)
 
     async def aclose(self) -> None:
-        """Release the generation, library, and meter clients' connections."""
+        """Release the store, generation, library, and meter clients' connections."""
 
+        await self._store.aclose()
         await self._library.aclose()
         await self._generation.aclose()
         await self._entitlement.aclose()
@@ -228,11 +230,13 @@ class LookupService:
             return self._empty_lookup(request, raw_selection)
 
         reading = await self._meter(request)
+        account_id = _account_id(request, reading)
         if not reading.allowed:
-            return self._exhausted_lookup(request, raw_selection, tokens, reading.allowance)
+            exhausted = self._exhausted_lookup(request, raw_selection, tokens, reading.allowance)
+            return replace(exhausted, account_id=account_id)
 
         stored = await self._resolve(request, raw_selection, tokens)
-        return replace(stored, allowance=reading.allowance)
+        return replace(stored, allowance=reading.allowance, account_id=account_id)
 
     async def _meter(self, request: CreateLookupRequest) -> _MeterReading:
         """Spend one unit of a signed-in reader's allowance, or read the grace path.
@@ -539,12 +543,23 @@ class LookupService:
 
 
 def build_default_service(settings: Settings | None = None) -> LookupService:
-    """Build the lookup service with its seeded inventory, stores, and clients."""
+    """Build the lookup service with its seeded inventory, stores, and clients.
+
+    An environment with no `DATABASE_URL` keeps the in-memory store, so a bare
+    local run and the unit tests need no database; every deployed environment
+    resolves the relational store the primary database holds (architecture.md
+    "Primary Database").
+    """
 
     resolved = settings or Settings.from_env()
+    store: LookupStore = (
+        InMemoryLookupStore()
+        if resolved.database_url is None
+        else PostgresLookupStore(create_engine(resolved.database_url))
+    )
     return LookupService(
         inventory=build_default_inventory(),
-        store=InMemoryLookupStore(),
+        store=store,
         library=HttpLibrary(
             base_url=resolved.library_base_url,
             internal_audience=resolved.internal_audience,
@@ -597,6 +612,22 @@ def _word_jobs(
         )
         for record, seed in missing
     ]
+
+
+def _account_id(request: CreateLookupRequest, reading: _MeterReading) -> str | None:
+    """The account the lookup belongs to, or None.
+
+    A reader who has not signed in holds no account. A signed-in reader's subject
+    *is* the account id, but the account row is the entitlement service's to
+    create: it exists once the meter has answered for this reader, so the account
+    is recorded only then. The documented grace path (NFR-011) leaves it null
+    rather than pointing at an account that may not be there yet, which the schema
+    allows for a guest or a pre-account lookup (schema "Lookup": `accountId`).
+    """
+
+    if request.isAnonymous or reading.allowance is None:
+        return None
+    return request.subject
 
 
 def _word_status(consent: bool, senses: tuple[Sense, ...]) -> LookupStatus:

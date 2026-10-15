@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 
 from library.app.api import create_app
 from library.app.config import Settings
+from library.app.service import build_default_service
 
 _INTERNAL = {"x-internal-audience": "scenova-internal"}
 
@@ -289,3 +290,19 @@ def test_promoting_without_a_candidate_is_not_found() -> None:
 
     assert response.status_code == 404
     assert response.json()["code"] == "entry_not_found"
+
+
+def test_an_unreachable_library_answers_service_unavailable() -> None:
+    # The store is the primary database, so a read that cannot reach it is a
+    # retryable 503 rather than an empty library (C-010, C-017).
+    service = build_default_service(
+        Settings(database_url="sqlite:////nonexistent-directory-xyz/scenova.db")
+    )
+    with TestClient(create_app(settings=Settings(), service=service)) as client:
+        found = _find(client)
+        read = client.get("/internal/library/entries/le_1", headers=_INTERNAL)
+
+    assert found.status_code == 503
+    assert found.json()["code"] == "library_unavailable"
+    assert read.status_code == 503
+    assert read.json()["code"] == "library_unavailable"

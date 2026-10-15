@@ -8,6 +8,8 @@ the internal audience; the gateway never routes here.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Annotated
 
 from fastapi import FastAPI, Header, Query, Request
@@ -31,8 +33,8 @@ from .models import (
     UpdateEntryRequest,
     UpdateEntryResponse,
 )
-from .service import LibraryService
-from .store import InMemoryLibraryStore, StoredEntry
+from .service import LibraryService, build_default_service
+from .store import StoredEntry
 
 
 def create_app(
@@ -42,9 +44,20 @@ def create_app(
     """Build the shared library application."""
 
     resolved_settings = settings or Settings.from_env()
-    resolved_service = service or LibraryService(store=InMemoryLibraryStore())
+    resolved_service = service or build_default_service(resolved_settings)
 
-    app = FastAPI(title="Scenova Shared Word-Clip Library", version="1.0.0")
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        try:
+            yield
+        finally:
+            await resolved_service.aclose()
+
+    app = FastAPI(
+        title="Scenova Shared Word-Clip Library",
+        version="1.0.0",
+        lifespan=lifespan,
+    )
 
     @app.exception_handler(LibraryError)
     async def _handle_library_error(_request: Request, exc: LibraryError) -> JSONResponse:

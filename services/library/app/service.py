@@ -8,9 +8,11 @@ this seam, so the store's rules live in one place and the HTTP routes stay thin.
 
 from __future__ import annotations
 
+from .config import Settings
+from .db import create_engine
 from .errors import EntryNotFoundError
 from .models import ClipAssetBody, EntryStatus, LibraryEntryBody, PartOfSpeech
-from .store import LibraryStore, StoredEntry
+from .store import InMemoryLibraryStore, LibraryStore, PostgresLibraryStore, StoredEntry
 
 
 class LibraryService:
@@ -74,3 +76,22 @@ class LibraryService:
         if promoted is None:
             raise EntryNotFoundError("No candidate clip is held for this entry.")
         return promoted
+
+    async def aclose(self) -> None:
+        """Release the store's database connections."""
+
+        await self._store.aclose()
+
+
+def build_default_service(settings: Settings | None = None) -> LibraryService:
+    """Build the library service against the primary database when one is set.
+
+    An environment with no `DATABASE_URL` keeps the in-memory store, so a bare
+    local run and the unit tests need no database; every deployed environment
+    resolves the relational store.
+    """
+
+    resolved = settings or Settings.from_env()
+    if resolved.database_url is None:
+        return LibraryService(store=InMemoryLibraryStore())
+    return LibraryService(store=PostgresLibraryStore(create_engine(resolved.database_url)))

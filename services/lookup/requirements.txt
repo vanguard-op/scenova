@@ -6,3 +6,8 @@ fastapi==0.143.0
 uvicorn==0.54.0
 pydantic==2.14.1
 httpx2==2.13.1
+# The primary database (architecture.md "Primary Database"): SQLAlchemy over the
+# psycopg driver the `DATABASE_URL` names, held to the same pinned versions in
+# every service that stores to it.
+sqlalchemy==2.0.44
+psycopg[binary]==3.2.10
