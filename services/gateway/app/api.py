@@ -8,6 +8,13 @@ read, the account update, and the account deletion carry no rate limit of their
 own; the account screen reads the plan, writes the consent choice, and deletes
 the account, none of which is a flood surface.
 
+An account deletion is the one place the gateway sequences more than one
+service: once the entitlement service has removed the account, the gateway
+anonymizes the reader's lookups and events behind it (nfr.md "Privacy &
+Compliance"; analytics.md "Analytics Data Governance"). The erasure is a
+secondary effect, so a store that cannot be reached is logged and left for the
+data-subject-request runbook to re-run rather than failing the deletion.
+
 The curator review routes (C-014 to C-016) are operator-only and carried here for
 the console: the gateway authenticates the operator session — curator role and
 multi-factor — before it forwards the call, and the review service enforces the
@@ -17,6 +24,7 @@ authenticated caller without the role with 403, at the edge and again upstream.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -30,7 +38,7 @@ from .analytics_client import AnalyticsClient, HttpAnalyticsClient
 from .auth import Subject, TokenVerifier, build_token_verifier
 from .config import Settings
 from .entitlement_client import EntitlementClient, HttpEntitlementClient
-from .errors import EmptySelectionError, GatewayError, RateLimitedError
+from .errors import EmptySelectionError, GatewayError, RateLimitedError, UpstreamUnavailableError
 from .feedback_client import FeedbackClient, HttpFeedbackClient
 from .lookup_client import HttpLookupClient, LookupClient, UpstreamResponse
 from .models import (
@@ -44,6 +52,8 @@ from .models import (
 from .notification_client import HttpPushRegistrationClient, PushRegistrationClient
 from .operator import OperatorVerifier, build_operator_verifier
 from .ratelimit import InMemoryFixedWindowRateLimiter, RateLimiter
+
+logger = logging.getLogger(__name__)
 
 
 def create_app(
@@ -88,6 +98,7 @@ def create_app(
     )
     resolved_analytics = analytics_client or HttpAnalyticsClient(
         base_url=resolved_settings.analytics_base_url,
+        internal_audience=resolved_settings.internal_audience,
         timeout_seconds=resolved_settings.upstream_timeout_seconds,
     )
     resolved_notification = notification_client or HttpPushRegistrationClient(
@@ -225,9 +236,19 @@ def create_app(
     @app.delete("/v1/account", status_code=202)
     async def delete_account(request: Request) -> Response:
         authorization = request.headers.get("authorization")
-        await resolved_verifier.verify(authorization)
+        subject = await resolved_verifier.verify(authorization)
         correlation_id = _correlation_id(resolved_settings, request)
         upstream = await resolved_entitlement.delete_account(authorization, correlation_id)
+        if upstream.status_code == 202:
+            # The account is gone, so the reader's lookups and events are
+            # anonymized behind it (nfr.md "Privacy & Compliance"; analytics.md
+            # "Analytics Data Governance"). The erasure is a secondary effect:
+            # a store that cannot be reached is logged and left for the
+            # data-subject-request runbook to re-run, rather than failing a
+            # deletion the reader has already completed.
+            await _erase_reader_data(
+                resolved_client, resolved_analytics, subject.id, correlation_id
+            )
         return _passthrough(upstream, correlation_id, resolved_settings)
 
     @app.get("/internal/review/queue")
@@ -283,6 +304,37 @@ def _internal_payload(payload: CreateLookupRequest, subject: Subject) -> dict[st
     # the gateway resolved (C-001).
     body["isAnonymous"] = subject.is_anonymous
     return body
+
+
+async def _erase_reader_data(
+    lookup: LookupClient,
+    analytics: AnalyticsClient,
+    subject: str,
+    correlation_id: str,
+) -> None:
+    """Anonymize a deleted reader's lookups and events (nfr.md "Privacy & Compliance").
+
+    The reader's account is already gone when this runs, so the erasure is a
+    secondary effect of the deletion: a store that cannot be reached is logged
+    and left for the data-subject-request runbook to re-run — the seams are
+    idempotent — rather than failing a deletion the reader has completed.
+    """
+
+    for name, anonymize in (
+        ("lookup", lookup.anonymize_subject),
+        ("analytics", analytics.anonymize_subject),
+    ):
+        try:
+            response = await anonymize(subject, correlation_id)
+        except UpstreamUnavailableError as exc:
+            logger.warning("the %s store was not anonymized after a deletion: %s", name, exc)
+            continue
+        if response.status_code // 100 != 2:
+            logger.warning(
+                "the %s store refused the anonymization after a deletion (status %s)",
+                name,
+                response.status_code,
+            )
 
 
 def _passthrough(upstream: UpstreamResponse, correlation_id: str, settings: Settings) -> Response:

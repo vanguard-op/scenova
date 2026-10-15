@@ -53,6 +53,11 @@ class _FakeAnalyticsClient:
             status_code=self.status_code, body=self.body, content_type="application/json"
         )
 
+    async def anonymize_subject(self, subject: str, correlation_id: str) -> UpstreamResponse:
+        return UpstreamResponse(
+            status_code=200, body=b'{"anonymized":0}', content_type="application/json"
+        )
+
     async def aclose(self) -> None:
         return None
 
@@ -74,6 +79,11 @@ class _FakeLookupClient:
     ) -> UpstreamResponse:
         return UpstreamResponse(
             status_code=200, body=b'{"lookupId":"lk_1"}', content_type="application/json"
+        )
+
+    async def anonymize_subject(self, subject: str, correlation_id: str) -> UpstreamResponse:
+        return UpstreamResponse(
+            status_code=200, body=b'{"anonymized":0}', content_type="application/json"
         )
 
     async def aclose(self) -> None:

@@ -8,8 +8,8 @@ half of it. A duplicate `event_id` is stored once, so a retried offline batch is
 idempotent.
 
 The same service exposes the two lifecycle operations the governance section
-names — the fourteen-month retention pass and a data-subject deletion — so they
-are exercised against the same store the intake writes to.
+names — the fourteen-month retention pass and a data-subject anonymization — so
+they are exercised against the same store the intake writes to.
 """
 
 from __future__ import annotations
@@ -122,10 +122,18 @@ class EventService:
             logger.info("aggregated and dropped %d expired events", sum(aggregated.values()))
         return aggregated
 
-    async def delete_subject(self, user_id: str) -> int:
-        """Remove a subject's events for a data-subject request (NFR-040, NFR-041)."""
+    async def anonymize_subject(self, user_id: str) -> int:
+        """Anonymize a subject's events for a data-subject request (NFR-040, NFR-041).
 
-        return await self._store.delete_subject(user_id)
+        The event store is reached by the reader's pseudonymous `user_id`, so a
+        deletion severs that link across the store rather than only in the
+        primary database (analytics.md "Analytics Data Governance"). The event
+        itself stays, so counts are unaffected; it can no longer be tied to the
+        reader. Idempotent: a re-run finds no event under the original identity.
+        """
+
+        self._consent.forget(user_id)
+        return await self._store.anonymize_subject(user_id)
 
     @property
     def sample_rate(self) -> float:

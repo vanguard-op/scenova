@@ -31,6 +31,8 @@ class LookupClient(Protocol):
         self, lookup_id: str, subject: str, correlation_id: str
     ) -> UpstreamResponse: ...
 
+    async def anonymize_subject(self, subject: str, correlation_id: str) -> UpstreamResponse: ...
+
     async def aclose(self) -> None: ...
 
 
@@ -60,6 +62,14 @@ class HttpLookupClient:
             f"/internal/lookups/{lookup_id}",
             correlation_id,
             params={"subject": subject},
+        )
+
+    async def anonymize_subject(self, subject: str, correlation_id: str) -> UpstreamResponse:
+        return await self._request(
+            "POST",
+            "/internal/lookups/anonymize",
+            correlation_id,
+            json={"subject": subject},
         )
 
     async def aclose(self) -> None:

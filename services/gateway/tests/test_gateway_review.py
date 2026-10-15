@@ -91,6 +91,9 @@ class _NoopLookupClient:
     ) -> UpstreamResponse:
         raise AssertionError("the lookup routes are not used in these tests")
 
+    async def anonymize_subject(self, subject: str, correlation_id: str) -> UpstreamResponse:
+        raise AssertionError("the lookup routes are not used in these tests")
+
     async def aclose(self) -> None:
         return None
 

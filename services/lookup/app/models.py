@@ -106,6 +106,22 @@ class CreateLookupResponse(LookupResponse):
     allowance: Allowance | None
 
 
+class AnonymizeRequest(BaseModel):
+    """The internal anonymization seam's request: the deleted reader's subject."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    subject: str
+
+
+class AnonymizeResponse(BaseModel):
+    """How many of the reader's lookups were anonymized."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    anonymized: int
+
+
 class CreateLookupRequest(BaseModel):
     """The internal create-lookup request.
 

@@ -50,3 +50,19 @@ class IngestResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     accepted: int
+
+
+class AnonymizeRequest(BaseModel):
+    """The internal anonymization seam's request: the deleted reader's subject."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    subject: str
+
+
+class AnonymizeResponse(BaseModel):
+    """How many of the reader's events were anonymized."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    anonymized: int

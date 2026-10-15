@@ -15,6 +15,9 @@ from dataclasses import dataclass
 
 from .taxonomy import DEFAULT_GATED_EVENTS, EventName
 
+# The audience asserted on the internal anonymization seam, which is never
+# reachable from the reader client.
+DEFAULT_INTERNAL_AUDIENCE = "scenova-internal"
 DEFAULT_RATE_LIMIT_PER_MINUTE = 120
 DEFAULT_RATE_LIMIT_WINDOW_SECONDS = 60
 # Raw events are kept for fourteen months and then aggregated or deleted
@@ -33,6 +36,8 @@ class Settings:
     firebase_project_id: str | None = None
     # The sink identifier the events are written to; empty means in-memory.
     event_store: str = ""
+    internal_audience: str = DEFAULT_INTERNAL_AUDIENCE
+    require_internal_auth: bool = True
     consent_gated_events: frozenset[EventName] = DEFAULT_GATED_EVENTS
     sample_rate: float = DEFAULT_SAMPLE_RATE
     rate_limit_per_minute: int = DEFAULT_RATE_LIMIT_PER_MINUTE
@@ -48,6 +53,8 @@ class Settings:
             auth_mode=_env_str(source, "AUTH_MODE", default_auth_mode),
             firebase_project_id=_env_opt(source, "FIREBASE_PROJECT_ID"),
             event_store=_env_str(source, "ANALYTICS_EVENT_STORE", ""),
+            internal_audience=_env_str(source, "INTERNAL_AUDIENCE", DEFAULT_INTERNAL_AUDIENCE),
+            require_internal_auth=_env_bool(source, "ANALYTICS_REQUIRE_INTERNAL_AUTH", True),
             consent_gated_events=_gated_events(source.get("ANALYTICS_CONSENT_GATED_EVENTS")),
             sample_rate=_env_rate(source, "ANALYTICS_SAMPLE_RATE", DEFAULT_SAMPLE_RATE),
             rate_limit_per_minute=_env_int(
@@ -98,6 +105,13 @@ def _env_int(env: Mapping[str, str], name: str, default: int) -> int:
         return int(raw)
     except ValueError:
         return default
+
+
+def _env_bool(env: Mapping[str, str], name: str, default: bool) -> bool:
+    value = env.get(name)
+    if value in (None, ""):
+        return default
+    return value.strip().lower() not in {"0", "false", "no", "off"}
 
 
 def _env_rate(env: Mapping[str, str], name: str, default: float) -> float:

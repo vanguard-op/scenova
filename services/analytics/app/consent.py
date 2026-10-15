@@ -35,3 +35,8 @@ class ConsentRegistry:
         """Whether the subject has explicitly withdrawn consent."""
 
         return self._states.get(user_id) is ConsentState.WITHDRAWN
+
+    def forget(self, user_id: str) -> None:
+        """Drop a subject's recorded consent, when their account is deleted."""
+
+        self._states.pop(user_id, None)

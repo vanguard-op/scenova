@@ -4,6 +4,11 @@ deletion (C-018, C-020, C-021).
 The gateway authenticates the reader's token before it forwards the call to the
 entitlement service and passes the service's status and body back unchanged, so a
 401, a 400, or a 503 reaches the client as the service produced it.
+
+On a deletion the gateway also anonymizes the reader's lookups and events behind
+the account, so a data-subject deletion reaches the stores rather than only the
+account record (nfr.md "Privacy & Compliance"; analytics.md "Analytics Data
+Governance").
 """
 
 from __future__ import annotations
@@ -13,12 +18,13 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
+from gateway.app.analytics_client import AnalyticsClient
 from gateway.app.api import create_app
 from gateway.app.auth import DevTokenVerifier
 from gateway.app.config import Settings
 from gateway.app.entitlement_client import EntitlementClient
 from gateway.app.errors import UpstreamUnavailableError
-from gateway.app.lookup_client import UpstreamResponse
+from gateway.app.lookup_client import LookupClient, UpstreamResponse
 from gateway.app.ratelimit import InMemoryFixedWindowRateLimiter
 
 _READER = {"Authorization": "Bearer dev:reader-1"}
@@ -78,13 +84,75 @@ class _FakeEntitlementClient:
         )
 
 
-def _client(entitlement: EntitlementClient) -> TestClient:
+class _RecordingLookupClient:
+    """A lookup client that records the anonymization calls it is handed."""
+
+    def __init__(self, *, error: Exception | None = None, status_code: int = 200) -> None:
+        self.error = error
+        self.status_code = status_code
+        self.anonymized: list[str] = []
+
+    async def create_lookup(
+        self, payload: Mapping[str, Any], correlation_id: str
+    ) -> UpstreamResponse:
+        raise AssertionError("the lookup create route is not used in these tests")
+
+    async def get_lookup(
+        self, lookup_id: str, subject: str, correlation_id: str
+    ) -> UpstreamResponse:
+        raise AssertionError("the lookup read route is not used in these tests")
+
+    async def anonymize_subject(self, subject: str, correlation_id: str) -> UpstreamResponse:
+        self.anonymized.append(subject)
+        if self.error is not None:
+            raise self.error
+        return UpstreamResponse(
+            status_code=self.status_code, body=b'{"anonymized":1}', content_type="application/json"
+        )
+
+    async def aclose(self) -> None:
+        return None
+
+
+class _RecordingAnalyticsClient:
+    """An analytics client that records the anonymization calls it is handed."""
+
+    def __init__(self, *, error: Exception | None = None, status_code: int = 200) -> None:
+        self.error = error
+        self.status_code = status_code
+        self.anonymized: list[str] = []
+
+    async def ingest(
+        self, payload: Mapping[str, Any], authorization: str | None, correlation_id: str
+    ) -> UpstreamResponse:
+        raise AssertionError("the event intake is not used in these tests")
+
+    async def anonymize_subject(self, subject: str, correlation_id: str) -> UpstreamResponse:
+        self.anonymized.append(subject)
+        if self.error is not None:
+            raise self.error
+        return UpstreamResponse(
+            status_code=self.status_code, body=b'{"anonymized":1}', content_type="application/json"
+        )
+
+    async def aclose(self) -> None:
+        return None
+
+
+def _client(
+    entitlement: EntitlementClient,
+    *,
+    lookup: LookupClient | None = None,
+    analytics: AnalyticsClient | None = None,
+) -> TestClient:
     return TestClient(
         create_app(
             settings=Settings(),
             verifier=DevTokenVerifier(),
             limiter=InMemoryFixedWindowRateLimiter(limit=120, window_seconds=60, clock=lambda: 0.0),
             entitlement_client=entitlement,
+            lookup_client=lookup or _RecordingLookupClient(),
+            analytics_client=analytics or _RecordingAnalyticsClient(),
         )
     )
 
@@ -181,3 +249,67 @@ def test_an_unreachable_entitlement_service_is_a_service_unavailable() -> None:
 
     assert response.status_code == 503
     assert response.json()["code"] == "upstream_unavailable"
+
+
+def test_deletion_anonymizes_the_readers_lookups_and_events() -> None:
+    # A deletion reaches the reader's data across the services, not only the
+    # account store: their lookups and their events are anonymized behind the
+    # account (nfr.md "Privacy & Compliance"; analytics.md "Analytics Data
+    # Governance").
+    entitlement = _FakeEntitlementClient(status_code=202, body=b'{"deleted":true}')
+    lookup = _RecordingLookupClient()
+    analytics = _RecordingAnalyticsClient()
+
+    with _client(entitlement, lookup=lookup, analytics=analytics) as client:
+        response = client.delete("/v1/account", headers=_READER)
+
+    assert response.status_code == 202
+    assert response.json() == {"deleted": True}
+    assert lookup.anonymized == ["reader-1"]
+    assert analytics.anonymized == ["reader-1"]
+
+
+def test_a_refused_deletion_anonymizes_nothing() -> None:
+    entitlement = _FakeEntitlementClient(
+        status_code=401, body=b'{"code":"no_account","message":"This account no longer exists."}'
+    )
+    lookup = _RecordingLookupClient()
+    analytics = _RecordingAnalyticsClient()
+
+    with _client(entitlement, lookup=lookup, analytics=analytics) as client:
+        response = client.delete("/v1/account", headers=_READER)
+
+    assert response.status_code == 401
+    assert lookup.anonymized == []
+    assert analytics.anonymized == []
+
+
+def test_an_unreachable_store_does_not_fail_the_deletion() -> None:
+    # The account is already gone when the erasure runs, so a store that cannot
+    # be reached is left for the data-subject-request runbook to re-run rather
+    # than failing a deletion the reader has completed.
+    entitlement = _FakeEntitlementClient(status_code=202, body=b'{"deleted":true}')
+    lookup = _RecordingLookupClient(error=UpstreamUnavailableError("down"))
+    analytics = _RecordingAnalyticsClient()
+
+    with _client(entitlement, lookup=lookup, analytics=analytics) as client:
+        response = client.delete("/v1/account", headers=_READER)
+
+    assert response.status_code == 202
+    assert response.json() == {"deleted": True}
+    # The other store is still anonymized.
+    assert analytics.anonymized == ["reader-1"]
+
+
+def test_a_store_that_refuses_the_erasure_does_not_fail_the_deletion() -> None:
+    # A non-2xx from a seam is a refused erasure, not a failed deletion: the
+    # account is already gone and the reader's request stands.
+    entitlement = _FakeEntitlementClient(status_code=202, body=b'{"deleted":true}')
+    lookup = _RecordingLookupClient()
+    analytics = _RecordingAnalyticsClient(status_code=401)
+
+    with _client(entitlement, lookup=lookup, analytics=analytics) as client:
+        response = client.delete("/v1/account", headers=_READER)
+
+    assert response.status_code == 202
+    assert analytics.anonymized == ["reader-1"]

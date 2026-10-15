@@ -4,10 +4,16 @@
 against the taxonomy, and stores it. Authentication and rate limiting are also
 applied at the gateway in the deployed topology; enforcing them here keeps the
 intake correct when it is addressed directly.
+
+`POST /internal/events/anonymize` anonymizes a deleted reader's events. It is an
+internal seam rather than a numbered contract, called when the reader's account
+is deleted, and is never reachable from the reader client (analytics.md
+"Analytics Data Governance").
 """
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Annotated
 
 from fastapi import FastAPI, Header, Request
@@ -16,8 +22,8 @@ from fastapi.responses import JSONResponse
 
 from .auth import TokenVerifier, build_token_verifier
 from .config import Settings
-from .errors import AnalyticsError, RateLimitedError
-from .models import IngestRequest, IngestResponse
+from .errors import AnalyticsError, RateLimitedError, UnauthorizedError
+from .models import AnonymizeRequest, AnonymizeResponse, IngestRequest, IngestResponse
 from .ratelimit import InMemoryFixedWindowRateLimiter, RateLimiter
 from .service import EventService, build_default_service
 
@@ -71,7 +77,23 @@ def create_app(
             raise RateLimitedError("Too many events. Please try again in a moment.")
         return await resolved_service.ingest(payload, subject.id)
 
+    @app.post("/internal/events/anonymize")
+    async def anonymize_events(
+        payload: AnonymizeRequest,
+        request: Request,
+    ) -> AnonymizeResponse:
+        _require_internal(resolved_settings, request.headers)
+        anonymized = await resolved_service.anonymize_subject(payload.subject)
+        return AnonymizeResponse(anonymized=anonymized)
+
     return app
+
+
+def _require_internal(settings: Settings, headers: Mapping[str, str]) -> None:
+    if not settings.require_internal_auth:
+        return
+    if headers.get("x-internal-audience") != settings.internal_audience:
+        raise UnauthorizedError("This endpoint is for internal callers only.")
 
 
 def _first_error_message(exc: RequestValidationError) -> str:

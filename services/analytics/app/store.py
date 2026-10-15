@@ -19,12 +19,16 @@ from __future__ import annotations
 import asyncio
 import calendar
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Protocol
 
 from .models import PropertyValue
 from .taxonomy import EventName
+
+# The pseudonymous identity an anonymized event is left under. It is a sentinel
+# no token subject can hold, so the event can never be re-linked to a reader.
+ANONYMIZED_USER_ID = "deleted"
 
 
 @dataclass(frozen=True)
@@ -58,8 +62,14 @@ class EventStore(Protocol):
 
     async def count(self) -> int: ...
 
-    async def delete_subject(self, user_id: str) -> int:
-        """Remove a subject's events for a data-subject request; return the count."""
+    async def anonymize_subject(self, user_id: str) -> int:
+        """Anonymize a subject's events for a data-subject request; return the count.
+
+        The event is kept so the product's counts survive, but its pseudonymous
+        identity — the `user_id` the account was resolved to, and the device and
+        session identifiers — is severed, so the event can no longer be tied to
+        the reader who made it (analytics.md "Analytics Data Governance").
+        """
         ...
 
     async def purge_before(self, cutoff: datetime) -> dict[str, int]:
@@ -92,14 +102,20 @@ class InMemoryEventStore:
     async def count(self) -> int:
         return len(self._events)
 
-    async def delete_subject(self, user_id: str) -> int:
+    async def anonymize_subject(self, user_id: str) -> int:
         async with self._lock:
-            removed = [
+            affected = [
                 event_id for event_id, event in self._events.items() if event.user_id == user_id
             ]
-            for event_id in removed:
-                del self._events[event_id]
-            return len(removed)
+            for event_id in affected:
+                event = self._events[event_id]
+                self._events[event_id] = replace(
+                    event,
+                    user_id=ANONYMIZED_USER_ID,
+                    anonymous_id="",
+                    session_id="",
+                )
+            return len(affected)
 
     async def purge_before(self, cutoff: datetime) -> dict[str, int]:
         async with self._lock:

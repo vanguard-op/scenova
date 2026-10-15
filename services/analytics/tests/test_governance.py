@@ -12,7 +12,13 @@ import pytest
 
 from analytics.app.config import Settings
 from analytics.app.service import EventService
-from analytics.app.store import InMemoryEventStore, StoredEvent, months_ago, retention_cutoff
+from analytics.app.store import (
+    ANONYMIZED_USER_ID,
+    InMemoryEventStore,
+    StoredEvent,
+    months_ago,
+    retention_cutoff,
+)
 from analytics.app.taxonomy import EventName
 from analytics.tests.fakes import batch, event
 
@@ -113,16 +119,48 @@ async def test_retention_aggregates_then_drops_events_past_the_window() -> None:
 
 
 @pytest.mark.asyncio
-async def test_deletion_propagation_removes_the_subjects_events() -> None:
+async def test_deletion_propagation_anonymizes_the_subjects_events() -> None:
+    # The event store is reached by the pseudonymous `user_id`, so a deletion
+    # severs that link across the store, not only in the primary database
+    # (analytics.md "Analytics Data Governance"). The event stays, so counts
+    # survive, but it can no longer be tied to the reader.
     service, store = _service()
     await store.append(_stored("e1", EventName.APP_OPENED, _NOW, user_id="reader-1"))
     await store.append(_stored("e2", EventName.APP_OPENED, _NOW, user_id="reader-2"))
 
-    removed = await service.delete_subject("reader-1")
+    anonymized = await service.anonymize_subject("reader-1")
 
-    assert removed == 1
-    remaining = await store.all()
-    assert [item.event_id for item in remaining] == ["e2"]
+    assert anonymized == 1
+    events = {item.event_id: item for item in await store.all()}
+    assert set(events) == {"e1", "e2"}
+    assert events["e1"].user_id == ANONYMIZED_USER_ID
+    assert events["e1"].anonymous_id == ""
+    assert events["e1"].session_id == ""
+    # Another reader's events are untouched.
+    assert events["e2"].user_id == "reader-2"
+    assert events["e2"].anonymous_id == "anon-1"
+
+
+@pytest.mark.asyncio
+async def test_anonymization_is_idempotent() -> None:
+    service, store = _service()
+    await store.append(_stored("e1", EventName.APP_OPENED, _NOW, user_id="reader-1"))
+
+    first = await service.anonymize_subject("reader-1")
+    second = await service.anonymize_subject("reader-1")
+
+    assert first == 1
+    assert second == 0
+    assert await store.count() == 1
+
+
+@pytest.mark.asyncio
+async def test_anonymizing_an_unknown_subject_changes_nothing() -> None:
+    service, store = _service()
+    await store.append(_stored("e1", EventName.APP_OPENED, _NOW, user_id="reader-1"))
+
+    assert await service.anonymize_subject("reader-9") == 0
+    assert (await store.all())[0].user_id == "reader-1"
 
 
 @pytest.mark.asyncio

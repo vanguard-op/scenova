@@ -4,6 +4,10 @@ Not a client surface: the gateway owns C-001 and C-002 and calls these internal
 routes with the caller's subject already resolved, so authentication and rate
 limiting stay at the gateway. The create route returns C-001's body, allowance
 included; the read route returns C-002's, which has none.
+
+`POST /internal/lookups/anonymize` anonymizes a deleted reader's lookups. It is
+an internal seam rather than a numbered contract, called when the reader's
+account is deleted (nfr.md "Privacy & Compliance").
 """
 
 from __future__ import annotations
@@ -18,7 +22,13 @@ from fastapi.responses import JSONResponse
 
 from .config import Settings
 from .errors import LookupError, UnauthorizedError
-from .models import CreateLookupRequest, CreateLookupResponse, LookupResponse
+from .models import (
+    AnonymizeRequest,
+    AnonymizeResponse,
+    CreateLookupRequest,
+    CreateLookupResponse,
+    LookupResponse,
+)
 from .service import LookupService, build_default_service
 
 
@@ -63,6 +73,15 @@ def create_app(
         result = await resolved_service.create_lookup(payload, correlation_id)
         response.headers[resolved_settings.correlation_id_header] = correlation_id
         return result
+
+    @app.post("/internal/lookups/anonymize")
+    async def anonymize_lookups(
+        payload: AnonymizeRequest,
+        x_internal_audience: Annotated[str | None, Header()] = None,
+    ) -> AnonymizeResponse:
+        _require_internal(resolved_settings, x_internal_audience)
+        anonymized = await resolved_service.anonymize_subject(payload.subject)
+        return AnonymizeResponse(anonymized=anonymized)
 
     @app.get("/internal/lookups/{lookup_id}")
     async def get_lookup(

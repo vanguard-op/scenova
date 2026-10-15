@@ -188,6 +188,19 @@ class LookupService:
             await self._store.add(refreshed)
         return refreshed.to_response(correlation_id)
 
+    async def anonymize_subject(self, subject: str) -> int:
+        """Anonymize the reader's lookups after their account is deleted.
+
+        A lookup is personal data (schema "Lookup"), so a data-subject deletion
+        strips the selection and the identity from the reader's records rather
+        than leaving them beside a live account id (nfr.md "Privacy &
+        Compliance"). It is idempotent, so a re-run for a reader whose records
+        were already anonymized finds nothing and reports zero.
+        """
+
+        async with self._write_lock:
+            return await self._store.anonymize_subject(subject)
+
     async def aclose(self) -> None:
         """Release the generation, library, and meter clients' connections."""
 
