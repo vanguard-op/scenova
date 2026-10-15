@@ -7,5 +7,13 @@
     "theme_color": "#5C4BC4",
     "description": "Work the queue of reported and flagged clips.",
     "orientation": "landscape-primary",
-    "prefer_related_applications": false
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "assets/assets/brand/scenova-app-icon.png",
+            "sizes": "1024x1024",
+            "type": "image/png",
+            "purpose": "any"
+        }
+    ]
 }

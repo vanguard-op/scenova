@@ -52,8 +52,15 @@ flutter:
 
   # The brand mark (A-001) and the icon set (A-008) travel with the shared
   # design system, so the console draws them from one bundle rather than
-  # carrying its own copy. The brand's type is bundled below; nothing else
-  # resolves to an asset from this app.
+  # carrying its own copy.
+  #
+  # The delivered app icon (A-006) is the one exception. It is the console's
+  # browser chrome — the favicon and install icon `web/index.html` and
+  # `web/manifest.json` point at — not art either app draws in a widget, so it
+  # is bundled here rather than pushed into the design system and every app that
+  # imports it.
+  assets:
+    - assets/brand/scenova-app-icon.png
 
   # The brand's type (A-011): Lora for display and headings, Inter for body.
   # Both ship as variable fonts, so one file carries the whole weight axis and a
