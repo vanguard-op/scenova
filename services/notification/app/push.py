@@ -48,14 +48,17 @@ class ClipReadyNotice:
 
     `token` is deliberately not a field: the notice is the message, and the
     token is supplied per send so it is never held in the queued payload.
+    `job_id` is the finished job the ingest named; a notice rebuilt from the
+    queue after a restart carries none, because the queued payload is the
+    lookup and the clip (schema "PendingNotice").
     """
 
     lookup_id: str
-    job_id: str
     clip_url: str
     duration_seconds: float
     resolution: str
     has_audio: bool
+    job_id: str = ""
 
 
 class PushUnavailableError(Exception):

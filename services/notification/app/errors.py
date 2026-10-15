@@ -53,3 +53,16 @@ class RateLimitedError(NotificationError):
 
     status_code = 429
     code = "rate_limited"
+
+
+class PushStoreUnavailableError(NotificationError):
+    """The registration or pending-notice store could not be reached.
+
+    The caller is told to retry rather than being told a notice will not come:
+    an unavailable store is a delay, and the registration or ingest the caller
+    made can be carried out once the store is back (C-008; architecture
+    "Notification Service": the notice is delayed rather than lost).
+    """
+
+    status_code = 503
+    code = "store_unavailable"

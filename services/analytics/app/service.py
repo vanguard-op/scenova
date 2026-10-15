@@ -25,7 +25,7 @@ from .consent import ConsentRegistry
 from .errors import InvalidRequestError, PersonalDataError
 from .models import EventIn, IngestRequest, IngestResponse, PropertyValue
 from .personal_data import personal_data_reason
-from .store import EventStore, InMemoryEventStore, StoredEvent, retention_cutoff
+from .store import EventStore, StoredEvent, build_default_store, retention_cutoff
 from .taxonomy import (
     CONSENT_EVENTS,
     CONSENT_PROPERTY,
@@ -186,9 +186,15 @@ class EventService:
 
 
 def build_default_service(settings: Settings) -> EventService:
-    """Build the intake with its in-memory store."""
+    """Build the intake with the store the environment selects.
 
-    return EventService(store=InMemoryEventStore(), settings=settings)
+    A configured `DATABASE_URL` points the intake at the primary database, so
+    every accepted event is held durably and survives a restart of the intake
+    (architecture.md "Analytics / Event Tracking"); without one, the in-memory
+    store keeps the intake bootable.
+    """
+
+    return EventService(store=build_default_store(settings.database_url), settings=settings)
 
 
 def _parse_occurred_at(raw: str) -> datetime:

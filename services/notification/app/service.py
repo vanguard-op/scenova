@@ -9,19 +9,21 @@ fallback, a denial, an empty selection — needs no notice, so `registered` repo
 false rather than holding a token for an event that will never come.
 
 `clip_ready` is the internal call the generation pipeline makes when a clip
-finishes (architecture "Notification Service": `Gen --> Notify`). It sends one
-notice per registered device; a push provider that cannot be reached leaves the
-notice queued rather than lost, and `drain_pending` retries the queue once the
-provider is back. `PushDrainLoop` runs that retry while the service is up, so the
-queue is a delay and not a leak. Each finished job is claimed once, so a retried
-ingest never sends a second notice.
+finishes (architecture "Notification Service": `Gen --> Notify`). It consumes a
+lookup's registrations exactly once — the consumption and the dedupe are the
+same rows, so a retried ingest never finds a device to notify again — and queues
+every notice before the first send, so a push outage or a crash delays delivery
+rather than losing it. `drain_pending` retries the queue once the provider is
+back and removes each notice the provider accepts, so a delivered notice is not
+sent twice. `PushDrainLoop` runs that retry while the service is up, so the
+queue is a delay and not a leak.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
-from collections import deque
+from uuid import uuid4
 
 from .config import Settings
 from .errors import UnknownLookupError, UnreadableTokenError
@@ -40,7 +42,13 @@ from .push import (
     PushSender,
     PushUnavailableError,
 )
-from .store import InMemoryRegistrationStore, PushRegistration, RegistrationStore
+from .store import (
+    NoticeQueue,
+    PushRegistration,
+    QueuedNotice,
+    RegistrationStore,
+    build_default_store,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -64,17 +72,14 @@ class NotificationService:
         self,
         *,
         store: RegistrationStore,
+        queue: NoticeQueue,
         lookups: LookupDirectory,
         sender: PushSender,
-        pending_limit: int = 1000,
     ) -> None:
         self._store = store
+        self._queue = queue
         self._lookups = lookups
         self._sender = sender
-        self._pending_limit = max(1, pending_limit)
-        # Notices the provider could not take, oldest first. In memory for the
-        # reading phase; the queue store replaces it behind the same seam.
-        self._pending: deque[tuple[PushRegistration, ClipReadyNotice]] = deque()
 
     async def register(self, request: RegisterRequest, subject: str) -> RegisterResponse:
         """Record a device for a lookup, or report that no notice is coming.
@@ -121,79 +126,105 @@ class NotificationService:
     async def clip_ready(self, request: ClipReadyRequest) -> ClipReadyResponse:
         """Tell every device waiting on a lookup that its clip is ready.
 
-        One notice per registered device, queued when the provider is down, and
-        at most once per job.
+        One notice per registered device. Every notice is queued before the
+        first send, so a provider outage, a crash, or a restart delays it rather
+        than losing it; the response counts the notices the queue accepted.
         """
 
-        if not await self._store.claim(request.jobId):
-            return ClipReadyResponse(queued=0)
-        registrations = await self._store.take(request.lookupId)
+        registrations = await self._store.consume(request.lookupId)
         notice = ClipReadyNotice(
             lookup_id=request.lookupId,
-            job_id=request.jobId,
             clip_url=request.clip.url,
             duration_seconds=request.clip.durationSeconds,
             resolution=request.clip.resolution,
             has_audio=request.clip.hasAudio,
+            job_id=request.jobId,
         )
-        queued = 0
-        for registration in registrations:
-            queued += 1
-            await self._deliver_or_queue(registration, notice)
-        return ClipReadyResponse(queued=queued)
+        queued = _queued_notices(registrations, notice)
+        held = await self._queue.enqueue(queued)
+        immediate = {q.id: notice for q in held}
+        for notice_row in held:
+            await self._send_or_leave(notice_row, immediate[notice_row.id])
+        return ClipReadyResponse(queued=len(held))
 
     async def drain_pending(self) -> int:
         """Retry queued notices; stop at the first provider that is still down.
 
         Returns how many notices reached the provider, so a drain can be
-        observed.
+        observed. Each delivered notice is removed from the queue, so a delivered
+        notice is not sent twice by the next drain.
         """
 
         delivered = 0
-        while self._pending:
-            registration, notice = self._pending[0]
+        for notice in await self._queue.outstanding():
             try:
                 await self._sender.send(
-                    token=registration.token,
-                    platform=registration.platform,
-                    notice=notice,
+                    token=notice.token,
+                    platform=notice.platform,
+                    notice=self._notice_from_queue(notice),
                 )
             except PushUnavailableError:
                 break
-            self._pending.popleft()
+            await self._queue.mark_delivered([notice.id])
             delivered += 1
         return delivered
 
     async def aclose(self) -> None:
-        """Release the lookup and push clients' connections."""
+        """Release the store, the lookup, and push clients' resources."""
 
+        await self._store.aclose()
+        await self._queue.aclose()
         await self._sender.aclose()
         await self._lookups.aclose()
 
-    async def _deliver_or_queue(
-        self, registration: PushRegistration, notice: ClipReadyNotice
-    ) -> None:
+    async def _send_or_leave(self, queued: QueuedNotice, sendable: ClipReadyNotice) -> None:
+        """Attempt one queued notice; a failed send stays on the queue."""
+
         try:
-            await self._sender.send(
-                token=registration.token,
-                platform=registration.platform,
-                notice=notice,
-            )
-            return
+            await self._sender.send(token=queued.token, platform=queued.platform, notice=sendable)
         except PushUnavailableError:
             logger.warning(
-                "the push provider is unavailable; queued the notice for lookup %s",
-                notice.lookup_id,
+                "the push provider is unavailable; the notice for lookup %s is queued",
+                queued.lookup_id,
             )
-        self._enqueue(registration, notice)
+            return
+        await self._queue.mark_delivered([queued.id])
 
-    def _enqueue(self, registration: PushRegistration, notice: ClipReadyNotice) -> None:
-        if len(self._pending) >= self._pending_limit:
-            # Bounded so a long outage cannot grow the queue without limit. The
-            # oldest notice goes first, matching a queue that drains in order.
-            self._pending.popleft()
-            logger.warning("the queued-notice limit was reached; the oldest notice was dropped")
-        self._pending.append((registration, notice))
+    def _notice_from_queue(self, notice: QueuedNotice) -> ClipReadyNotice:
+        """The sendable notice a queued row resumes as.
+
+        The queued payload is the C-008 notice's data payload — the lookup and
+        the clip (schema "PendingNotice") — and a notice rebuilt from it carries
+        no finished job, because the queue holds none.
+        """
+
+        return ClipReadyNotice(
+            lookup_id=notice.lookup_id,
+            clip_url=notice.clip_url,
+            duration_seconds=notice.duration_seconds,
+            resolution=notice.resolution,
+            has_audio=notice.has_audio,
+        )
+
+
+def _queued_notices(
+    registrations: list[PushRegistration], notice: ClipReadyNotice
+) -> list[QueuedNotice]:
+    """A queued notice per registered device, each carrying the C-008 payload."""
+
+    return [
+        QueuedNotice(
+            id=f"pn_{uuid4().hex}",
+            lookup_id=registration.lookup_id,
+            token=registration.token,
+            platform=registration.platform,
+            clip_url=notice.clip_url,
+            duration_seconds=notice.duration_seconds,
+            resolution=notice.resolution,
+            has_audio=notice.has_audio,
+        )
+        for registration in registrations
+    ]
 
 
 def build_push_sender(settings: Settings) -> PushSender:
@@ -223,17 +254,20 @@ def build_push_sender(settings: Settings) -> PushSender:
 
 
 def build_default_service(settings: Settings) -> NotificationService:
-    """Build the service with its registration store, lookup client, and push sender."""
+    """Build the service with its push store, lookup client, and push sender."""
 
+    store, queue = build_default_store(
+        settings.database_url, pending_limit=settings.pending_notice_limit
+    )
     return NotificationService(
-        store=InMemoryRegistrationStore(),
+        store=store,
+        queue=queue,
         lookups=HttpLookupDirectory(
             base_url=settings.lookup_base_url,
             internal_audience=settings.internal_audience,
             timeout_seconds=settings.lookup_timeout_seconds,
         ),
         sender=build_push_sender(settings),
-        pending_limit=settings.pending_notice_limit,
     )
 
 
@@ -241,10 +275,11 @@ class PushDrainLoop:
     """Retries queued notices on an interval while the service runs.
 
     architecture.md "Notification Service": if the push service is down,
-    notifications are queued rather than lost. The queue only means that while
-    something drains it, so this loop retries the queue, oldest first, and stops
-    at the first send the provider still will not take. A drain that raises never
-    stops the loop, since a queued notice is only delayed, not abandoned.
+    notifications are queued rather than lost. A queued notice only means that
+    while something drains it, so this loop retries the queue, oldest first, and
+    stops at the first send the provider still will not take. A drain that
+    raises never stops the loop, since a queued notice is only delayed, not
+    abandoned.
     """
 
     def __init__(self, service: NotificationService, *, interval_seconds: float) -> None:

@@ -14,7 +14,7 @@ from notification.app.models import Platform
 from notification.app.push import ClipReadyNotice, PushUnavailableError
 from notification.app.ratelimit import InMemoryFixedWindowRateLimiter
 from notification.app.service import NotificationService
-from notification.app.store import InMemoryRegistrationStore
+from notification.app.store import InMemoryNoticeQueue, InMemoryRegistrationStore
 
 AUTH = {"Authorization": "Bearer dev:reader-1"}
 INTERNAL = {"x-internal-audience": "scenova-internal"}
@@ -88,6 +88,7 @@ class Rig:
 
     service: NotificationService
     store: InMemoryRegistrationStore
+    queue: InMemoryNoticeQueue
     lookups: FakeLookupDirectory
     sender: FakePushSender
     statuses: dict[tuple[str, str], LookupStatus] = field(default_factory=dict)
@@ -105,16 +106,15 @@ def rig(
     resolved = dict(statuses or {})
     lookups = FakeLookupDirectory(resolved, unavailable=lookup_unavailable)
     sender = FakePushSender(unavailable=push_unavailable)
-    store = InMemoryRegistrationStore()
-    service = NotificationService(
-        store=store,
-        lookups=lookups,
-        sender=sender,
-        pending_limit=pending_limit,
+    store, queue = (
+        InMemoryRegistrationStore(),
+        InMemoryNoticeQueue(limit=pending_limit),
     )
+    service = NotificationService(store=store, queue=queue, lookups=lookups, sender=sender)
     return Rig(
         service=service,
         store=store,
+        queue=queue,
         lookups=lookups,
         sender=sender,
         statuses=resolved,
@@ -159,9 +159,9 @@ def build_fake_service(settings: Settings) -> NotificationService:
 
     return NotificationService(
         store=InMemoryRegistrationStore(),
+        queue=InMemoryNoticeQueue(limit=settings.pending_notice_limit),
         lookups=FakeLookupDirectory(),
         sender=FakePushSender(),
-        pending_limit=settings.pending_notice_limit,
     )
 
 

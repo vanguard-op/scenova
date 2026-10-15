@@ -53,3 +53,17 @@ class RateLimitedError(AnalyticsError):
 
     status_code = 429
     code = "rate_limited"
+
+
+class EventStoreUnavailableError(AnalyticsError):
+    """The event store could not be reached.
+
+    The batch is answered as retryable, never as accepted: the intake writes
+    each event to the primary database before it acknowledges it, so an event
+    the store cannot take is not accepted (architecture.md "Analytics / Event
+    Tracking"). The client re-sends the batch, and the `event_id` key makes the
+    retry idempotent (C-007).
+    """
+
+    status_code = 503
+    code = "store_unavailable"

@@ -34,6 +34,7 @@ class Settings:
 
     auth_mode: str = "dev"
     firebase_project_id: str | None = None
+    database_url: str | None = None
     # The sink identifier the events are written to; empty means in-memory.
     event_store: str = ""
     internal_audience: str = DEFAULT_INTERNAL_AUDIENCE
@@ -52,6 +53,7 @@ class Settings:
         return cls(
             auth_mode=_env_str(source, "AUTH_MODE", default_auth_mode),
             firebase_project_id=_env_opt(source, "FIREBASE_PROJECT_ID"),
+            database_url=_env_opt(source, "DATABASE_URL"),
             event_store=_env_str(source, "ANALYTICS_EVENT_STORE", ""),
             internal_audience=_env_str(source, "INTERNAL_AUDIENCE", DEFAULT_INTERNAL_AUDIENCE),
             require_internal_auth=_env_bool(source, "ANALYTICS_REQUIRE_INTERNAL_AUTH", True),

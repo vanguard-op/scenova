@@ -15,3 +15,8 @@ httpx2==2.13.1
 pyjwt[crypto]==2.15.1
 google-auth==2.62.0
 requests==2.34.2
+# The push registrations and the pending clip-ready notices are held in the
+# primary relational database (architecture.md "Notification Service"); these
+# are the same pinned versions every relational store carries.
+sqlalchemy==2.0.44
+psycopg[binary]==3.2.10

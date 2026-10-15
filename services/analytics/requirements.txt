@@ -8,3 +8,8 @@ uvicorn==0.54.0
 pydantic==2.14.1
 httpx2==2.13.1
 pyjwt[crypto]==2.15.1
+# The event store is the primary database, not a second engine
+# (architecture.md "Analytics / Event Tracking"); these are the same pinned
+# versions every relational store carries.
+sqlalchemy==2.0.44
+psycopg[binary]==3.2.10

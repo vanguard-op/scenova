@@ -48,6 +48,7 @@ class Settings:
 
     auth_mode: str = "dev"
     firebase_project_id: str | None = None
+    database_url: str | None = None
     internal_audience: str = DEFAULT_INTERNAL_AUDIENCE
     correlation_id_header: str = DEFAULT_CORRELATION_ID_HEADER
     require_internal_auth: bool = True
@@ -85,6 +86,7 @@ class Settings:
         return cls(
             auth_mode=_env_str(source, "AUTH_MODE", default_auth_mode),
             firebase_project_id=_env_opt(source, "FIREBASE_PROJECT_ID"),
+            database_url=_env_opt(source, "DATABASE_URL"),
             internal_audience=_env_str(source, "INTERNAL_AUDIENCE", DEFAULT_INTERNAL_AUDIENCE),
             correlation_id_header=_env_str(
                 source, "CORRELATION_ID_HEADER", DEFAULT_CORRELATION_ID_HEADER
