@@ -34,6 +34,7 @@ class Settings:
     notification_base_url: str = f"http://127.0.0.1:{DEFAULT_NOTIFICATION_PORT}"
     feedback_base_url: str = f"http://127.0.0.1:{DEFAULT_FEEDBACK_PORT}"
     entitlement_base_url: str = f"http://127.0.0.1:{DEFAULT_ENTITLEMENT_PORT}"
+    redis_url: str | None = None
     internal_audience: str = DEFAULT_INTERNAL_AUDIENCE
     auth_mode: str = "dev"
     firebase_project_id: str | None = None
@@ -81,6 +82,10 @@ class Settings:
             notification_base_url=notification_base_url,
             feedback_base_url=feedback_base_url,
             entitlement_base_url=entitlement_base_url,
+            # The cache the rate-limit counters and the hot lookup keys live in
+            # (architecture.md "Data Stores"); unset, the gateway holds its
+            # counters in process memory.
+            redis_url=_env_opt(source, "REDIS_URL"),
             internal_audience=_env_str(source, "INTERNAL_AUDIENCE", DEFAULT_INTERNAL_AUDIENCE),
             auth_mode=_env_str(source, "AUTH_MODE", default_auth_mode),
             firebase_project_id=_env_opt(source, "FIREBASE_PROJECT_ID"),

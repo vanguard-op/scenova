@@ -6,7 +6,10 @@ C-022.
 The gateway authenticates the caller, rate-limits lookups, events, push
 registrations, ratings, and reports, validates the request body, and passes the
 downstream service's response through unchanged, so the frozen contract's status
-codes and error codes reach the client as they are produced. The entitlement
+codes and error codes reach the client as they are produced. The rate-limit
+counters are read from Redis (architecture.md "Data Stores"), shared by every
+gateway replica, with an in-memory fallback per instance while the cache is
+unreachable. The entitlement
 read, the account settings read, the account update, and the account deletion
 carry no rate limit of their own; the account screen reads the plan and the saved
 choices, writes the consent choice, and deletes the account, none of which is a
@@ -55,7 +58,13 @@ from .models import (
 )
 from .notification_client import HttpPushRegistrationClient, PushRegistrationClient
 from .operator import OperatorVerifier, build_operator_verifier
-from .ratelimit import InMemoryFixedWindowRateLimiter, RateLimiter
+from .ratelimit import (
+    AsyncRedisLike,
+    InMemoryFixedWindowRateLimiter,
+    RateLimiter,
+    RedisFixedWindowRateLimiter,
+    build_redis_client,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -79,21 +88,40 @@ def create_app(
     resolved_settings = settings or Settings.from_env()
     resolved_verifier = verifier or build_token_verifier(resolved_settings)
     resolved_operator = operator_verifier or build_operator_verifier(resolved_settings)
-    resolved_limiter = limiter or InMemoryFixedWindowRateLimiter(
-        limit=resolved_settings.rate_limit_per_minute,
-        window_seconds=resolved_settings.rate_limit_window_seconds,
+    # The rate-limit counters are read from Redis, not from process memory
+    # (architecture.md "Data Stores"), so the limit holds across every gateway
+    # replica. Without the cache (unit tests, a local run without the compose
+    # Redis) each limiter stays in process memory.
+    redis_client: AsyncRedisLike | None = (
+        build_redis_client(resolved_settings.redis_url)
+        if resolved_settings.redis_url is not None
+        else None
     )
-    resolved_event_limiter = event_limiter or InMemoryFixedWindowRateLimiter(
-        limit=resolved_settings.events_rate_limit_per_minute,
-        window_seconds=resolved_settings.rate_limit_window_seconds,
+    window_seconds = resolved_settings.rate_limit_window_seconds
+
+    def _default_limiter(prefix: str, limit: int) -> RateLimiter:
+        return (
+            RedisFixedWindowRateLimiter(
+                client=redis_client,
+                prefix=prefix,
+                limit=limit,
+                window_seconds=window_seconds,
+            )
+            if redis_client is not None
+            else InMemoryFixedWindowRateLimiter(limit=limit, window_seconds=window_seconds)
+        )
+
+    resolved_limiter = limiter or _default_limiter(
+        "lookup", resolved_settings.rate_limit_per_minute
     )
-    resolved_registration_limiter = registration_limiter or InMemoryFixedWindowRateLimiter(
-        limit=resolved_settings.registrations_rate_limit_per_minute,
-        window_seconds=resolved_settings.rate_limit_window_seconds,
+    resolved_event_limiter = event_limiter or _default_limiter(
+        "events", resolved_settings.events_rate_limit_per_minute
     )
-    resolved_feedback_limiter = feedback_limiter or InMemoryFixedWindowRateLimiter(
-        limit=resolved_settings.feedback_rate_limit_per_minute,
-        window_seconds=resolved_settings.rate_limit_window_seconds,
+    resolved_registration_limiter = registration_limiter or _default_limiter(
+        "registrations", resolved_settings.registrations_rate_limit_per_minute
+    )
+    resolved_feedback_limiter = feedback_limiter or _default_limiter(
+        "feedback", resolved_settings.feedback_rate_limit_per_minute
     )
     resolved_client = lookup_client or HttpLookupClient(
         base_url=resolved_settings.lookup_base_url,
@@ -129,6 +157,8 @@ def create_app(
             await resolved_notification.aclose()
             await resolved_feedback.aclose()
             await resolved_entitlement.aclose()
+            if redis_client is not None:
+                await redis_client.aclose()
 
     app = FastAPI(title="Scenova API Gateway", version="1.0.0", lifespan=lifespan)
 
