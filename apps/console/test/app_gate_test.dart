@@ -4,7 +4,7 @@ import 'package:scenova_console/screens/review_queue_screen.dart';
 import 'package:scenova_console/screens/sign_in_screen.dart';
 import 'package:scenova_console/services/operator_auth.dart';
 import 'package:scenova_console/services/review_api.dart';
-import 'package:scenova_console/widgets/console_shell.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 import 'support/harness.dart';
 

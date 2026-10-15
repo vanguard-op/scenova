@@ -2,8 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
-
-import '../theme/colors.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 /// The first-run walkthrough (`docs/Scenova/screens/01-onboarding.md` →
 /// Declared Assets; `ASSETS.md` → A-010).

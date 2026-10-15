@@ -6,8 +6,8 @@ import '../theme/colors.dart';
 /// offset (`docs/Scenova/branding.md` → "Accessibility → Focus indicators").
 ///
 /// It is drawn outside the control's bounds so focusing never shifts the
-/// layout, and it is the same ring on every interactive element, so the console
-/// is fully keyboard-navigable with one visible focus treatment.
+/// layout, and it is the same ring on every interactive element in both apps,
+/// so a keyboard user meets one visible focus treatment.
 class FocusRing extends StatelessWidget {
   const FocusRing({
     super.key,

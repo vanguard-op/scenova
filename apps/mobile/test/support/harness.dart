@@ -37,8 +37,7 @@ import 'package:scenova/services/report_outbox.dart';
 import 'package:scenova/services/report_store.dart';
 import 'package:scenova/services/settings_controller.dart';
 import 'package:scenova/theme/app_theme.dart';
-import 'package:scenova/theme/tokens.dart';
-import 'package:scenova/widgets/app_icons.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 /// The collaborators a test hands to a screen.
 ScenovaServices buildServices({

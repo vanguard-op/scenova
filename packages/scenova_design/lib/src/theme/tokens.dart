@@ -1,18 +1,51 @@
 import 'package:flutter/material.dart';
 
-/// Spacing, sizing, radius, shadow, motion, and opacity tokens for the review
-/// console.
+/// Spacing, sizing, radius, shadow, motion, and opacity tokens.
 ///
 /// Source of truth: `docs/Scenova/branding.md` — "Spacing", "Sizing",
-/// "Shadows", and "Motion Direction". The console is the doc's Desktop device
-/// class ("Responsive & Device Targets": the sidebar-and-table operator
-/// console, pointer and keyboard), so the values keyed by device class are the
-/// Desktop column and need no breakpoint.
+/// "Shadows", and "Motion Direction". Values keyed by device class resolve
+/// through [DeviceClass]: the mobile values are the base, the tablet class
+/// overrides them for the reader app at the 600px breakpoint, and the desktop
+/// class carries the operator console.
 ///
-/// Every layout value in the console resolves through this file. No widget
+/// Every layout value in both apps resolves through this file. No widget
 /// carries a literal spacing, radius, size, shadow, or duration.
 
-/// Space scale (branding → "Spacing", Desktop).
+/// The device class a layout is resolved for.
+///
+/// `docs/Scenova/branding.md` → "Responsive & Device Targets": mobile below
+/// 600px, tablet from 600px, and desktop from 1024px.
+enum DeviceClass {
+  mobile,
+  tablet,
+  desktop;
+
+  /// The breakpoint where the in-context card switches from a bottom sheet to
+  /// a centered card.
+  static const double tabletBreakpoint = 600;
+
+  /// The breakpoint where the operator console takes its desktop layout with a
+  /// sidebar.
+  static const double desktopBreakpoint = 1024;
+
+  static DeviceClass fromWidth(double width) {
+    if (width >= desktopBreakpoint) return DeviceClass.desktop;
+    if (width >= tabletBreakpoint) return DeviceClass.tablet;
+    return DeviceClass.mobile;
+  }
+
+  /// The reader app's class for a viewport width.
+  ///
+  /// The reader app is the doc's Mobile and Tablet postures; its card centres
+  /// at 600px and never takes the console's sidebar layout, so a viewport past
+  /// the desktop breakpoint keeps the tablet scale rather than the console's.
+  static DeviceClass fromReaderWidth(double width) =>
+      width >= tabletBreakpoint ? DeviceClass.tablet : DeviceClass.mobile;
+
+  bool get isTablet => this == DeviceClass.tablet;
+}
+
+/// Space scale (branding → "Spacing").
 @immutable
 class ScenovaSpacing {
   const ScenovaSpacing({
@@ -34,10 +67,10 @@ class ScenovaSpacing {
   /// Default: card padding, list item gaps.
   final double md;
 
-  /// Between sections, card padding.
+  /// Between sections, card padding on tablet.
   final double lg;
 
-  /// Breathing room around a panel.
+  /// Breathing room around the in-context card.
   final double xl;
 
   /// Between unrelated sections.
@@ -46,7 +79,17 @@ class ScenovaSpacing {
   /// Layout-level separation above and below the fold.
   final double xxxl;
 
-  static const ScenovaSpacing desktop = ScenovaSpacing(
+  static const mobile = ScenovaSpacing(
+    xs: 4,
+    sm: 8,
+    md: 12,
+    lg: 20,
+    xl: 28,
+    xxl: 40,
+    xxxl: 56,
+  );
+
+  static const tablet = ScenovaSpacing(
     xs: 4,
     sm: 8,
     md: 16,
@@ -55,9 +98,17 @@ class ScenovaSpacing {
     xxl: 48,
     xxxl: 64,
   );
+
+  /// The branding doc's Desktop column, shared with the tablet scale.
+  static const desktop = tablet;
+
+  static ScenovaSpacing of(DeviceClass device) => switch (device) {
+    DeviceClass.mobile => mobile,
+    DeviceClass.tablet || DeviceClass.desktop => tablet,
+  };
 }
 
-/// Sizing scale (branding → "Sizing", Desktop).
+/// Sizing scale (branding → "Sizing").
 @immutable
 class ScenovaSizing {
   const ScenovaSizing({
@@ -68,10 +119,10 @@ class ScenovaSizing {
     required this.iconLg,
   });
 
-  /// The control height for buttons and icon actions.
+  /// Minimum touch target for buttons.
   final double buttonHeight;
 
-  /// The filter fields.
+  /// The history search field.
   final double inputHeight;
 
   /// Inline icons and status indicators.
@@ -83,13 +134,36 @@ class ScenovaSizing {
   /// Feature icons and empty states.
   final double iconLg;
 
-  static const ScenovaSizing desktop = ScenovaSizing(
+  static const mobile = ScenovaSizing(
+    buttonHeight: 44,
+    inputHeight: 48,
+    iconSm: 16,
+    iconMd: 24,
+    iconLg: 32,
+  );
+
+  static const tablet = ScenovaSizing(
+    buttonHeight: 44,
+    inputHeight: 44,
+    iconSm: 16,
+    iconMd: 24,
+    iconLg: 40,
+  );
+
+  /// The branding doc's Desktop column: the console's control height.
+  static const desktop = ScenovaSizing(
     buttonHeight: 40,
     inputHeight: 40,
     iconSm: 16,
     iconMd: 24,
     iconLg: 32,
   );
+
+  static ScenovaSizing of(DeviceClass device) => switch (device) {
+    DeviceClass.mobile => mobile,
+    DeviceClass.tablet => tablet,
+    DeviceClass.desktop => desktop,
+  };
 }
 
 /// Corner radii (branding → "Sizing", Fixed).
@@ -101,6 +175,9 @@ abstract final class ScenovaRadius {
 }
 
 /// Shadow tokens (branding → "Shadows").
+///
+/// The in-context card sits over content the product does not own, so it takes
+/// [lg] plus a solid surface, never a translucent blur.
 abstract final class ScenovaShadows {
   static const List<BoxShadow> none = <BoxShadow>[];
 
@@ -135,15 +212,16 @@ abstract final class ScenovaShadows {
 
 /// Motion tokens.
 ///
-/// `docs/Scenova/branding.md` describes the motion character ("calm and quick")
-/// but does not enumerate timing values; these are the smallest set that
-/// expresses it and are reported as a gap in the branding spec rather than
-/// invented per call site.
+/// `docs/Scenova/branding.md` describes the motion character ("calm and quick";
+/// the clip view "settles in one movement and gets out of the way, with no
+/// bounce or flourish") but does not enumerate timing values. These tokens are
+/// the smallest set that expresses that character; they are reported as a gap
+/// in the branding spec rather than invented per call site.
 abstract final class ScenovaMotion {
   /// Press and focus feedback.
   static const Duration press = Duration(milliseconds: 120);
 
-  /// Simple state changes.
+  /// The in-context card settling in and simple state changes.
   static const Duration settle = Duration(milliseconds: 240);
 
   /// Dismissals and larger transitions.
@@ -172,12 +250,13 @@ abstract final class ScenovaOpacity {
   static const double placeholderStill = 0.6;
 }
 
-/// The resolved token set for the current theme.
+/// The resolved token set for the current theme and device class.
 ///
 /// Read it with [ScenovaTokens.of].
 @immutable
 class ScenovaTokens extends ThemeExtension<ScenovaTokens> {
   const ScenovaTokens({
+    required this.deviceClass,
     required this.spacing,
     required this.sizing,
     required this.shadowSm,
@@ -186,6 +265,7 @@ class ScenovaTokens extends ThemeExtension<ScenovaTokens> {
     required this.shadowXl,
   });
 
+  final DeviceClass deviceClass;
   final ScenovaSpacing spacing;
   final ScenovaSizing sizing;
   final List<BoxShadow> shadowSm;
@@ -193,11 +273,15 @@ class ScenovaTokens extends ThemeExtension<ScenovaTokens> {
   final List<BoxShadow> shadowLg;
   final List<BoxShadow> shadowXl;
 
-  static ScenovaTokens resolve({required Brightness brightness}) {
+  static ScenovaTokens resolve({
+    required DeviceClass deviceClass,
+    required Brightness brightness,
+  }) {
     final isDark = brightness == Brightness.dark;
     return ScenovaTokens(
-      spacing: ScenovaSpacing.desktop,
-      sizing: ScenovaSizing.desktop,
+      deviceClass: deviceClass,
+      spacing: ScenovaSpacing.of(deviceClass),
+      sizing: ScenovaSizing.of(deviceClass),
       shadowSm: isDark ? ScenovaShadows.smDark : ScenovaShadows.smLight,
       shadowMd: isDark ? ScenovaShadows.mdDark : ScenovaShadows.mdLight,
       shadowLg: isDark ? ScenovaShadows.lgDark : ScenovaShadows.lgLight,
@@ -213,6 +297,7 @@ class ScenovaTokens extends ThemeExtension<ScenovaTokens> {
 
   @override
   ScenovaTokens copyWith({
+    DeviceClass? deviceClass,
     ScenovaSpacing? spacing,
     ScenovaSizing? sizing,
     List<BoxShadow>? shadowSm,
@@ -221,6 +306,7 @@ class ScenovaTokens extends ThemeExtension<ScenovaTokens> {
     List<BoxShadow>? shadowXl,
   }) {
     return ScenovaTokens(
+      deviceClass: deviceClass ?? this.deviceClass,
       spacing: spacing ?? this.spacing,
       sizing: sizing ?? this.sizing,
       shadowSm: shadowSm ?? this.shadowSm,

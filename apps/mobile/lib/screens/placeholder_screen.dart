@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-
-import '../widgets/app_icons.dart';
-import '../widgets/states.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 /// A destination named on the navigation map whose own screen belongs to a
 /// later phase.

@@ -3,9 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scenova/theme/app_theme.dart';
-import 'package:scenova/theme/colors.dart';
-import 'package:scenova/theme/tokens.dart';
-import 'package:scenova/widgets/app_icons.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 /// Puts an icon under the real theme, so its tokens resolve the way they do in
 /// the app.
@@ -30,16 +28,16 @@ void main() {
 
         expect(
           glyph.assetPath(ScenovaIconState.active),
-          'assets/icons/filled/play.svg',
+          'packages/scenova_design/assets/icons/filled/play.svg',
         );
         expect(
           glyph.assetPath(ScenovaIconState.inactive),
-          'assets/icons/outlined/play.svg',
+          'packages/scenova_design/assets/icons/outlined/play.svg',
         );
         // The disabled treatment is a tone change, not a different shape.
         expect(
           glyph.assetPath(ScenovaIconState.disabled),
-          'assets/icons/outlined/play.svg',
+          'packages/scenova_design/assets/icons/outlined/play.svg',
         );
       },
     );
@@ -83,7 +81,7 @@ void main() {
       final svg = tester.widget<SvgPicture>(find.byType(SvgPicture));
       expect(
         svg.bytesLoader.toString(),
-        contains('assets/icons/outlined/history.svg'),
+        contains('packages/scenova_design/assets/icons/outlined/history.svg'),
       );
       expect(tester.takeException(), isNull);
     });

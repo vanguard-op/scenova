@@ -3,9 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scenova/theme/app_theme.dart';
-import 'package:scenova/theme/colors.dart';
-import 'package:scenova/theme/tokens.dart';
-import 'package:scenova/widgets/brand_mark.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 /// Puts the mark under the real theme, so its ink resolves the way it does in
 /// the app.

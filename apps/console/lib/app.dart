@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 import 'models/review_queue.dart';
 import 'screens/review_entry_screen.dart';
@@ -10,7 +11,6 @@ import 'screens/sign_in_screen.dart';
 import 'services/console_services.dart';
 import 'services/operator_auth.dart';
 import 'theme/app_theme.dart';
-import 'widgets/console_shell.dart';
 
 /// The console application: the theme, the operator gate, and the shell.
 class ConsoleApp extends StatelessWidget {

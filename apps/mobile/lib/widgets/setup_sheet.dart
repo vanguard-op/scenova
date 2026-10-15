@@ -1,9 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-
-import '../theme/colors.dart';
-import '../theme/tokens.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 /// The setup panel: a solid, draggable bottom sheet carrying the setup content
 /// over the walkthrough clip (`docs/Scenova/screens/01-onboarding.md` → Layout,

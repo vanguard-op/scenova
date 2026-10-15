@@ -1,0 +1,39 @@
+name: scenova_design
+description: "Scenova's design system: the brand's tokens and the shared components both apps import."
+publish_to: 'none'
+
+version: 0.1.0
+
+environment:
+  sdk: ^3.13.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Renders the brand mark and the custom icon set from the delivered assets.
+  flutter_svg: ^2.3.0
+
+  # Streams a clip in the shared Clip Player, so the reader sees the clip
+  # itself rather than a poster and the controls follow real playback.
+  video_player: ^2.14.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  # The brand mark (A-001) and the custom icon set (A-008) travel with the
+  # design system, so both apps draw the same art from one bundle rather than
+  # each carrying a copy. The mark ships as the master it was delivered as; the
+  # icon set's active state uses the filled form and the default and disabled
+  # states share the outlined form, since the disabled treatment is a tone
+  # change, not a different shape. The `assets/` directory is the repository's
+  # own, linked from here the way both apps link it.
+  assets:
+    - assets/icons/outlined/
+    - assets/icons/filled/
+    - assets/brand/scenova-mark.svg

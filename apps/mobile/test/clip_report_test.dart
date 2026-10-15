@@ -12,7 +12,7 @@ import 'package:scenova/services/connectivity.dart';
 import 'package:scenova/services/history_store.dart';
 import 'package:scenova/services/lookup_api.dart';
 import 'package:scenova/services/report_api.dart';
-import 'package:scenova/widgets/scenova_button.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 import 'support/harness.dart';
 

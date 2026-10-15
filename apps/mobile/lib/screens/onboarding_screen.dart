@@ -1,15 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 import '../services/app_services.dart';
 import '../services/settings_controller.dart';
-import '../theme/colors.dart';
-import '../theme/tokens.dart';
-import '../theme/typography.dart';
-import '../widgets/app_icons.dart';
-import '../widgets/brand_lockup.dart';
 import '../widgets/enable_action_guide.dart';
 import '../widgets/first_run_walkthrough.dart';
-import '../widgets/scenova_button.dart';
 import '../widgets/setup_sheet.dart';
 import 'onboarding_controller.dart';
 

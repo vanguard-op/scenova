@@ -13,7 +13,7 @@ import 'package:scenova/services/capture_intake.dart';
 import 'package:scenova/services/connectivity.dart';
 import 'package:scenova/services/lookup_api.dart';
 import 'package:scenova/services/settings_controller.dart';
-import 'package:scenova/widgets/app_icons.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 import 'support/harness.dart';
 

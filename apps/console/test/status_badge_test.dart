@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scenova_console/models/review_queue.dart';
-import 'package:scenova_console/theme/colors.dart';
 import 'package:scenova_console/widgets/status_badge.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 import 'support/harness.dart';
 

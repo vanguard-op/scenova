@@ -6,8 +6,7 @@ import 'package:scenova/screens/clip_view_screen.dart';
 import 'package:scenova/services/app_services.dart';
 import 'package:scenova/services/extension_channel.dart';
 import 'package:scenova/services/lookup_api.dart';
-import 'package:scenova/theme/colors.dart';
-import 'package:scenova/widgets/app_icons.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 import 'support/harness.dart';
 

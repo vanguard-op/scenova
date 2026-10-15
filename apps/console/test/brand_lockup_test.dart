@@ -2,14 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:scenova_console/theme/typography.dart';
-import 'package:scenova_console/widgets/brand_lockup.dart';
-import 'package:scenova_console/widgets/brand_mark.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 import 'support/harness.dart';
 
 /// The console's wordmark type styles, as the theme resolves them.
-ScenovaTextStyles styles() => ScenovaTextStyles.resolve();
+ScenovaTextStyles styles() =>
+    ScenovaTextStyles.resolve(ScenovaTypeScale.desktop);
 
 /// The wordmark's alphabetic baseline, in global coordinates.
 ///

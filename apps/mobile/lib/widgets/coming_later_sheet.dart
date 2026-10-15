@@ -1,9 +1,5 @@
 import 'package:flutter/material.dart';
-
-import '../theme/colors.dart';
-import '../theme/tokens.dart';
-import '../theme/typography.dart';
-import 'scenova_button.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 /// A bottom sheet for an action whose surface belongs to a later phase.
 ///

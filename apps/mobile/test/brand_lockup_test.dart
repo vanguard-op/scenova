@@ -3,10 +3,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scenova/theme/app_theme.dart';
-import 'package:scenova/theme/tokens.dart';
-import 'package:scenova/theme/typography.dart';
-import 'package:scenova/widgets/brand_lockup.dart';
-import 'package:scenova/widgets/brand_mark.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 /// Puts the lockup under the real theme, at a phone's width.
 Future<void> pumpLockup(

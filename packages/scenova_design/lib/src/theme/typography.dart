@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
 
-/// Typography tokens for the review console.
+import 'tokens.dart';
+
+/// Typography tokens.
 ///
 /// Source of truth: `docs/Scenova/branding.md` — "Typography". The display
-/// serif carries the brand on the few headings the console has; body text stays
-/// on a neutral sans for legibility in a dense table.
+/// serif carries the brand on the few headings the product has; body text
+/// stays on a neutral sans for legibility on a small card and in a dense
+/// table.
 ///
-/// The console is the branding doc's Desktop device class
-/// ("Responsive & Device Targets": pointer and keyboard, the operator console),
-/// so its type scale is the Desktop column and needs no breakpoint. The family
-/// names match the branding spec; their files ship in the asset ledger (A-011)
-/// and are bundled from `assets/fonts/`, so the styles resolve to the brand's
-/// own type. The fallbacks cover a platform that cannot load a bundled family.
+/// The family names below match the branding spec. Their files ship in the
+/// asset ledger (A-011) and are bundled from `assets/fonts/` by each app, so
+/// the styles resolve to the brand's own type; the fallbacks cover the case
+/// where a platform cannot load a bundled family.
 abstract final class ScenovaTypography {
   /// Display and headings.
   static const String displayFamily = 'Lora';
@@ -44,7 +45,7 @@ abstract final class ScenovaTypography {
       (style.fontSize ?? 0) * displayCapHeightRatio;
 }
 
-/// The type scale for the console (branding → "Type Scale", Desktop).
+/// The type scale resolved for one device class (branding → "Type Scale").
 @immutable
 class ScenovaTypeScale {
   const ScenovaTypeScale({
@@ -67,8 +68,30 @@ class ScenovaTypeScale {
   final double bodySmall;
   final double caption;
 
-  /// The branding doc's Desktop column.
-  static const ScenovaTypeScale desktop = ScenovaTypeScale(
+  static const mobile = ScenovaTypeScale(
+    display: 26,
+    h1: 22,
+    h2: 19,
+    h3: 17,
+    bodyLarge: 16,
+    body: 16,
+    bodySmall: 14,
+    caption: 12,
+  );
+
+  static const tablet = ScenovaTypeScale(
+    display: 32,
+    h1: 26,
+    h2: 21,
+    h3: 18,
+    bodyLarge: 17,
+    body: 16,
+    bodySmall: 14,
+    caption: 12,
+  );
+
+  /// The branding doc's Desktop column, for the operator console.
+  static const desktop = ScenovaTypeScale(
     display: 34,
     h1: 28,
     h2: 22,
@@ -78,6 +101,12 @@ class ScenovaTypeScale {
     bodySmall: 14,
     caption: 12,
   );
+
+  static ScenovaTypeScale of(DeviceClass device) => switch (device) {
+    DeviceClass.mobile => mobile,
+    DeviceClass.tablet => tablet,
+    DeviceClass.desktop => desktop,
+  };
 }
 
 /// The resolved text styles, keyed by the branding token name.
@@ -106,9 +135,7 @@ class ScenovaTextStyles extends ThemeExtension<ScenovaTextStyles> {
   final TextStyle bodySmall;
   final TextStyle caption;
 
-  static ScenovaTextStyles resolve([
-    ScenovaTypeScale scale = ScenovaTypeScale.desktop,
-  ]) {
+  static ScenovaTextStyles resolve(ScenovaTypeScale scale) {
     return ScenovaTextStyles(
       display: _display(scale.display, FontWeight.w700, 1.2),
       h1: _display(scale.h1, FontWeight.w700, 1.25),
@@ -142,7 +169,7 @@ class ScenovaTextStyles extends ThemeExtension<ScenovaTextStyles> {
   }
 
   /// Maps the token scale onto Material's [TextTheme] slots so stock widgets
-  /// (dialogs, buttons) inherit the brand scale.
+  /// (app bars, buttons, dialogs) inherit the brand scale.
   TextTheme toTextTheme() {
     return TextTheme(
       displayLarge: display,

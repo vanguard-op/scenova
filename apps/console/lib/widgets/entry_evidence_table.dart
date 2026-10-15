@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 import '../format/relative_age.dart';
 import '../models/review_entry.dart';
-import '../theme/colors.dart';
 import '../theme/layout.dart';
-import '../theme/tokens.dart';
-import '../theme/typography.dart';
 
 /// The Evidence table (`docs/Scenova/screens/10-review-entry.md` → Components):
 /// the reports and the negative feedback against the entry, beside the clip.

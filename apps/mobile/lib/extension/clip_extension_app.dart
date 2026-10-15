@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 import '../models/analytics_event.dart';
 import '../screens/clip_controller.dart';
@@ -7,8 +8,6 @@ import '../services/app_services.dart';
 import '../services/capture_intake.dart';
 import '../services/extension_channel.dart';
 import '../theme/app_theme.dart';
-import '../theme/colors.dart';
-import '../theme/tokens.dart';
 
 /// The clip view as the iOS share extension presents it (`FEAT-002`).
 ///
@@ -78,7 +77,7 @@ class _ClipExtensionAppState extends State<ClipExtensionApp>
 
   DeviceClass _resolveDeviceClass() {
     final view = WidgetsBinding.instance.platformDispatcher.views.first;
-    return DeviceClass.fromWidth(
+    return DeviceClass.fromReaderWidth(
       view.physicalSize.width / view.devicePixelRatio,
     );
   }

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:scenova_console/widgets/brand_lockup.dart';
-import 'package:scenova_console/widgets/console_shell.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 import 'support/harness.dart';
 

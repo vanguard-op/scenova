@@ -1,0 +1,11 @@
+# Static analysis for the shared design system.
+#
+# The same lint set both apps use, so the package reads the way they do.
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - build/**
+
+linter:
+  rules:

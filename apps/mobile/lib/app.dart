@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 import 'app_router.dart';
 import 'models/analytics_event.dart';
@@ -14,7 +15,6 @@ import 'screens/placeholder_screen.dart';
 import 'services/app_services.dart';
 import 'services/capture_channel.dart';
 import 'theme/app_theme.dart';
-import 'theme/tokens.dart';
 
 /// The app shell: theme resolution, the navigation map, and the entry gate.
 ///
@@ -192,7 +192,7 @@ class _ScenovaAppState extends State<ScenovaApp> with WidgetsBindingObserver {
 
   DeviceClass _resolveDeviceClass() {
     final view = WidgetsBinding.instance.platformDispatcher.views.first;
-    return DeviceClass.fromWidth(
+    return DeviceClass.fromReaderWidth(
       view.physicalSize.width / view.devicePixelRatio,
     );
   }

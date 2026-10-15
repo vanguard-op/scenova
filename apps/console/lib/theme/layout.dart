@@ -2,22 +2,14 @@
 ///
 /// `docs/Scenova/branding.md` fixes the spacing, sizing, radius, shadow, and
 /// type scales, and those are the values every screen consumes. It does not
-/// declare the console's chrome widths — the sidebar, the top bar, the table's
-/// column weights — because those belong to the console's own composition
-/// rather than to the brand. They live here, in one place, so no screen carries
-/// a bare layout number at a call site.
+/// declare the console's table weights or the measures its panels are held to,
+/// because those belong to the console's own composition rather than to the
+/// brand. They live here, in one place, so no screen carries a bare layout
+/// number at a call site.
+///
+/// The console shell's chrome and the clip's own frame shape belong to the
+/// shared components and travel with them in the design system.
 abstract final class ConsoleLayout {
-  /// The sidebar's width. Wide enough for the queue label and its count, and
-  /// narrow enough to leave the table room.
-  static const double sidebarWidth = 248;
-
-  /// The sticky top bar's height, holding the mark and the operator's identity.
-  static const double topBarHeight = 64;
-
-  /// The body's maximum width, so the table does not stretch to an unreadable
-  /// width on a very wide display.
-  static const double contentMaxWidth = 1440;
-
   /// The table's column weights. The word and the reason carry the most text;
   /// the sense, the age, and the state are short.
   static const int wordColumnFlex = 4;
@@ -48,13 +40,6 @@ abstract final class ConsoleLayout {
   /// two stay close and the evidence keeps room for a report's note and time.
   static const int entryCardFlex = 5;
   static const int entryEvidenceFlex = 6;
-
-  /// The clip's shape. The clips are generated in a 16:9 frame.
-  static const double clipAspectRatio = 16 / 9;
-
-  /// The clip's own play control, drawn on a still frame. Well above the
-  /// pointer minimum, so the one action on an empty frame is unmistakable.
-  static const double clipPlayAffordanceSize = 64;
 
   /// The evidence table's column weights. The report's note carries the most
   /// text; the reason and the time are short.

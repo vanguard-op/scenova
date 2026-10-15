@@ -31,6 +31,12 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # The shared design system: the brand's tokens and the shared components,
+  # imported rather than mirrored, so a token change and the mark's audit are
+  # made once for both apps.
+  scenova_design:
+    path: ../../packages/scenova_design
+
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
@@ -38,7 +44,8 @@ dependencies:
   # Talks to the gateway for lookups (C-001, C-002).
   http: ^1.2.0
 
-  # Renders the custom icon set and the brand mark from the SVG assets.
+  # Inspects the SVG the design system draws for the mark and the custom icon
+  # set, so the app's tests can assert the art both apps share.
   flutter_svg: ^2.3.0
 
   # Authenticates the lookup path (C-001/C-002 auth): an anonymous ID token
@@ -46,8 +53,9 @@ dependencies:
   firebase_core: ^4.15.0
   firebase_auth: ^6.7.0
 
-  # Streams the clip in the shared Clip Player, so the reader sees the clip
-  # itself rather than a poster and the controls follow real playback.
+  # Streams the first-run walkthrough behind the Onboarding screen. The clip
+  # the reader watches in the shared Clip Player streams through the design
+  # system's own copy of the plugin.
   video_player: ^2.14.1
 
   # Derives the poster frame kept with a saved lookup from its clip, using the
@@ -116,22 +124,14 @@ flutter:
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg
 
-  # The custom icon set (A-008). The active state uses the filled form; the
-  # default and disabled states share the outlined form and take their tone from
-  # the colour tokens, so only these two variants are bundled.
-  #
-  # The brand mark (A-001) is bundled as the master it ships as: the square
-  # canvas holds the ink in a centred 4.6:1 band, and the widget frames that
-  # band. Only the mark is bundled; the one-colour and knockout forms are the
-  # same art, and the mark retints to the ink token for dark surfaces.
+  # The custom icon set (A-008) and the brand mark (A-001) travel with the
+  # shared design system, so the app draws them from one bundle rather than
+  # carrying its own copy.
   #
   # The first-run walkthrough clip (A-010) is bundled for Onboarding. Only the
   # walkthrough is included: the store preview (A-009) belongs to the store
   # listing, not an in-app surface.
   assets:
-    - assets/icons/outlined/
-    - assets/icons/filled/
-    - assets/brand/scenova-mark.svg
     - assets/motion/first-run-walkthrough.mp4
 
   # The brand's type (A-011): Lora for display and headings, Inter for body.

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 import 'review_queue.dart';
 
@@ -86,8 +87,11 @@ enum FeedbackRating {
 }
 
 /// The clip behind a queued entry (`C-015` `entry.clip`).
+///
+/// It implements the design system's [ClipSource], so the shared Clip Player
+/// takes it as it is.
 @immutable
-class ReviewClip {
+class ReviewClip implements ClipSource {
   const ReviewClip({
     required this.url,
     required this.durationSeconds,
@@ -95,20 +99,19 @@ class ReviewClip {
     required this.hasAudio,
   });
 
+  @override
   final String url;
+  @override
   final double durationSeconds;
+  @override
   final String resolution;
+  @override
   final bool hasAudio;
 
   /// Whether the source is one a video player can stream. A scripted or empty
-  /// source is not, so the player holds a still poster instead of asking the
+  /// source is not, so the player holds a still frame instead of asking the
   /// platform to open something it cannot play.
-  bool get isPlayable {
-    if (url.isEmpty) return false;
-    final uri = Uri.tryParse(url);
-    if (uri == null) return false;
-    return uri.scheme == 'http' || uri.scheme == 'https';
-  }
+  bool get isPlayable => isPlayableClipUrl(url);
 
   static ReviewClip fromJson(Map<String, dynamic> json) {
     return ReviewClip(

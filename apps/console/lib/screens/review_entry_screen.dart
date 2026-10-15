@@ -1,22 +1,15 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 import '../models/phrase_rubric.dart';
 import '../models/review_entry.dart';
 import '../models/review_queue.dart';
 import '../services/console_services.dart';
 import '../services/review_api.dart';
-import '../theme/colors.dart';
 import '../theme/layout.dart';
-import '../theme/tokens.dart';
-import '../theme/typography.dart';
-import '../widgets/app_icons.dart';
-import '../widgets/clip_player.dart';
 import '../widgets/entry_evidence_table.dart';
-import '../widgets/scenova_button.dart';
-import '../widgets/skeleton.dart';
-import '../widgets/states.dart';
 import '../widgets/status_badge.dart';
 import 'review_entry_controller.dart';
 
@@ -111,6 +104,7 @@ class _ReviewEntryScreenState extends State<ReviewEntryScreen> {
                 'Ask an administrator to grant it, then sign in again.',
             actionLabel: 'Sign out',
             onAction: _signOut,
+            maxWidth: ConsoleLayout.stateMaxWidth,
           ),
         );
       case ReviewEntryStatus.error:
@@ -135,12 +129,14 @@ class _ReviewEntryScreenState extends State<ReviewEntryScreen> {
             'The queue lists what is still open.',
         retryLabel: 'Back to the queue',
         onRetry: widget.onBack,
+        maxWidth: ConsoleLayout.stateMaxWidth,
       );
     }
     return ErrorState(
       headline: 'The entry could not be loaded',
       body: _failureBody(failure),
       onRetry: controller.load,
+      maxWidth: ConsoleLayout.stateMaxWidth,
     );
   }
 
@@ -322,17 +318,29 @@ class _EntryHeading extends StatelessWidget {
 /// The entry card: the clip with the word as its caption, and the generation
 /// phrase the clip is made from
 /// (`docs/Scenova/screens/10-review-entry.md` → Layout).
-class _EntryCard extends StatelessWidget {
+///
+/// The card owns the clip's playback, so the shared Clip Player is handed
+/// whether it is playing and whether sound is on and reports back when the run
+/// finishes.
+class _EntryCard extends StatefulWidget {
   const _EntryCard({required this.detail});
 
   final ReviewEntryDetail detail;
+
+  @override
+  State<_EntryCard> createState() => _EntryCardState();
+}
+
+class _EntryCardState extends State<_EntryCard> {
+  bool _playing = false;
+  bool _soundOn = false;
 
   @override
   Widget build(BuildContext context) {
     final colors = ScenovaColors.of(context);
     final tokens = ScenovaTokens.of(context);
     final styles = ScenovaTextStyles.of(context);
-    final entry = detail.entry;
+    final entry = widget.detail.entry;
 
     return Container(
       decoration: BoxDecoration(
@@ -344,7 +352,18 @@ class _EntryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          ClipPlayer(caption: entry.lemma, clip: entry.clip),
+          ClipPlayer(
+            status: ClipPlayerStatus.ready,
+            caption: entry.lemma,
+            clip: entry.clip,
+            playing: _playing,
+            soundOn: _soundOn,
+            reduceMotion: MediaQuery.disableAnimationsOf(context),
+            controls: true,
+            onTogglePlay: () => setState(() => _playing = !_playing),
+            onToggleSound: () => setState(() => _soundOn = !_soundOn),
+            onCompleted: () => setState(() => _playing = false),
+          ),
           SizedBox(height: tokens.spacing.md),
           Text(
             '${entry.lemma} · sense ${entry.senseLabel}',
@@ -471,6 +490,7 @@ class _ActionsPanel extends StatelessWidget {
             : failure.message,
         retryLabel: retryable ? 'Try again' : 'Dismiss',
         onRetry: retryable ? onRetry : onDismiss,
+        maxWidth: ConsoleLayout.stateMaxWidth,
       );
     }
 
@@ -817,7 +837,7 @@ class _EntrySkeleton extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: <Widget>[
                       const AspectRatio(
-                        aspectRatio: ConsoleLayout.clipAspectRatio,
+                        aspectRatio: ClipPlayer.aspectRatio,
                         child: SkeletonBlock(),
                       ),
                       SizedBox(height: tokens.spacing.md),

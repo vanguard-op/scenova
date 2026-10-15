@@ -1,13 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 import '../format/relative_age.dart';
 import '../models/review_queue.dart';
-import '../theme/colors.dart';
 import '../theme/layout.dart';
-import '../theme/tokens.dart';
-import '../theme/typography.dart';
-import 'focus_ring.dart';
-import 'skeleton.dart';
 import 'status_badge.dart';
 
 /// The Queue table (`docs/Scenova/screens/09-review-queue.md` → Components):

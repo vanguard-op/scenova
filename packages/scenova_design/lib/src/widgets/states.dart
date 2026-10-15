@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 
 import '../theme/colors.dart';
-import '../theme/layout.dart';
 import '../theme/tokens.dart';
 import '../theme/typography.dart';
 import 'app_icons.dart';
 import 'scenova_button.dart';
+
+/// The width a centred state is held to when a screen does not name its own.
+///
+/// A headline reads on one or two lines at this measure rather than stretching
+/// across a wide surface.
+const double _defaultStateMaxWidth = 360;
 
 /// The shared Empty State (`docs/Scenova/screens.md` → "Shared / Common
 /// Components"): a centred icon, a short headline, a line of guidance, and one
@@ -18,6 +23,7 @@ class EmptyState extends StatelessWidget {
     required this.body,
     this.actionLabel,
     this.onAction,
+    this.maxWidth = _defaultStateMaxWidth,
   });
 
   final AppIcon icon;
@@ -25,6 +31,10 @@ class EmptyState extends StatelessWidget {
   final String body;
   final String? actionLabel;
   final VoidCallback? onAction;
+
+  /// The measure the state is held to. A wide surface passes its own so the
+  /// headline does not stretch across it.
+  final double maxWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -34,9 +44,7 @@ class EmptyState extends StatelessWidget {
 
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          maxWidth: ConsoleLayout.stateMaxWidth,
-        ),
+        constraints: BoxConstraints(maxWidth: maxWidth),
         child: Padding(
           padding: EdgeInsets.symmetric(
             horizontal: tokens.spacing.lg,
@@ -87,12 +95,17 @@ class ErrorState extends StatelessWidget {
     required this.body,
     this.retryLabel = 'Try again',
     this.onRetry,
+    this.maxWidth = _defaultStateMaxWidth,
   });
 
   final String headline;
   final String body;
   final String retryLabel;
   final VoidCallback? onRetry;
+
+  /// The measure the state is held to. A wide surface passes its own so the
+  /// headline does not stretch across it.
+  final double maxWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -102,9 +115,7 @@ class ErrorState extends StatelessWidget {
 
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          maxWidth: ConsoleLayout.stateMaxWidth,
-        ),
+        constraints: BoxConstraints(maxWidth: maxWidth),
         child: Padding(
           padding: EdgeInsets.symmetric(
             horizontal: tokens.spacing.lg,

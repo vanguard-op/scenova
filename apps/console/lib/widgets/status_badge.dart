@@ -1,18 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 import '../models/review_entry.dart';
 import '../models/review_queue.dart';
-import '../theme/colors.dart';
-import '../theme/tokens.dart';
-import '../theme/typography.dart';
-import 'app_icons.dart';
 
 /// The Review Status Badge (`docs/Scenova/screens.md` → "Shared / Common
 /// Components").
 ///
-/// It shows the queue item's review state in the semantic tokens — a tinted
-/// background, a border, and the family's text shade — with the state's own
-/// label and icon, so the state never rests on colour alone.
+/// It shows the queue item's review state through the shared [StatusBadge],
+/// which carries the state's own label and icon beside its colour so the state
+/// never rests on colour alone.
 class ReviewStatusBadge extends StatelessWidget {
   const ReviewStatusBadge({super.key, required this.state});
 
@@ -20,42 +17,11 @@ class ReviewStatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = ScenovaColors.of(context);
-    final tokens = ScenovaTokens.of(context);
-    final styles = ScenovaTextStyles.of(context);
-    final family = _family(colors, state);
-
-    return Semantics(
-      label: 'Review state: ${state.label}',
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: tokens.spacing.sm,
-          vertical: tokens.spacing.xs,
-        ),
-        decoration: BoxDecoration(
-          color: family.tint,
-          borderRadius: BorderRadius.circular(ScenovaRadius.full),
-          border: Border.all(color: family.border),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            AppIconView(
-              icon: _icon(state),
-              size: tokens.sizing.iconSm,
-              color: family.text,
-            ),
-            SizedBox(width: tokens.spacing.xs),
-            Text(
-              state.label,
-              style: styles.caption.copyWith(
-                color: family.text,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return StatusBadge(
+      label: state.label,
+      icon: _icon(state),
+      family: _family(ScenovaColors.of(context), state),
+      semanticLabel: 'Review state: ${state.label}',
     );
   }
 
@@ -86,8 +52,8 @@ class ReviewStatusBadge extends StatelessWidget {
 ///
 /// The review state says where the entry sits in the queue; this says whether
 /// the clip is in front of readers. A curator deciding between clear and hold
-/// needs both, so the two badges sit together. Like the review badge it carries
-/// a label and an icon, so the status never rests on colour alone.
+/// needs both, so the two badges sit together. Like the review badge it goes
+/// through the shared [StatusBadge], so the status never rests on colour alone.
 class EntryStatusBadge extends StatelessWidget {
   const EntryStatusBadge({super.key, required this.status});
 
@@ -95,42 +61,11 @@ class EntryStatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = ScenovaColors.of(context);
-    final tokens = ScenovaTokens.of(context);
-    final styles = ScenovaTextStyles.of(context);
-    final family = _family(colors, status);
-
-    return Semantics(
-      label: 'Library status: ${status.label}',
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: tokens.spacing.sm,
-          vertical: tokens.spacing.xs,
-        ),
-        decoration: BoxDecoration(
-          color: family.tint,
-          borderRadius: BorderRadius.circular(ScenovaRadius.full),
-          border: Border.all(color: family.border),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            AppIconView(
-              icon: _icon(status),
-              size: tokens.sizing.iconSm,
-              color: family.text,
-            ),
-            SizedBox(width: tokens.spacing.xs),
-            Text(
-              status.label,
-              style: styles.caption.copyWith(
-                color: family.text,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return StatusBadge(
+      label: status.label,
+      icon: _icon(status),
+      family: _family(ScenovaColors.of(context), status),
+      semanticLabel: 'Library status: ${status.label}',
     );
   }
 

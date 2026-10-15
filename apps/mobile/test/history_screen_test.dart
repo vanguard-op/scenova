@@ -9,11 +9,7 @@ import 'package:scenova/services/feature_flags.dart';
 import 'package:scenova/services/history_store.dart';
 import 'package:scenova/services/lookup_api.dart';
 import 'package:scenova/services/poster_frame_store.dart';
-import 'package:scenova/widgets/app_icons.dart';
-import 'package:scenova/widgets/clip_still_frame.dart';
-import 'package:scenova/widgets/offline_banner.dart';
-import 'package:scenova/widgets/skeleton.dart';
-import 'package:scenova/widgets/states.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 import 'support/harness.dart';
 

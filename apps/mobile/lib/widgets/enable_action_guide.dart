@@ -1,10 +1,5 @@
 import 'package:flutter/material.dart';
-
-import '../theme/colors.dart';
-import '../theme/tokens.dart';
-import '../theme/typography.dart';
-import 'app_icons.dart';
-import 'scenova_button.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 /// The enable-action card (`docs/Scenova/screens/01-onboarding.md`).
 ///

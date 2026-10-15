@@ -1,14 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 import '../config.dart';
 import '../models/report.dart';
-import '../theme/colors.dart';
-import '../theme/tokens.dart';
-import '../theme/typography.dart';
-import 'app_icons.dart';
-import 'scenova_button.dart';
 
 /// Opens the Report sheet over the Clip View
 /// (`docs/Scenova/screens/05-report-sheet.md`).

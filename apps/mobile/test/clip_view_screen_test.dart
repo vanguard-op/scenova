@@ -18,9 +18,7 @@ import 'package:scenova/services/poster_frame_store.dart';
 import 'package:scenova/services/push_registration_api.dart';
 import 'package:scenova/services/push_tokens.dart';
 import 'package:scenova/services/settings_controller.dart';
-import 'package:scenova/widgets/app_icons.dart';
-import 'package:scenova/widgets/clip_player.dart';
-import 'package:scenova/widgets/offline_banner.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 import 'support/harness.dart';
 

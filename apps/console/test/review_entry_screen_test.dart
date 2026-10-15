@@ -7,10 +7,8 @@ import 'package:scenova_console/models/review_queue.dart';
 import 'package:scenova_console/screens/review_entry_controller.dart';
 import 'package:scenova_console/screens/review_entry_screen.dart';
 import 'package:scenova_console/services/review_api.dart';
-import 'package:scenova_console/widgets/clip_player.dart';
-import 'package:scenova_console/widgets/scenova_button.dart';
-import 'package:scenova_console/widgets/skeleton.dart';
 import 'package:scenova_console/widgets/status_badge.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 import 'support/harness.dart';
 

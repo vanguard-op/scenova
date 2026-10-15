@@ -2,21 +2,13 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 import '../app_router.dart';
 import '../models/history_entry.dart';
 import '../services/app_services.dart';
 import '../services/history_store.dart';
 import '../services/poster_frame_store.dart';
-import '../theme/colors.dart';
-import '../theme/tokens.dart';
-import '../theme/typography.dart';
-import '../widgets/app_icons.dart';
-import '../widgets/clip_still_frame.dart';
-import '../widgets/offline_banner.dart';
-import '../widgets/scenova_button.dart';
-import '../widgets/skeleton.dart';
-import '../widgets/states.dart';
 
 /// What the history list is doing.
 enum _HistoryStatus { loading, loaded, empty, error }

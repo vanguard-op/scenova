@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 
 /// Colour tokens for Scenova.
 ///
-/// Source of truth: `docs/Scenova/branding.md` — "Color Palette". Every colour
-/// in the app resolves through this file; no widget carries a literal colour.
+/// Source of truth: `docs/Scenova/branding.md` — "Color Palette". Both apps
+/// resolve every colour through the design system; no widget carries a literal
+/// colour.
 ///
 /// Each accent and semantic family publishes its full 100/300/500/700/900
 /// scale: 500 is the element colour, 100 tints its background, 900 is its text,

@@ -5,11 +5,10 @@ import 'package:scenova/screens/home_screen.dart';
 import 'package:scenova/screens/onboarding_controller.dart';
 import 'package:scenova/screens/onboarding_screen.dart';
 import 'package:scenova/services/settings_controller.dart';
-import 'package:scenova/theme/colors.dart';
-import 'package:scenova/widgets/brand_lockup.dart';
 import 'package:scenova/widgets/enable_action_guide.dart';
 import 'package:scenova/widgets/first_run_walkthrough.dart';
 import 'package:scenova/widgets/setup_sheet.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 import 'support/harness.dart';
 

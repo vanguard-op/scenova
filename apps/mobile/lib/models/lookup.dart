@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 /// The lookup wire model, conforming to `C-001` / `C-002`.
 ///
@@ -46,7 +47,7 @@ enum LookupStatus {
 
 /// A generated or library clip, capped at four seconds at 360p.
 @immutable
-class Clip {
+class Clip implements ClipSource {
   const Clip({
     required this.url,
     required this.durationSeconds,
@@ -54,9 +55,13 @@ class Clip {
     required this.hasAudio,
   });
 
+  @override
   final String url;
+  @override
   final double durationSeconds;
+  @override
   final String resolution;
+  @override
   final bool hasAudio;
 
   factory Clip.fromJson(Map<String, dynamic> json) {

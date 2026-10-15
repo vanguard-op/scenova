@@ -5,11 +5,7 @@ import 'package:scenova/models/history_entry.dart';
 import 'package:scenova/screens/clip_view_screen.dart';
 import 'package:scenova/services/capture_intake.dart';
 import 'package:scenova/services/history_store.dart';
-import 'package:scenova/widgets/brand_lockup.dart';
-import 'package:scenova/widgets/brand_mark.dart';
-import 'package:scenova/widgets/offline_banner.dart';
-import 'package:scenova/widgets/skeleton.dart';
-import 'package:scenova/widgets/states.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 import 'support/harness.dart';
 

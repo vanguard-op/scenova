@@ -4,7 +4,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../theme/colors.dart';
 
 /// The Scenova mark, drawn from the delivered asset
-/// (`ASSETS.md` → A-001, `assets/brand/scenova-mark.svg`).
+/// (`ASSETS.md` → A-001, `assets/brand/scenova-mark.svg`), bundled by the
+/// design system so both apps draw the same art.
 ///
 /// `docs/Scenova/branding.md` → "Brand Mark & Logo System": three short
 /// horizontal strokes sit in a row, and the middle one peels upward into a
@@ -24,7 +25,11 @@ class BrandMark extends StatelessWidget {
   const BrandMark({super.key, this.size = 24, this.color, this.semanticLabel});
 
   /// The delivered mark: mark-only, transparent, in the ink token's light value.
-  static const String assetPath = 'assets/brand/scenova-mark.svg';
+  ///
+  /// The design system bundles the art, so the key carries the package prefix
+  /// Flutter gives a package's own assets.
+  static const String assetPath =
+      'packages/scenova_design/assets/brand/scenova-mark.svg';
 
   /// The mark's width over its height, taken from the delivered master's ink
   /// band (778 × 170 in its 1024 canvas). The mark is far wider than it is tall,

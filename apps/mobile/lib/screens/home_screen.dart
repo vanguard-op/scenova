@@ -1,21 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 import '../app_router.dart';
 import '../models/entitlement.dart';
 import '../models/history_entry.dart';
 import '../services/app_services.dart';
 import '../services/capture_intake.dart';
-import '../theme/colors.dart';
-import '../theme/tokens.dart';
-import '../theme/typography.dart';
 import '../widgets/allowance_indicator.dart';
-import '../widgets/app_icons.dart';
-import '../widgets/brand_lockup.dart';
 import '../widgets/enable_action_guide.dart';
-import '../widgets/offline_banner.dart';
-import '../widgets/scenova_button.dart';
-import '../widgets/skeleton.dart';
-import '../widgets/states.dart';
 
 /// Where the word entry, the allowance, and recent lookups are.
 enum _HomeStatus { loading, loaded, empty, error }

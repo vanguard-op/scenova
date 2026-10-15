@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../theme/colors.dart';
-import '../theme/layout.dart';
 import '../theme/tokens.dart';
 import '../theme/typography.dart';
 import 'app_icons.dart';
@@ -17,6 +16,9 @@ import 'scenova_button.dart';
 /// The shell is the frame every console screen sits in, so the chrome does not
 /// move when a curator opens an entry and returns. The body scrolls; the top
 /// bar and the sidebar hold.
+///
+/// Its chrome dimensions belong to the shell rather than to the brand, which
+/// fixes only the spacing, sizing, radius, shadow, and type scales.
 class ConsoleShell extends StatelessWidget {
   const ConsoleShell({
     super.key,
@@ -27,6 +29,21 @@ class ConsoleShell extends StatelessWidget {
     required this.onSignOut,
     required this.child,
   });
+
+  /// The sidebar's width. Wide enough for the queue label and its count, and
+  /// narrow enough to leave the table room.
+  static const double sidebarWidth = 248;
+
+  /// The sticky top bar's height, holding the mark and the operator's identity.
+  static const double topBarHeight = 64;
+
+  /// The body's maximum width, so the table does not stretch to an unreadable
+  /// width on a very wide display.
+  static const double contentMaxWidth = 1440;
+
+  /// The width the operator's identity is held to before it truncates, so a
+  /// long address never crowds out sign-out.
+  static const double operatorLabelMaxWidth = 260;
 
   /// The signed-in operator, as the top bar shows them.
   final String operatorLabel;
@@ -67,7 +84,7 @@ class ConsoleShell extends StatelessWidget {
                       alignment: Alignment.topCenter,
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(
-                          maxWidth: ConsoleLayout.contentMaxWidth,
+                          maxWidth: contentMaxWidth,
                         ),
                         child: child,
                       ),
@@ -96,7 +113,7 @@ class _TopBar extends StatelessWidget {
     final styles = ScenovaTextStyles.of(context);
 
     return Container(
-      height: ConsoleLayout.topBarHeight,
+      height: ConsoleShell.topBarHeight,
       padding: EdgeInsets.symmetric(horizontal: tokens.spacing.lg),
       decoration: BoxDecoration(
         color: colors.surface,
@@ -119,7 +136,9 @@ class _TopBar extends StatelessWidget {
           ),
           SizedBox(width: tokens.spacing.sm),
           ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 260),
+            constraints: const BoxConstraints(
+              maxWidth: ConsoleShell.operatorLabelMaxWidth,
+            ),
             child: Text(
               operatorLabel,
               style: styles.bodySmall.copyWith(color: colors.textPrimary),
@@ -157,7 +176,7 @@ class _Sidebar extends StatelessWidget {
     final tokens = ScenovaTokens.of(context);
 
     return Container(
-      width: ConsoleLayout.sidebarWidth,
+      width: ConsoleShell.sidebarWidth,
       decoration: BoxDecoration(
         color: colors.surface,
         border: Border(right: BorderSide(color: colors.border)),

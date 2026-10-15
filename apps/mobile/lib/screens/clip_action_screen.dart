@@ -1,11 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 import '../models/analytics_event.dart';
 import '../services/app_services.dart';
 import '../services/capture_intake.dart';
-import '../theme/colors.dart';
 import 'clip_controller.dart';
 import 'clip_view_screen.dart';
 

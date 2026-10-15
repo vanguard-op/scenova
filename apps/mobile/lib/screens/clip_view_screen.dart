@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 import '../models/analytics_event.dart';
 import '../models/feedback.dart';
@@ -9,18 +10,8 @@ import '../models/report.dart';
 import '../services/app_services.dart';
 import '../services/push_registrar.dart';
 import '../services/settings_controller.dart';
-import '../theme/colors.dart';
-import '../theme/tokens.dart';
-import '../theme/typography.dart';
-import '../widgets/app_icons.dart';
-import '../widgets/clip_player.dart';
 import '../widgets/coming_later_sheet.dart';
-import '../widgets/offline_banner.dart';
 import '../widgets/report_sheet.dart';
-import '../widgets/scenova_button.dart';
-import '../widgets/skeleton.dart';
-import '../widgets/states.dart';
-import '../widgets/word_phrase_header.dart';
 import 'clip_controller.dart';
 
 /// How the clip view is presented.

@@ -11,6 +11,12 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # The shared design system: the brand's tokens and the shared components,
+  # imported rather than mirrored, so a token change and the mark's audit are
+  # made once for both apps.
+  scenova_design:
+    path: ../../packages/scenova_design
+
   # The console is a web app; the path URL strategy keeps its screens on the
   # routes the docs declare (`/review`, `/review/entry/:entryId`).
   flutter_web_plugins:
@@ -23,7 +29,8 @@ dependencies:
   # Talks to the gateway's review endpoints (C-014), which carry the queue.
   http: ^1.2.0
 
-  # Renders the brand mark and the custom icon set from the delivered assets.
+  # Inspects the SVG the design system draws for the mark, so the console's
+  # tests can assert the art both apps share.
   flutter_svg: ^2.3.0
 
   # Authenticates the operator session (C-014 auth): an operator's Firebase ID
@@ -35,11 +42,6 @@ dependencies:
   # rather than a hardcoded English string (`branding.md` → "Formats").
   intl: ^0.20.3
 
-  # Streams the clip in the shared Clip Player, so a curator judges the clip
-  # itself rather than a poster. The entry view is the one console screen that
-  # shows a clip; the plugin's web implementation plays it in the browser.
-  video_player: ^2.14.1
-
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -48,17 +50,10 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  # The brand mark (A-001) and the icon set (A-008) are shared with the reader
-  # app through the repository's `assets/` directory, which this workspace links
-  # the same way the reader app does. The mark ships as the master it was
-  # delivered as; the icon set's active state uses the filled form and the
-  # default and disabled states share the outlined form, since the disabled
-  # treatment is a tone change, not a different shape.
-  assets:
-    - assets/icons/outlined/
-    - assets/icons/filled/
-    - assets/brand/scenova-mark.svg
-    - assets/brand/scenova-app-icon.png
+  # The brand mark (A-001) and the icon set (A-008) travel with the shared
+  # design system, so the console draws them from one bundle rather than
+  # carrying its own copy. The brand's type is bundled below; nothing else
+  # resolves to an asset from this app.
 
   # The brand's type (A-011): Lora for display and headings, Inter for body.
   # Both ship as variable fonts, so one file carries the whole weight axis and a

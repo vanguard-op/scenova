@@ -3,12 +3,10 @@ import 'package:flutter/material.dart';
 import '../theme/colors.dart';
 import '../theme/tokens.dart';
 
-/// A placeholder used while a screen loads.
+/// A stack of placeholder rows used while a screen loads.
 ///
-/// The queue renders a skeleton table while its first page is in flight
-/// (`docs/Scenova/screens/09-review-queue.md` → Loading), and the entry renders
-/// a skeleton card (`docs/Scenova/screens/10-review-entry.md` → Loading), so
-/// the layout holds its shape and the page does not jump when the data lands.
+/// The reader app holds the shape of Home's and History's lists while their
+/// first read is in flight, so the page does not jump when the data lands.
 class SkeletonList extends StatelessWidget {
   const SkeletonList({super.key, this.rows = 4});
 

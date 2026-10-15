@@ -15,8 +15,9 @@ enum ScenovaButtonVariant { primary, secondary, outline, ghost, destructive }
 /// The component tokens fix the background, text, border, radius, height, and
 /// padding per variant; pressed states move to the adjacent darker shade and
 /// disabled states drop to the tinted shade. A focused control draws the brand
-/// focus ring, and its height is the Desktop control height, above the 24px
-/// minimum pointer target the console is held to.
+/// focus ring, and its height is the token scale's control height for the
+/// device class, so a reader's control meets the 44px minimum touch target and
+/// the console's stays above the 24px minimum pointer target.
 class ScenovaButton extends StatefulWidget {
   const ScenovaButton({
     super.key,
@@ -142,7 +143,8 @@ class _ScenovaButtonState extends State<ScenovaButton> {
   }
 }
 
-/// A square icon action, meeting the Desktop control height.
+/// A square icon action at the token scale's control height for the device
+/// class.
 class ScenovaIconButton extends StatefulWidget {
   const ScenovaIconButton({
     super.key,

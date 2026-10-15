@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 import '../models/entitlement.dart';
-import '../theme/colors.dart';
-import '../theme/typography.dart';
 
 /// The allowance indicator on Home (`docs/Scenova/screens/02-home.md`).
 ///

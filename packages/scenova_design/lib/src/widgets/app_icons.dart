@@ -30,10 +30,11 @@ enum ScenovaGlyph {
   ///
   /// The active state uses the filled form; the default and disabled states
   /// share the outlined form, since the disabled treatment is a tone change,
-  /// not a different shape.
+  /// not a different shape. The design system bundles the set, so the key
+  /// carries the package prefix Flutter gives a package's own assets.
   String assetPath(ScenovaIconState state) {
     final variant = state == ScenovaIconState.active ? 'filled' : 'outlined';
-    return 'assets/icons/$variant/$assetName.svg';
+    return 'packages/scenova_design/assets/icons/$variant/$assetName.svg';
   }
 }
 
@@ -67,11 +68,11 @@ final class SystemIcon extends AppIcon {
   final IconData data;
 }
 
-/// Every icon the app draws.
+/// Every icon the product draws.
 ///
 /// The custom set resolves through the glyph branch; everything else is
-/// platform chrome. Both branches render through [AppIconView], so an icon is
-/// never a bare `Icon` at a call site.
+/// platform chrome, including the console's own chrome. Both branches render
+/// through [AppIconView], so an icon is never a bare `Icon` at a call site.
 abstract final class AppIcons {
   // The custom set.
   static const AppIcon seeIt = GlyphIcon(ScenovaGlyph.seeIt);

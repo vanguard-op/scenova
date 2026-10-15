@@ -1,10 +1,5 @@
 import 'package:flutter/material.dart';
-
-import '../theme/colors.dart';
-import '../theme/tokens.dart';
-import '../theme/typography.dart';
-import 'app_icons.dart';
-import 'scenova_button.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 /// The Pagination (`docs/Scenova/screens/09-review-queue.md` → Components):
 /// pages a queue longer than one page, newest report first.

@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scenova/services/settings_controller.dart';
 import 'package:scenova/theme/app_theme.dart';
-import 'package:scenova/theme/tokens.dart';
 import 'package:scenova/widgets/enable_action_guide.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 import 'support/harness.dart';
 

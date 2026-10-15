@@ -3,11 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scenova/theme/app_theme.dart';
-import 'package:scenova/theme/colors.dart';
-import 'package:scenova/theme/tokens.dart';
 import 'package:scenova/widgets/first_run_walkthrough.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_player_platform_interface/video_player_platform_interface.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 import 'support/harness.dart';
 

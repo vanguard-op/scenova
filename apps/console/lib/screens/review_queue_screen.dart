@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:scenova_design/scenova_design.dart';
 
 import '../models/review_queue.dart';
-import '../theme/colors.dart';
-import '../theme/tokens.dart';
-import '../theme/typography.dart';
-import '../widgets/app_icons.dart';
+import '../theme/layout.dart';
 import '../widgets/filter_bar.dart';
 import '../widgets/queue_pagination.dart';
 import '../widgets/queue_table.dart';
-import '../widgets/states.dart';
 import 'review_queue_controller.dart';
 
 /// Screen 9: the Review Queue (`docs/Scenova/screens/09-review-queue.md`).
@@ -120,6 +117,7 @@ class _QueueBody extends StatelessWidget {
                 'Ask an administrator to grant it, then sign in again.',
             actionLabel: 'Sign out',
             onAction: onSignOut,
+            maxWidth: ConsoleLayout.stateMaxWidth,
           ),
         );
       case ReviewQueueStatus.error:
@@ -128,6 +126,7 @@ class _QueueBody extends StatelessWidget {
             headline: 'The queue could not be loaded',
             body: _failureBody(controller),
             onRetry: controller.refresh,
+            maxWidth: ConsoleLayout.stateMaxWidth,
           ),
         );
       case ReviewQueueStatus.loaded:
@@ -183,6 +182,7 @@ class _LoadedQueue extends StatelessWidget {
                 body: 'Try a different reason, state, or word.',
                 actionLabel: 'Clear filters',
                 onAction: controller.clearFilters,
+                maxWidth: ConsoleLayout.stateMaxWidth,
               )
             : EmptyState(
                 icon: AppIcons.report,
@@ -190,6 +190,7 @@ class _LoadedQueue extends StatelessWidget {
                 body: 'Reported and flagged clips appear here, newest first.',
                 actionLabel: 'Refresh',
                 onAction: controller.refresh,
+                maxWidth: ConsoleLayout.stateMaxWidth,
               ),
       );
     }
