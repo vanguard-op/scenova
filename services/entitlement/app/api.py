@@ -21,6 +21,9 @@ an internal seam rather than a numbered contract: the lookup service calls it
 before it serves or generates, so one lookup spends one unit of the allowance
 whether it hits the library or generates.
 
+The `enable_paid_tier` release flag is read from the environment and applied to
+both: with it off, every reader is served as Free whatever their stored plan.
+
 `POST /internal/accounts/purge` runs the retention pass: it hard-deletes every
 deleted account past the documented window. It is an internal seam rather than a
 numbered contract, triggered by a scheduled caller.
@@ -69,6 +72,7 @@ def create_app(
         topup_lookups=resolved_settings.topup_lookups,
         trial_days=resolved_settings.trial_days,
         retention_days=resolved_settings.retention_days,
+        paid_tier_enabled=resolved_settings.enable_paid_tier,
     )
     resolved_verifier = verifier or build_token_verifier(resolved_settings)
 

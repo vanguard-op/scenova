@@ -9,6 +9,9 @@ grants 20 lookups a month, Pro 50, and the 7-day trial carries the Pro allowance
 for its length. A one-time top-up adds its lookups to the current period. The
 figures are tunable here rather than hard-coded in the service, so a pricing
 change is a configuration change and not a code change.
+
+The paid-tier kill switch is read here too: it is a runtime release flag rather
+than a pricing figure, so the environment's value is the source of truth.
 """
 
 from __future__ import annotations
@@ -37,6 +40,14 @@ DEFAULT_TRIAL_DAYS = 7
 # variable.
 RETENTION_DAYS = 30
 
+# The `enable_paid_tier` release flag (release.md "Rollout Phases & Feature
+# Flags"): when off, every reader is served and metered on the Free tier and the
+# Paywall is hidden, so an exhausted allowance shows the word and phrase with no
+# plan to buy. It defaults on here so a missing variable never silently reverts a
+# reader who has paid; every environment supplies its rollout value through
+# `FLAG_ENABLE_PAID_TIER`.
+DEFAULT_ENABLE_PAID_TIER = True
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -56,6 +67,8 @@ class Settings:
     topup_lookups: int = DEFAULT_TOPUP_LOOKUPS
     trial_days: int = DEFAULT_TRIAL_DAYS
     retention_days: int = RETENTION_DAYS
+    # The paid-tier kill switch; when off, every reader is served as Free.
+    enable_paid_tier: bool = DEFAULT_ENABLE_PAID_TIER
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Settings:
@@ -75,6 +88,7 @@ class Settings:
             pro_lookups=_env_int(source, "ENTITLEMENT_PRO_LOOKUPS", DEFAULT_PRO_LOOKUPS),
             topup_lookups=_env_int(source, "ENTITLEMENT_TOPUP_LOOKUPS", DEFAULT_TOPUP_LOOKUPS),
             trial_days=_env_int(source, "ENTITLEMENT_TRIAL_DAYS", DEFAULT_TRIAL_DAYS),
+            enable_paid_tier=_env_bool(source, "FLAG_ENABLE_PAID_TIER", DEFAULT_ENABLE_PAID_TIER),
         )
 
 

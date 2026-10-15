@@ -29,6 +29,12 @@ not a numbered contract.
 its personal data are hard-deleted once the documented window closes (nfr.md
 "Data lifecycle"). It is an internal seam, not a numbered contract.
 
+The `enable_paid_tier` release flag (release.md "Rollout Phases & Feature
+Flags") is applied when a reader is served or metered: when it is off, every
+reader is served as Free, whatever their stored plan. The stored entitlement is
+left as it is, so flipping the flag back on restores the reader's plan rather
+than forcing them to buy it again.
+
 A period rolls forward on any access, so a reader who has not opened the app for
 a month is metered against the month they are in, not the one they left. A
 top-up is deliberately not carried into the new period.
@@ -93,6 +99,7 @@ class EntitlementService:
         topup_lookups: int,
         trial_days: int,
         retention_days: int,
+        paid_tier_enabled: bool = True,
         clock: Callable[[], datetime] | None = None,
     ) -> None:
         self._store = store
@@ -101,6 +108,7 @@ class EntitlementService:
         self._topup_lookups = max(0, topup_lookups)
         self._trial_days = max(0, trial_days)
         self._retention_days = max(0, retention_days)
+        self._paid_tier_enabled = paid_tier_enabled
         self._clock = clock if clock is not None else _utcnow
         # Serialises the read-modify-write of an allowance, so two lookups racing
         # for the last unit cannot both spend it and a redelivered event is
@@ -112,7 +120,7 @@ class EntitlementService:
 
         account = await self._account_for(subject)
         record = await self._entitlement_for(account)
-        return _response(record)
+        return _response(self._served(record))
 
     async def update_account(
         self, subject: Subject, request: AccountUpdateRequest
@@ -226,6 +234,10 @@ class EntitlementService:
         A lookup with nothing left is refused without spending, so the caller can
         resolve it to the fallback with `used` equal to `limit`. A lookup the
         client resends with the same key is metered once.
+
+        The spend is against the allowance the reader is served — Free while the
+        paid tier is off — while the stored record keeps counting, so re-enabling
+        the tier finds the month's usage intact.
         """
 
         account = await self._account_for(subject)
@@ -234,9 +246,10 @@ class EntitlementService:
             if client_lookup_id is not None and await self._store.lookup_applied(
                 subject.id, client_lookup_id
             ):
-                return _spend_response(record, allowed=True)
-            if record.lookups_used >= record.lookups_limit:
-                return _spend_response(record, allowed=False)
+                return _spend_response(self._served(record), allowed=True)
+            served = self._served(record)
+            if served.lookups_used >= served.lookups_limit:
+                return _spend_response(served, allowed=False)
             updated = replace(
                 record,
                 lookups_used=record.lookups_used + 1,
@@ -245,7 +258,7 @@ class EntitlementService:
             await self._store.save_entitlement(updated)
             if client_lookup_id is not None:
                 await self._store.mark_lookup_applied(subject.id, client_lookup_id)
-            return _spend_response(updated, allowed=True)
+            return _spend_response(self._served(updated), allowed=True)
 
     # --- Accounts and entitlements -------------------------------------------
 
@@ -366,6 +379,33 @@ class EntitlementService:
 
     def _limit_for(self, plan: Plan) -> int:
         return self._free_lookups if plan is Plan.FREE else self._pro_lookups
+
+    def _served(self, record: EntitlementRecord) -> EntitlementRecord:
+        """The entitlement a reader is served and metered on right now.
+
+        With the paid tier live this is the stored entitlement. With the
+        `enable_paid_tier` kill switch off it is Free: the plan reads free, the
+        allowance is the Free allowance, the trial is not offered and the period
+        reads active, so an exhausted allowance shows the word and phrase with no
+        plan to buy (release.md "Rollout Phases & Feature Flags").
+
+        The override is a serve-time view, never a write: the trial, the paid
+        plan, and the month's usage stay in the store, so re-enabling the tier
+        restores the reader's plan and their usage rather than making them buy it
+        again. The used count is clamped to the Free allowance so an exhausted
+        meter reads `used` equal to `limit`, which the client relies on (C-001).
+        """
+
+        if self._paid_tier_enabled:
+            return record
+        return replace(
+            record,
+            plan=Plan.FREE,
+            lookups_used=min(record.lookups_used, self._free_lookups),
+            lookups_limit=self._free_lookups,
+            status=EntitlementStatus.ACTIVE,
+            trial_ends_at=None,
+        )
 
     # --- Billing events -------------------------------------------------------
 
