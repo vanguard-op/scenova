@@ -2,11 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scenova_console/screens/sign_in_screen.dart';
 import 'package:scenova_console/services/operator_auth.dart';
+import 'package:scenova_console/widgets/brand_lockup.dart';
 
 import 'support/harness.dart';
 
 void main() {
   group('SignInScreen', () {
+    testWidgets('carries the brand lockup in its heading', (tester) async {
+      final auth = FakeOperatorAuth();
+      addTearDown(auth.dispose);
+      await pumpThemed(tester, SignInScreen(auth: auth));
+
+      // The heading leads with the lockup, which sizes the mark to the
+      // wordmark's cap height.
+      expect(find.byType(BrandLockup), findsOneWidget);
+      expect(find.text(BrandLockup.wordmark), findsOneWidget);
+    });
+
     testWidgets('asks for an email and a password before signing in', (
       tester,
     ) async {

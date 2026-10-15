@@ -10,7 +10,7 @@ import '../theme/tokens.dart';
 import '../theme/typography.dart';
 import '../widgets/allowance_indicator.dart';
 import '../widgets/app_icons.dart';
-import '../widgets/brand_mark.dart';
+import '../widgets/brand_lockup.dart';
 import '../widgets/enable_action_guide.dart';
 import '../widgets/offline_banner.dart';
 import '../widgets/scenova_button.dart';
@@ -143,23 +143,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            BrandMark(size: tokens.sizing.iconSm),
-            SizedBox(width: tokens.spacing.sm),
-            // The mark takes its width from its delivered aspect ratio, so the
-            // wordmark flexes rather than the row overflowing on a narrow phone.
-            Flexible(
-              child: Text(
-                'Scenova',
-                style: styles.h2.copyWith(color: colors.textPrimary),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
+        // The lockup sizes the mark to the wordmark's cap height; the wordmark
+        // flexes rather than the row overflowing on a narrow phone.
+        title: BrandLockup(style: styles.h2),
         actions: <Widget>[
           ScenovaIconButton(
             icon: AppIcons.history,

@@ -5,7 +5,7 @@ import '../theme/colors.dart';
 import '../theme/tokens.dart';
 import '../theme/typography.dart';
 import '../widgets/app_icons.dart';
-import '../widgets/brand_mark.dart';
+import '../widgets/brand_lockup.dart';
 import '../widgets/scenova_button.dart';
 
 /// The console's sign-in: the identity-provider surface an operator lands on
@@ -245,16 +245,7 @@ class _Heading extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Row(
-          children: <Widget>[
-            BrandMark(size: tokens.sizing.iconLg, semanticLabel: 'Scenova'),
-            SizedBox(width: tokens.spacing.sm),
-            Text(
-              'Scenova',
-              style: styles.h2.copyWith(color: colors.textPrimary),
-            ),
-          ],
-        ),
+        BrandLockup(style: styles.h2),
         SizedBox(height: tokens.spacing.lg),
         Text(title, style: styles.h1.copyWith(color: colors.textPrimary)),
         SizedBox(height: tokens.spacing.xs),

@@ -5,6 +5,7 @@ import 'package:scenova/models/history_entry.dart';
 import 'package:scenova/screens/clip_view_screen.dart';
 import 'package:scenova/services/capture_intake.dart';
 import 'package:scenova/services/history_store.dart';
+import 'package:scenova/widgets/brand_lockup.dart';
 import 'package:scenova/widgets/brand_mark.dart';
 import 'package:scenova/widgets/offline_banner.dart';
 import 'package:scenova/widgets/skeleton.dart';
@@ -83,14 +84,16 @@ void main() {
     await teardown(tester);
   });
 
-  testWidgets('the app bar draws the brand mark from the delivered asset', (
+  testWidgets('the app bar draws the brand lockup from the delivered asset', (
     tester,
   ) async {
     await pumpHarness(tester);
     await tester.pump();
 
-    // The mark leads the wordmark, drawn from the asset rather than a
-    // hand-drawn stand-in.
+    // The app bar carries the lockup, which sizes the mark to the wordmark's
+    // cap height; the mark is drawn from the asset rather than a hand-drawn
+    // stand-in.
+    expect(find.byType(BrandLockup), findsOneWidget);
     final mark = find.byType(BrandMark);
     expect(mark, findsOneWidget);
     final svg = tester.widget<SvgPicture>(

@@ -6,6 +6,7 @@ import 'package:scenova/screens/onboarding_controller.dart';
 import 'package:scenova/screens/onboarding_screen.dart';
 import 'package:scenova/services/settings_controller.dart';
 import 'package:scenova/theme/colors.dart';
+import 'package:scenova/widgets/brand_lockup.dart';
 import 'package:scenova/widgets/enable_action_guide.dart';
 import 'package:scenova/widgets/first_run_walkthrough.dart';
 import 'package:scenova/widgets/setup_sheet.dart';
@@ -57,6 +58,9 @@ void main() {
 
     expect(find.text('See what a word means'), findsOneWidget);
     expect(find.byType(OnboardingScreen), findsOneWidget);
+    // The setup header carries the brand lockup, which sizes the mark to the
+    // wordmark's cap height.
+    expect(find.byType(BrandLockup), findsOneWidget);
     expect(find.byType(FirstRunWalkthrough), findsOneWidget);
     expect(find.byType(EnableActionGuide), findsOneWidget);
     expect(find.text('Step 1 of 2'), findsOneWidget);

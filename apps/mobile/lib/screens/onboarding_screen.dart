@@ -6,7 +6,7 @@ import '../theme/colors.dart';
 import '../theme/tokens.dart';
 import '../theme/typography.dart';
 import '../widgets/app_icons.dart';
-import '../widgets/brand_mark.dart';
+import '../widgets/brand_lockup.dart';
 import '../widgets/enable_action_guide.dart';
 import '../widgets/first_run_walkthrough.dart';
 import '../widgets/scenova_button.dart';
@@ -185,16 +185,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Row(
-          children: <Widget>[
-            BrandMark(size: tokens.sizing.iconSm, semanticLabel: 'Scenova'),
-            SizedBox(width: tokens.spacing.sm),
-            Text(
-              'Scenova',
-              style: styles.h2.copyWith(color: colors.textPrimary),
-            ),
-          ],
-        ),
+        BrandLockup(style: styles.h2),
         SizedBox(height: tokens.spacing.md),
         Text(
           'See what a word means',

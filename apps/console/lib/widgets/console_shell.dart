@@ -5,7 +5,7 @@ import '../theme/layout.dart';
 import '../theme/tokens.dart';
 import '../theme/typography.dart';
 import 'app_icons.dart';
-import 'brand_mark.dart';
+import 'brand_lockup.dart';
 import 'focus_ring.dart';
 import 'scenova_button.dart';
 
@@ -105,9 +105,7 @@ class _TopBar extends StatelessWidget {
       ),
       child: Row(
         children: <Widget>[
-          BrandMark(size: tokens.sizing.iconMd, semanticLabel: 'Scenova'),
-          SizedBox(width: tokens.spacing.sm),
-          Text('Scenova', style: styles.h3.copyWith(color: colors.textPrimary)),
+          BrandLockup(style: styles.h3),
           SizedBox(width: tokens.spacing.sm),
           Text(
             'Review console',

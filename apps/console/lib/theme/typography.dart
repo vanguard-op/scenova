@@ -29,6 +29,19 @@ abstract final class ScenovaTypography {
     'Arial',
     'sans-serif',
   ];
+
+  /// The display family's cap height as a fraction of the font size.
+  ///
+  /// Lora declares a cap height of 700 units against a 1000-unit em (the
+  /// delivered `assets/fonts/Lora[wght].ttf`, OS/2 `sCapHeight`), so a wordmark
+  /// set at size S has a cap height of `0.70 * S`. The brand lockup sizes the
+  /// mark to that height (`docs/Scenova/branding.md` → "Brand Mark & Logo
+  /// System": the mark leads the wordmark, centred on its cap height).
+  static const double displayCapHeightRatio = 0.70;
+
+  /// The cap height of a display-family [style], in logical pixels.
+  static double capHeightOf(TextStyle style) =>
+      (style.fontSize ?? 0) * displayCapHeightRatio;
 }
 
 /// The type scale for the console (branding → "Type Scale", Desktop).
