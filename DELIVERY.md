@@ -86,7 +86,7 @@ docs/           BPRD (product-shaper)
 ### Completed Phases
 | Phase | Closed | Notes |
 |---|---|---|
-| Phase 3: Trust and Continuity | 2026-10-15 | C-012 to C-016 frozen and conformed; the generation path's release still flagged (`D-023`) |
+| Phase 3: Trust and Continuity | 2026-10-15 | C-012 to C-016 frozen and conformed at the gate; the moderation change request supersedes the hold semantics (`D-030`). The generation path's release still flagged (`D-023`) |
 | — | — | The conditional closes of the first two phases are decisions-log entries (`D-020`, `D-023`). |
 
 ### Active Phase: Phase 4: Polish and Account
