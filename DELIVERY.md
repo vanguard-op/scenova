@@ -92,10 +92,11 @@ docs/           BPRD (product-shaper)
 ### Active Phase: Phase 4: Polish and Account
 | Task | Feature | Owner | Status | Contract |
 |---|---|---|---|---|
-| T-101 | — | infra-engineer | In Progress | — |
-| T-102 | FEAT-010, FEAT-011, FEAT-015 | backend-engineer | Backlog | C-003, C-009, C-010, C-011, C-013, C-014, C-015, C-016, C-017 |
-| T-103 | FEAT-015 | frontend-engineer | Backlog | C-014, C-015, C-016 |
+| T-101 | — | infra-engineer | Done | — |
+| T-102 | FEAT-010, FEAT-011, FEAT-015 | backend-engineer | In Progress | C-003, C-009, C-010, C-011, C-013, C-014, C-015, C-016, C-017 |
+| T-103 | FEAT-015 | frontend-engineer | In Progress | C-014, C-015, C-016 |
 | T-104 | FEAT-009, FEAT-011 | frontend-engineer | Backlog | C-008, C-013 |
+| T-105 | — | backend-engineer | Backlog | — |
 
 ## Decisions Log
 | # | Decision | Rationale | By |
