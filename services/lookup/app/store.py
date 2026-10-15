@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
-from .models import Kind, LookupResponse, LookupStatus, Sense
+from .models import Allowance, CreateLookupResponse, Kind, LookupResponse, LookupStatus, Sense
 
 
 @dataclass(frozen=True)
@@ -29,8 +29,14 @@ class StoredLookup:
     # The pipeline jobs this lookup is waiting on, so a poll can ask whether any
     # has stopped without a clip (C-006, FEAT-005).
     generation_job_ids: tuple[str, ...] = ()
+    # The reader's allowance as it read when this lookup was made, kept so a
+    # resent create replays the same body (C-001); null for a reader who is not
+    # signed in.
+    allowance: Allowance | None = None
 
     def to_response(self, correlation_id: str) -> LookupResponse:
+        """The C-002 body: a lookup read by id, which carries no allowance."""
+
         return LookupResponse(
             lookupId=self.id,
             kind=self.kind,
@@ -40,6 +46,21 @@ class StoredLookup:
             senses=list(self.senses),
             notice=self.notice,
             correlationId=correlation_id,
+        )
+
+    def to_create_response(self, correlation_id: str) -> CreateLookupResponse:
+        """The C-001 body: the lookup plus the allowance it was metered against."""
+
+        return CreateLookupResponse(
+            lookupId=self.id,
+            kind=self.kind,
+            rawSelection=self.raw_selection,
+            normalisedLemma=self.normalised_lemma,
+            status=self.status,
+            senses=list(self.senses),
+            notice=self.notice,
+            correlationId=correlation_id,
+            allowance=self.allowance,
         )
 
 

@@ -26,7 +26,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from .analytics_client import AnalyticsClient, HttpAnalyticsClient
-from .auth import TokenVerifier, build_token_verifier
+from .auth import Subject, TokenVerifier, build_token_verifier
 from .config import Settings
 from .entitlement_client import EntitlementClient, HttpEntitlementClient
 from .errors import EmptySelectionError, GatewayError, RateLimitedError
@@ -144,7 +144,7 @@ def create_app(
             raise EmptySelectionError("The selection was empty.")
         correlation_id = _correlation_id(resolved_settings, request)
         upstream = await resolved_client.create_lookup(
-            _internal_payload(payload, subject.id), correlation_id
+            _internal_payload(payload, subject), correlation_id
         )
         return _passthrough(upstream, correlation_id, resolved_settings)
 
@@ -266,9 +266,13 @@ def create_app(
     return app
 
 
-def _internal_payload(payload: CreateLookupRequest, subject: str) -> dict[str, Any]:
+def _internal_payload(payload: CreateLookupRequest, subject: Subject) -> dict[str, Any]:
     body: dict[str, Any] = payload.model_dump()
-    body["subject"] = subject
+    body["subject"] = subject.id
+    # The lookup path meters a signed-in reader's allowance; a reader who has not
+    # signed in is metered on the device, so the flag travels with the subject
+    # the gateway resolved (C-001).
+    body["isAnonymous"] = subject.is_anonymous
     return body
 
 

@@ -26,13 +26,20 @@ _FIREBASE_CERTS_URL = (
     "https://www.googleapis.com/robot/v1/metadata/x509/" "securetoken@system.gserviceaccount.com"
 )
 _CERT_CACHE_TTL_SECONDS = 3600.0
+_ANONYMOUS_PROVIDER = "anonymous"
 
 
 @dataclass(frozen=True)
 class Subject:
-    """The authenticated caller identity."""
+    """The authenticated caller identity.
+
+    `is_anonymous` marks the token the client carries before sign-in: the reader
+    holds no account, so the lookup path meters them on the device and carries no
+    allowance for them (C-001).
+    """
 
     id: str
+    is_anonymous: bool = False
 
 
 class TokenVerifier(Protocol):
@@ -47,8 +54,10 @@ Decoder = Callable[[str], Awaitable[Mapping[str, Any]]]
 class DevTokenVerifier:
     """Local verifier for the pre-account path.
 
-    Accepts an explicit `dev:<subject>` token or a Firebase-shaped JWT, so the
-    gateway enforces authentication before a Firebase project is wired.
+    Accepts an explicit `dev:<subject>` token for a signed-in reader, a
+    `dev-anon:<subject>` token for one who has not signed in, or a
+    Firebase-shaped JWT, so the gateway enforces authentication before a
+    Firebase project is wired.
     """
 
     async def verify(self, authorization: str | None) -> Subject:
@@ -56,7 +65,7 @@ class DevTokenVerifier:
         subject = _dev_subject(token)
         if subject is None:
             raise UnauthorizedError("The token is invalid.")
-        return Subject(id=subject)
+        return subject
 
 
 class FirebaseTokenVerifier:
@@ -75,7 +84,7 @@ class FirebaseTokenVerifier:
         subject = claims.get("sub")
         if not isinstance(subject, str) or not subject:
             raise UnauthorizedError("The token has no subject.")
-        return Subject(id=subject)
+        return Subject(id=subject, is_anonymous=_is_anonymous(claims))
 
 
 def build_token_verifier(settings: Settings) -> TokenVerifier:
@@ -97,14 +106,24 @@ def _extract_bearer(authorization: str | None) -> str:
     return token.strip()
 
 
-def _dev_subject(token: str) -> str | None:
+def _dev_subject(token: str) -> Subject | None:
+    anonymous_prefix = "dev-anon:"
+    if token.startswith(anonymous_prefix) and len(token) > len(anonymous_prefix):
+        return Subject(id=token[len(anonymous_prefix) :], is_anonymous=True)
     prefix = "dev:"
     if token.startswith(prefix) and len(token) > len(prefix):
-        return token[len(prefix) :]
+        return Subject(id=token[len(prefix) :])
     parts = token.split(".")
     if len(parts) == 3 and all(parts):
-        return token
+        return Subject(id=token)
     return None
+
+
+def _is_anonymous(claims: Mapping[str, Any]) -> bool:
+    firebase = claims.get("firebase")
+    if not isinstance(firebase, Mapping):
+        return False
+    return firebase.get("sign_in_provider") == _ANONYMOUS_PROVIDER
 
 
 def _decoder_for(project_id: str) -> Decoder:

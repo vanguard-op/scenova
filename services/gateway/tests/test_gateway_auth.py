@@ -38,6 +38,14 @@ async def test_dev_verifier_accepts_a_firebase_shaped_token() -> None:
     subject = await DevTokenVerifier().verify("Bearer aaa.bbb.ccc")
 
     assert subject.id == "aaa.bbb.ccc"
+    assert subject.is_anonymous is False
+
+
+@pytest.mark.asyncio
+async def test_dev_verifier_marks_a_signed_out_reader_anonymous() -> None:
+    subject = await DevTokenVerifier().verify("Bearer dev-anon:device-9")
+
+    assert subject == Subject(id="device-9", is_anonymous=True)
 
 
 @pytest.mark.asyncio
@@ -55,6 +63,17 @@ async def test_firebase_verifier_reads_the_subject_claim() -> None:
     subject = await FirebaseTokenVerifier("scenova-dev", decoder=decode).verify("Bearer x.y.z")
 
     assert subject.id == "firebase-uid"
+    assert subject.is_anonymous is False
+
+
+@pytest.mark.asyncio
+async def test_firebase_verifier_recognises_an_anonymous_token() -> None:
+    async def decode(token: str) -> Mapping[str, Any]:
+        return {"sub": "anon-uid", "firebase": {"sign_in_provider": "anonymous"}}
+
+    subject = await FirebaseTokenVerifier("scenova-dev", decoder=decode).verify("Bearer x.y.z")
+
+    assert subject.is_anonymous is True
 
 
 @pytest.mark.asyncio

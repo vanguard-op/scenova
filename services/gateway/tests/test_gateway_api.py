@@ -131,7 +131,25 @@ def test_a_successful_lookup_passes_through_with_the_correlation_id() -> None:
     assert response.headers["x-correlation-id"] == "corr-1"
     assert lookup_client.last_payload is not None
     assert lookup_client.last_payload["subject"] == "reader-1"
+    assert lookup_client.last_payload["isAnonymous"] is False
     assert lookup_client.last_payload["selection"] == "coming"
+
+
+def test_a_signed_out_reader_is_forwarded_as_anonymous() -> None:
+    # The lookup path meters a signed-in reader and leaves a guest to the device,
+    # so the gateway tells it which one the token is (C-001).
+    lookup_client = _FakeLookupClient()
+    with _client(lookup_client, verifier=DevTokenVerifier()) as client:
+        response = client.post(
+            "/v1/lookups",
+            json=_VALID,
+            headers={"Authorization": "Bearer dev-anon:device-9"},
+        )
+
+    assert response.status_code == 200
+    assert lookup_client.last_payload is not None
+    assert lookup_client.last_payload["subject"] == "device-9"
+    assert lookup_client.last_payload["isAnonymous"] is True
 
 
 def test_an_upstream_conflict_passes_through() -> None:

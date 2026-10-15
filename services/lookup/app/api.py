@@ -2,7 +2,8 @@
 
 Not a client surface: the gateway owns C-001 and C-002 and calls these internal
 routes with the caller's subject already resolved, so authentication and rate
-limiting stay at the gateway.
+limiting stay at the gateway. The create route returns C-001's body, allowance
+included; the read route returns C-002's, which has none.
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ from fastapi.responses import JSONResponse
 
 from .config import Settings
 from .errors import LookupError, UnauthorizedError
-from .models import CreateLookupRequest, LookupResponse
+from .models import CreateLookupRequest, CreateLookupResponse, LookupResponse
 from .service import LookupService, build_default_service
 
 
@@ -56,7 +57,7 @@ def create_app(
         request: Request,
         response: Response,
         x_internal_audience: Annotated[str | None, Header()] = None,
-    ) -> LookupResponse:
+    ) -> CreateLookupResponse:
         _require_internal(resolved_settings, x_internal_audience)
         correlation_id = _correlation_id(resolved_settings, request)
         result = await resolved_service.create_lookup(payload, correlation_id)

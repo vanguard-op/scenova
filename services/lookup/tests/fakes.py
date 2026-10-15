@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from lookup.app.entitlement import EntitlementUnavailableError, SpendOutcome
 from lookup.app.generation import (
     GenerationAlreadyEnqueuedError,
     GenerationJob,
@@ -77,3 +78,54 @@ def unavailable() -> RecordingGenerationClient:
     """A generation client standing in for an unreachable pipeline."""
 
     return RecordingGenerationClient(error=GenerationUnavailableError("unreachable"))
+
+
+class RecordingEntitlementClient:
+    """An allowance meter that records every spend, or fails on demand.
+
+    `allowed` is False for a reader whose allowance is spent, so `lookups_used`
+    equals `lookups_limit` and the lookup resolves to the fallback (FEAT-013).
+    `error` stands in for an unreachable meter, which must not block the reader.
+    """
+
+    def __init__(
+        self,
+        *,
+        allowed: bool = True,
+        lookups_used: int = 1,
+        lookups_limit: int = 20,
+        period_end: str = "2026-11-15T12:00:00+00:00",
+        error: Exception | None = None,
+    ) -> None:
+        self.allowed = allowed
+        self.lookups_used = lookups_used
+        self.lookups_limit = lookups_limit
+        self.period_end = period_end
+        self.error = error
+        self.calls: list[tuple[str, str]] = []
+
+    async def spend(self, subject: str, client_lookup_id: str) -> SpendOutcome:
+        self.calls.append((subject, client_lookup_id))
+        if self.error is not None:
+            raise self.error
+        return SpendOutcome(
+            allowed=self.allowed,
+            lookups_used=self.lookups_used,
+            lookups_limit=self.lookups_limit,
+            period_end=self.period_end,
+        )
+
+    async def aclose(self) -> None:
+        return None
+
+
+def exhausted_meter(limit: int = 20) -> RecordingEntitlementClient:
+    """A meter for a reader who has spent every lookup this period."""
+
+    return RecordingEntitlementClient(allowed=False, lookups_used=limit, lookups_limit=limit)
+
+
+def unavailable_meter() -> RecordingEntitlementClient:
+    """A meter standing in for an unreachable entitlement service."""
+
+    return RecordingEntitlementClient(error=EntitlementUnavailableError("unreachable"))

@@ -10,17 +10,21 @@ from lookup.app.inventory import build_default_inventory
 from lookup.app.library import InMemoryLibrary
 from lookup.app.service import LookupService
 from lookup.app.store import InMemoryLookupStore
-from lookup.tests.fakes import RecordingGenerationClient
+from lookup.tests.fakes import RecordingEntitlementClient, RecordingGenerationClient
 
 _INTERNAL = {"x-internal-audience": "scenova-internal"}
 
 
-def _client(require_internal_auth: bool = True) -> TestClient:
+def _client(
+    require_internal_auth: bool = True,
+    entitlement: RecordingEntitlementClient | None = None,
+) -> TestClient:
     service = LookupService(
         inventory=build_default_inventory(),
         store=InMemoryLookupStore(),
         library=InMemoryLibrary(),
         generation=RecordingGenerationClient(),
+        entitlement=entitlement if entitlement is not None else RecordingEntitlementClient(),
     )
     return TestClient(
         create_app(
@@ -30,7 +34,9 @@ def _client(require_internal_auth: bool = True) -> TestClient:
     )
 
 
-def _payload(selection: str, client_id: str = "client-1") -> dict[str, object]:
+def _payload(
+    selection: str, client_id: str = "client-1", *, is_anonymous: bool = False
+) -> dict[str, object]:
     return {
         "selection": selection,
         "clientLookupId": client_id,
@@ -38,6 +44,7 @@ def _payload(selection: str, client_id: str = "client-1") -> dict[str, object]:
         "locale": "en",
         "consentModelProcessing": True,
         "subject": "reader-1",
+        "isAnonymous": is_anonymous,
     }
 
 
@@ -74,7 +81,44 @@ def test_create_lookup_returns_the_contract_shape() -> None:
         "senses",
         "notice",
         "correlationId",
+        "allowance",
     }
+
+
+def test_create_lookup_carries_the_reader_allowance() -> None:
+    meter = RecordingEntitlementClient(lookups_used=3, lookups_limit=20)
+
+    with _client(entitlement=meter) as client:
+        response = client.post("/internal/lookups", json=_payload("coming"), headers=_INTERNAL)
+
+    assert response.json()["allowance"] == {
+        "used": 3,
+        "limit": 20,
+        "periodEnd": "2026-11-15T12:00:00+00:00",
+    }
+
+
+def test_create_lookup_for_a_signed_out_reader_carries_no_allowance() -> None:
+    with _client() as client:
+        response = client.post(
+            "/internal/lookups", json=_payload("coming", is_anonymous=True), headers=_INTERNAL
+        )
+
+    assert response.json()["allowance"] is None
+
+
+def test_get_lookup_omits_the_allowance() -> None:
+    with _client() as client:
+        created = client.post(
+            "/internal/lookups", json=_payload("coming"), headers=_INTERNAL
+        ).json()
+        found = client.get(
+            f"/internal/lookups/{created['lookupId']}",
+            params={"subject": "reader-1"},
+            headers=_INTERNAL,
+        )
+
+    assert "allowance" not in found.json()
 
 
 def test_empty_selection_is_a_bad_request() -> None:

@@ -21,6 +21,15 @@ FEAT-007's `enable_phrase_clip` release flag is honoured here: when it is off, a
 short phrase is not routed to the phrase path and falls back to the word path, so
 the reader still gets the phrase as a word lookup and no phrase clip is started
 (release.md "Rollout Phases & Feature Flags").
+
+FEAT-013 is metered here. A signed-in reader's lookup spends one unit of their
+monthly allowance before it serves or generates, so a hit and a miss cost the
+same (monetization.md "Revenue Model"), and the C-001 body carries the allowance
+back. When the allowance is spent the lookup resolves to the fallback with the
+word and phrase and no clip, and `allowance.used` equals `allowance.limit` so the
+client can offer a way to add more. A reader who has not signed in is metered on
+the device and carries no allowance; an unreachable meter is a grace path, never
+a block (NFR-011).
 """
 
 from __future__ import annotations
@@ -31,6 +40,11 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from .config import CLIP_MODEL_PIN, Settings
+from .entitlement import (
+    EntitlementPort,
+    EntitlementUnavailableError,
+    HttpEntitlement,
+)
 from .errors import (
     ClientLookupIdConflictError,
     EmptySelectionError,
@@ -62,8 +76,10 @@ from .library import (
     LibraryUnavailableError,
 )
 from .models import (
+    Allowance,
     Clip,
     CreateLookupRequest,
+    CreateLookupResponse,
     Kind,
     LookupResponse,
     LookupStatus,
@@ -105,6 +121,19 @@ class _SenseResolution:
     regeneration_seed: str | None
 
 
+@dataclass(frozen=True)
+class _MeterReading:
+    """What the allowance meter said before a lookup resolved.
+
+    ``allowed`` is False only when the reader's allowance is spent; ``allowance``
+    is the reading carried back to the client, and is None for a reader who is
+    not signed in or whose meter could not be reached.
+    """
+
+    allowed: bool
+    allowance: Allowance | None
+
+
 class LookupService:
     """Normalises selections and records lookups against the shared library."""
 
@@ -115,6 +144,7 @@ class LookupService:
         store: LookupStore,
         library: LibraryPort,
         generation: GenerationClient,
+        entitlement: EntitlementPort,
         clip_model_pin: str = CLIP_MODEL_PIN,
         generation_target_duration_seconds: float = CLIP_TARGET_SECONDS,
         enable_phrase_clip: bool = True,
@@ -123,6 +153,7 @@ class LookupService:
         self._store = store
         self._library = library
         self._generation = generation
+        self._entitlement = entitlement
         self._clip_model_pin = clip_model_pin
         self._target_duration = generation_target_duration_seconds
         self._enable_phrase_clip = enable_phrase_clip
@@ -132,7 +163,7 @@ class LookupService:
 
     async def create_lookup(
         self, request: CreateLookupRequest, correlation_id: str
-    ) -> LookupResponse:
+    ) -> CreateLookupResponse:
         raw_selection = request.selection.strip()
         async with self._write_lock:
             existing = await self._store.find_by_client_id(request.subject, request.clientLookupId)
@@ -141,10 +172,10 @@ class LookupService:
                     raise ClientLookupIdConflictError(
                         "This clientLookupId was already used with a different selection."
                     )
-                return existing.to_response(correlation_id)
-            stored = await self._resolve(request, raw_selection)
+                return existing.to_create_response(correlation_id)
+            stored = await self._create(request, raw_selection)
             await self._store.add(stored)
-        return stored.to_response(correlation_id)
+        return stored.to_create_response(correlation_id)
 
     async def get_lookup(self, lookup_id: str, subject: str, correlation_id: str) -> LookupResponse:
         stored = await self._store.get(lookup_id)
@@ -158,22 +189,65 @@ class LookupService:
         return refreshed.to_response(correlation_id)
 
     async def aclose(self) -> None:
-        """Release the generation and library clients' connections."""
+        """Release the generation, library, and meter clients' connections."""
 
         await self._library.aclose()
         await self._generation.aclose()
+        await self._entitlement.aclose()
 
-    async def _resolve(self, request: CreateLookupRequest, raw_selection: str) -> StoredLookup:
+    async def _create(self, request: CreateLookupRequest, raw_selection: str) -> StoredLookup:
+        """Validate a selection, spend its allowance, and resolve it.
+
+        Validation runs before the spend, so a malformed selection costs the
+        reader nothing; a punctuation-only selection resolves empty and spends
+        nothing because there was no word or phrase to look up.
+        """
+
         if raw_selection == "":
             raise EmptySelectionError("The selection was empty.")
         tokens = tokenise(request.selection)
-        if not tokens:
-            return self._empty_lookup(request, raw_selection)
         if len(tokens) > MAX_PHRASE_WORDS:
             raise PhraseLimitExceededError(
                 f"A selection of {len(tokens)} words is over the "
                 f"{MAX_PHRASE_WORDS}-word phrase limit."
             )
+        if not tokens:
+            return self._empty_lookup(request, raw_selection)
+
+        reading = await self._meter(request)
+        if not reading.allowed:
+            return self._exhausted_lookup(request, raw_selection, tokens, reading.allowance)
+
+        stored = await self._resolve(request, raw_selection, tokens)
+        return replace(stored, allowance=reading.allowance)
+
+    async def _meter(self, request: CreateLookupRequest) -> _MeterReading:
+        """Spend one unit of a signed-in reader's allowance, or read the grace path.
+
+        A reader who has not signed in holds no account here, so nothing is
+        spent and the response carries no allowance. When the meter cannot be
+        reached the lookup proceeds and the allowance is left to the client to
+        reconcile, so a metering fault never blocks the reader (NFR-011).
+        """
+
+        if request.isAnonymous:
+            return _MeterReading(allowed=True, allowance=None)
+        try:
+            outcome = await self._entitlement.spend(request.subject, request.clientLookupId)
+        except EntitlementUnavailableError:
+            return _MeterReading(allowed=True, allowance=None)
+        return _MeterReading(
+            allowed=outcome.allowed,
+            allowance=Allowance(
+                used=outcome.lookups_used,
+                limit=outcome.lookups_limit,
+                periodEnd=outcome.period_end,
+            ),
+        )
+
+    async def _resolve(
+        self, request: CreateLookupRequest, raw_selection: str, tokens: list[str]
+    ) -> StoredLookup:
         if len(tokens) == 1:
             return await self._word_lookup(request, raw_selection, tokens[0])
         phrase = " ".join(tokens)
@@ -184,20 +258,27 @@ class LookupService:
             return await self._word_lookup(request, raw_selection, phrase)
         return await self._phrase_lookup(request, raw_selection, phrase)
 
-    async def _word_lookup(
-        self, request: CreateLookupRequest, raw_selection: str, token: str
-    ) -> StoredLookup:
-        notice: str | None = None
+    def _inventory_key(self, token: str) -> tuple[str, tuple[SenseRecord, ...]]:
+        """The library key for a word, and the senses to resolve for it.
+
+        A word absent from the inventory, or an inventory that cannot be
+        reached, keeps the word as the key with a single neutral sense
+        (FEAT-003).
+        """
+
         try:
             resolved = self._inventory.resolve(token)
         except InventoryUnavailableError:
             resolved = None
         if resolved is None:
-            lemma = token
-            records: tuple[SenseRecord, ...] = (_out_of_inventory_sense(token),)
-        else:
-            lemma = resolved.lemma
-            records = resolved.senses
+            return token, (_out_of_inventory_sense(token),)
+        return resolved.lemma, resolved.senses
+
+    async def _word_lookup(
+        self, request: CreateLookupRequest, raw_selection: str, token: str
+    ) -> StoredLookup:
+        notice: str | None = None
+        lemma, records = self._inventory_key(token)
         resolved_senses = [await self._sense(lemma, record) for record in records]
         senses = tuple(resolution.sense for resolution in resolved_senses)
         status = _word_status(request.consentModelProcessing, senses)
@@ -273,6 +354,48 @@ class LookupService:
             LookupStatus.FALLBACK,
             (),
             GENERATION_UNAVAILABLE_NOTICE,
+        )
+
+    def _exhausted_lookup(
+        self,
+        request: CreateLookupRequest,
+        raw_selection: str,
+        tokens: list[str],
+        allowance: Allowance | None,
+    ) -> StoredLookup:
+        """The lookup a reader gets when their allowance is spent (FEAT-013).
+
+        The word and phrase still show; no clip is served or generated, so a
+        library hit is withheld too and the reader is not charged again. The
+        allowance comes back with `used` equal to `limit`, which is the client's
+        signal to offer a way to add more. A phrase selection keeps its kind and
+        no senses, like any phrase lookup.
+        """
+
+        if len(tokens) > 1 and self._enable_phrase_clip:
+            return _stored(
+                _new_id(),
+                request,
+                raw_selection,
+                Kind.PHRASE,
+                None,
+                LookupStatus.FALLBACK,
+                (),
+                None,
+                allowance=allowance,
+            )
+        key = tokens[0] if len(tokens) == 1 else " ".join(tokens)
+        lemma, records = self._inventory_key(key)
+        return _stored(
+            _new_id(),
+            request,
+            raw_selection,
+            Kind.WORD,
+            lemma,
+            LookupStatus.FALLBACK,
+            tuple(_miss_sense(record) for record in records),
+            None,
+            allowance=allowance,
         )
 
     async def _sense(self, lemma: str, record: SenseRecord) -> _SenseResolution:
@@ -403,7 +526,7 @@ class LookupService:
 
 
 def build_default_service(settings: Settings | None = None) -> LookupService:
-    """Build the lookup service with its seeded inventory, stores, and pipeline client."""
+    """Build the lookup service with its seeded inventory, stores, and clients."""
 
     resolved = settings or Settings.from_env()
     return LookupService(
@@ -418,6 +541,11 @@ def build_default_service(settings: Settings | None = None) -> LookupService:
             base_url=resolved.pipeline_base_url,
             internal_audience=resolved.internal_audience,
             timeout_seconds=resolved.pipeline_timeout_seconds,
+        ),
+        entitlement=HttpEntitlement(
+            base_url=resolved.entitlement_base_url,
+            internal_audience=resolved.internal_audience,
+            timeout_seconds=resolved.entitlement_timeout_seconds,
         ),
         clip_model_pin=resolved.clip_model_pin,
         generation_target_duration_seconds=resolved.generation_target_duration_seconds,
@@ -521,6 +649,7 @@ def _stored(
     notice: str | None,
     *,
     generation_job_ids: tuple[str, ...] = (),
+    allowance: Allowance | None = None,
 ) -> StoredLookup:
     return StoredLookup(
         id=lookup_id,
@@ -534,4 +663,5 @@ def _stored(
         notice=notice,
         created_at=datetime.now(UTC).isoformat(),
         generation_job_ids=generation_job_ids,
+        allowance=allowance,
     )

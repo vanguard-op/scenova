@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from lookup.app.config import CLIP_MODEL_PIN
+from lookup.app.entitlement import EntitlementPort
 from lookup.app.errors import (
     ClientLookupIdConflictError,
     EmptySelectionError,
@@ -38,7 +39,14 @@ from lookup.app.service import (
     LookupService,
 )
 from lookup.app.store import InMemoryLookupStore
-from lookup.tests.fakes import RecordingGenerationClient, UnavailableLibrary, unavailable
+from lookup.tests.fakes import (
+    RecordingEntitlementClient,
+    RecordingGenerationClient,
+    UnavailableLibrary,
+    exhausted_meter,
+    unavailable,
+    unavailable_meter,
+)
 
 
 def _request(
@@ -47,6 +55,7 @@ def _request(
     consent: bool = True,
     client_id: str = "client-1",
     subject: str = "reader-1",
+    is_anonymous: bool = False,
 ) -> CreateLookupRequest:
     return CreateLookupRequest(
         selection=selection,
@@ -55,6 +64,7 @@ def _request(
         locale="en",
         consentModelProcessing=consent,
         subject=subject,
+        isAnonymous=is_anonymous,
     )
 
 
@@ -62,6 +72,7 @@ def _service(
     inventory: SenseInventory | None = None,
     library: LibraryPort | None = None,
     generation: RecordingGenerationClient | None = None,
+    entitlement: EntitlementPort | None = None,
     clip_model_pin: str = CLIP_MODEL_PIN,
     enable_phrase_clip: bool = True,
 ) -> LookupService:
@@ -70,6 +81,7 @@ def _service(
         store=InMemoryLookupStore(),
         library=library if library is not None else InMemoryLibrary(),
         generation=generation if generation is not None else RecordingGenerationClient(),
+        entitlement=entitlement if entitlement is not None else RecordingEntitlementClient(),
         clip_model_pin=clip_model_pin,
         enable_phrase_clip=enable_phrase_clip,
     )
@@ -772,3 +784,138 @@ async def test_a_replacement_entry_is_served_after_a_retirement() -> None:
 
     assert polled.status == LookupStatus.SERVED
     assert polled.senses[0].entryId == "e-new"
+
+
+# --- FEAT-013: the lookup path meters the allowance --------------------------
+
+
+@pytest.mark.asyncio
+async def test_a_signed_in_lookup_spends_one_unit_and_carries_the_allowance() -> None:
+    meter = RecordingEntitlementClient(lookups_used=1, lookups_limit=20)
+
+    response = await _service(entitlement=meter).create_lookup(_request("coming"), "corr")
+
+    assert meter.calls == [("reader-1", "client-1")]
+    assert response.allowance is not None
+    assert response.allowance.used == 1
+    assert response.allowance.limit == 20
+    assert response.allowance.periodEnd == "2026-11-15T12:00:00+00:00"
+
+
+@pytest.mark.asyncio
+async def test_a_spent_allowance_resolves_to_the_fallback_with_no_clip() -> None:
+    generation = RecordingGenerationClient()
+    meter = exhausted_meter(limit=2)
+
+    response = await _service(entitlement=meter, generation=generation).create_lookup(
+        _request("coming"), "corr"
+    )
+
+    assert response.status == LookupStatus.FALLBACK
+    assert response.allowance is not None
+    # `used` equal to `limit` is the client's signal to offer a way to add more.
+    assert response.allowance.used == response.allowance.limit == 2
+    # The word and phrase still show; no clip is served or generated.
+    assert response.normalisedLemma == "come"
+    assert response.senses[0].glossPhrase == "to move toward or reach a place"
+    assert response.senses[0].clip is None
+    assert generation.jobs == []
+    # The spent allowance is not charged again.
+    assert meter.calls == [("reader-1", "client-1")]
+
+
+@pytest.mark.asyncio
+async def test_a_spent_allowance_withholds_a_library_clip() -> None:
+    library = InMemoryLibrary()
+    library.add(
+        "come",
+        "arrive",
+        PartOfSpeech.VERB,
+        _entry("e-come", "to move toward or reach a place"),
+    )
+    generation = RecordingGenerationClient()
+
+    response = await _service(
+        library=library, generation=generation, entitlement=exhausted_meter()
+    ).create_lookup(_request("coming"), "corr")
+
+    assert response.status == LookupStatus.FALLBACK
+    assert response.senses[0].clip is None
+    assert response.senses[0].entryId is None
+    assert generation.jobs == []
+
+
+@pytest.mark.asyncio
+async def test_a_spent_allowance_resolves_a_phrase_lookup_to_the_fallback() -> None:
+    meter = exhausted_meter(limit=2)
+
+    response = await _service(entitlement=meter).create_lookup(_request("kick the bucket"), "corr")
+
+    assert response.kind == Kind.PHRASE
+    assert response.status == LookupStatus.FALLBACK
+    assert response.senses == []
+    assert response.allowance is not None
+    assert response.allowance.used == response.allowance.limit == 2
+
+
+@pytest.mark.asyncio
+async def test_a_signed_out_reader_is_metered_on_the_device_and_carries_no_allowance() -> None:
+    meter = RecordingEntitlementClient()
+
+    response = await _service(entitlement=meter).create_lookup(
+        _request("coming", is_anonymous=True), "corr"
+    )
+
+    # No account backs the guest, so the meter is never called and the allowance
+    # is device-local (C-001).
+    assert meter.calls == []
+    assert response.allowance is None
+    assert response.status == LookupStatus.GENERATING
+
+
+@pytest.mark.asyncio
+async def test_a_resent_lookup_spends_once_and_replays_its_allowance() -> None:
+    meter = RecordingEntitlementClient(lookups_used=1, lookups_limit=20)
+    service = _service(entitlement=meter)
+
+    first = await service.create_lookup(_request("coming", client_id="c-1"), "corr-1")
+    second = await service.create_lookup(_request("coming", client_id="c-1"), "corr-2")
+
+    assert len(meter.calls) == 1
+    assert first.lookupId == second.lookupId
+    assert second.allowance == first.allowance
+
+
+@pytest.mark.asyncio
+async def test_an_unreachable_meter_does_not_block_the_reader() -> None:
+    meter = unavailable_meter()
+
+    response = await _service(entitlement=meter).create_lookup(_request("coming"), "corr")
+
+    # The lookup proceeds on the grace path; the client reconciles the allowance
+    # later (NFR-011).
+    assert response.status == LookupStatus.GENERATING
+    assert response.allowance is None
+
+
+@pytest.mark.asyncio
+async def test_a_lookup_is_validated_before_its_allowance_is_spent() -> None:
+    meter = RecordingEntitlementClient()
+
+    with pytest.raises(PhraseLimitExceededError):
+        await _service(entitlement=meter).create_lookup(
+            _request("one two three four five six seven"), "corr"
+        )
+
+    assert meter.calls == []
+
+
+@pytest.mark.asyncio
+async def test_an_empty_selection_is_not_metered() -> None:
+    meter = RecordingEntitlementClient()
+
+    response = await _service(entitlement=meter).create_lookup(_request("..."), "corr")
+
+    assert response.status == LookupStatus.EMPTY
+    assert response.allowance is None
+    assert meter.calls == []
