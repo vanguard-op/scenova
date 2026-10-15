@@ -101,4 +101,53 @@ async def test_a_status_change_moves_the_entry_and_keeps_the_key() -> None:
 async def test_an_unknown_entry_cannot_change_status() -> None:
     store = InMemoryLibraryStore()
 
-    assert await store.set_status("le_missing", EntryStatus.HELD) is None
+    assert await store.set_status("le_missing", EntryStatus.RETIRED) is None
+
+
+@pytest.mark.asyncio
+async def test_a_candidate_is_held_beside_the_entry_and_promoted() -> None:
+    # The clip regenerated for a reporting reader is held beside the serving clip
+    # until a curator chooses it; promoting it makes it the clip served (FEAT-011).
+    store = InMemoryLibraryStore()
+    await store.upsert(_entry(), _asset("clip_1"))
+
+    held = await store.set_candidate("le_1", _asset("clip_cand"))
+
+    assert held is not None
+    assert held.asset.id == "clip_1", "the serving clip is unchanged while a candidate is held"
+    assert held.candidate is not None and held.candidate.id == "clip_cand"
+
+    promoted = await store.promote_candidate("le_1")
+
+    assert promoted is not None
+    assert promoted.asset.id == "clip_cand"
+    assert promoted.candidate is None
+    found = await store.find("come", "arrive", PartOfSpeech.VERB)
+    assert found is not None and found.asset.id == "clip_cand"
+
+
+@pytest.mark.asyncio
+async def test_a_status_change_keeps_the_held_candidate() -> None:
+    store = InMemoryLibraryStore()
+    await store.upsert(_entry(), _asset("clip_1"))
+    await store.set_candidate("le_1", _asset("clip_cand"))
+
+    updated = await store.set_status("le_1", EntryStatus.RETIRED)
+
+    assert updated is not None and updated.candidate is not None
+    assert updated.candidate.id == "clip_cand"
+
+
+@pytest.mark.asyncio
+async def test_an_unknown_entry_cannot_take_a_candidate() -> None:
+    store = InMemoryLibraryStore()
+
+    assert await store.set_candidate("le_missing", _asset()) is None
+
+
+@pytest.mark.asyncio
+async def test_promoting_without_a_candidate_is_none() -> None:
+    store = InMemoryLibraryStore()
+    await store.upsert(_entry(), _asset())
+
+    assert await store.promote_candidate("le_1") is None

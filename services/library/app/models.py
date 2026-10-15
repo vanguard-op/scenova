@@ -31,10 +31,13 @@ class PartOfSpeech(StrEnum):
 
 
 class EntryStatus(StrEnum):
-    """Whether an entry is served, held after a report, or retired (schema)."""
+    """Whether an entry is served or retired (schema).
+
+    An entry under review keeps serving: its review state lives on its queue
+    item, never on the entry, so there is no `held` status (FEAT-015).
+    """
 
     ACTIVE = "active"
-    HELD = "held"
     RETIRED = "retired"
 
 
@@ -111,9 +114,9 @@ class ServedClip(BaseModel):
 class ServedEntry(BaseModel):
     """What the library holds for one sense.
 
-    `status` travels with the entry: a held or retired entry is still returned so
-    the caller can tell it apart from an absent one and start a replacement,
-    while never serving it.
+    `status` travels with the entry: a retired entry is still returned so the
+    caller can tell it apart from an absent one and start a replacement, while
+    never serving it.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -161,7 +164,7 @@ class GetEntryResponse(BaseModel):
 
 
 class UpdateEntryRequest(BaseModel):
-    """A review action on an entry: hold it, retire it, or restore it."""
+    """A review action on an entry: retire it, or restore it to serving."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -175,3 +178,23 @@ class UpdateEntryResponse(BaseModel):
 
     entryId: str
     status: EntryStatus
+
+
+class StoreCandidateResponse(BaseModel):
+    """The acknowledgement for a stored candidate clip (FEAT-011)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    entryId: str
+
+
+class CandidateResponse(BaseModel):
+    """The candidate clip held for an entry, or null when none was generated.
+
+    The clip regenerated for a reporting reader is held beside the entry's
+    serving clip until a curator chooses which one serves (FEAT-011, FEAT-015).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    clip: ServedClip | None

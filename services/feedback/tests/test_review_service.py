@@ -17,6 +17,7 @@ from feedback.app.errors import (
 )
 from feedback.app.models import (
     ActionRequest,
+    ChosenClip,
     ModerationActionName,
     Rating,
     ReportReason,
@@ -31,7 +32,7 @@ from feedback.app.store import (
     queue_feedback,
     queue_report,
 )
-from feedback.tests.fakes import FullRig, entry_view, full_rig
+from feedback.tests.fakes import FullRig, clip_view, entry_view, full_rig
 
 _NOW = "2026-10-14T00:00:00+00:00"
 _LATER = "2026-10-14T01:00:00+00:00"
@@ -87,11 +88,18 @@ async def _add_feedback(
 def _action(
     action: ModerationActionName,
     *,
+    chosen_clip: ChosenClip | None = None,
     phrase: str | None = None,
     notes: str | None = None,
     expected_state: ReviewState = ReviewState.QUEUED,
 ) -> ActionRequest:
-    return ActionRequest(action=action, phrase=phrase, notes=notes, expectedState=expected_state)
+    return ActionRequest(
+        action=action,
+        chosenClip=chosen_clip,
+        phrase=phrase,
+        notes=notes,
+        expectedState=expected_state,
+    )
 
 
 @pytest.mark.asyncio
@@ -197,8 +205,11 @@ async def test_a_queue_item_whose_entry_is_gone_is_left_out() -> None:
 
 
 @pytest.mark.asyncio
-async def test_the_entry_shows_its_clip_evidence_and_state() -> None:
-    rigged = full_rig(entries={"le_1": entry_view(gloss_phrase="to move toward a place")})
+async def test_the_entry_shows_its_clip_candidate_evidence_and_state() -> None:
+    rigged = full_rig(
+        entries={"le_1": entry_view(gloss_phrase="to move toward a place")},
+        candidates={"le_1": clip_view(url="https://cdn.example/cand_1.mp4")},
+    )
     await _queue_report(rigged)
     await _add_feedback(rigged, rating=Rating.WRONG)
     await _add_feedback(rigged, rating=Rating.HELPFUL, created_at=_LATER)
@@ -209,11 +220,25 @@ async def test_the_entry_shows_its_clip_evidence_and_state() -> None:
     assert response.entry.glossPhrase == "to move toward a place"
     assert response.entry.status.value == "active"
     assert response.entry.clip.url == "https://cdn.example/clip_1.mp4"
+    # The candidate regenerated for the reporting reader sits beside the serving
+    # clip for the curator to choose between (FEAT-011, FEAT-015).
+    assert response.candidate is not None
+    assert response.candidate.url == "https://cdn.example/cand_1.mp4"
     assert [report.reason for report in response.reports] == ["wrong_meaning"]
     assert response.reports[0].note == "the clip shows another sense"
     # Only the negative rating is evidence; a helpful one is not shown.
     assert [feedback.rating for feedback in response.feedback] == [Rating.WRONG]
     assert response.state is ReviewState.QUEUED
+
+
+@pytest.mark.asyncio
+async def test_an_entry_without_a_candidate_reports_none() -> None:
+    rigged = full_rig(entries={"le_1": entry_view()})
+    await _queue_report(rigged)
+
+    response = await rigged.review.entry("le_1")
+
+    assert response.candidate is None
 
 
 @pytest.mark.asyncio
@@ -225,36 +250,70 @@ async def test_an_entry_with_nothing_queued_is_not_found() -> None:
 
 
 @pytest.mark.asyncio
-async def test_clear_returns_the_entry_to_serving_and_resolves_the_item() -> None:
-    rigged = full_rig(entries={"le_1": entry_view(status="held")})
+async def test_choose_the_serving_clip_keeps_serving_and_resolves() -> None:
+    rigged = full_rig(entries={"le_1": entry_view()})
     await _queue_report(rigged)
 
-    response = await rigged.review.act("le_1", _action(ModerationActionName.CLEAR))
+    response = await rigged.review.act(
+        "le_1", _action(ModerationActionName.CHOOSE, chosen_clip=ChosenClip.SERVING)
+    )
 
     assert response.status.value == "active"
     assert response.state is ReviewState.ACTIONED
-    assert rigged.library.statuses == [("le_1", "active")]
+    # The entry already serves its clip, so nothing moves in the library.
+    assert rigged.library.statuses == []
+    assert rigged.library.promotions == []
     item = await rigged.store.queue_item("le_1")
     assert item is not None and item.state is ReviewState.ACTIONED
     reports = await rigged.store.reports_for_entry("le_1")
     assert reports[0].status is ReportStatus.ACTIONED
     actions = await rigged.store.moderation_actions()
-    assert actions[0].action is ModerationActionName.CLEAR
+    assert actions[0].action is ModerationActionName.CHOOSE
+    assert actions[0].chosen_clip == "serving"
     assert actions[0].actor_role == "curator"
     assert actions[0].report_id == "rp_1"
 
 
 @pytest.mark.asyncio
-async def test_hold_withholds_the_entry() -> None:
+async def test_choose_the_candidate_makes_it_the_serving_clip() -> None:
+    rigged = full_rig(
+        entries={"le_1": entry_view()},
+        candidates={"le_1": clip_view(url="https://cdn.example/cand_1.mp4")},
+    )
+    await _queue_report(rigged)
+
+    response = await rigged.review.act(
+        "le_1", _action(ModerationActionName.CHOOSE, chosen_clip=ChosenClip.CANDIDATE)
+    )
+
+    assert response.status.value == "active"
+    assert response.state is ReviewState.ACTIONED
+    assert rigged.library.promotions == ["le_1"]
+    entry = await rigged.library.get_entry("le_1")
+    assert entry is not None
+    assert entry.clip.url == "https://cdn.example/cand_1.mp4"
+    actions = await rigged.store.moderation_actions()
+    assert actions[0].chosen_clip == "candidate"
+
+
+@pytest.mark.asyncio
+async def test_choose_without_a_clip_is_refused() -> None:
     rigged = full_rig(entries={"le_1": entry_view()})
     await _queue_report(rigged)
 
-    response = await rigged.review.act("le_1", _action(ModerationActionName.HOLD))
+    with pytest.raises(InvalidRequestError):
+        await rigged.review.act("le_1", _action(ModerationActionName.CHOOSE))
 
-    assert response.status.value == "held"
-    assert response.state is ReviewState.ACTIONED
-    assert rigged.library.statuses == [("le_1", "held")]
-    assert rigged.regeneration.calls == []
+
+@pytest.mark.asyncio
+async def test_choose_a_candidate_that_is_not_held_is_refused() -> None:
+    rigged = full_rig(entries={"le_1": entry_view()})
+    await _queue_report(rigged)
+
+    with pytest.raises(InvalidRequestError):
+        await rigged.review.act(
+            "le_1", _action(ModerationActionName.CHOOSE, chosen_clip=ChosenClip.CANDIDATE)
+        )
 
 
 @pytest.mark.asyncio
@@ -268,20 +327,7 @@ async def test_retire_stops_serving_without_regenerating_now() -> None:
     assert response.state is ReviewState.ACTIONED
     assert rigged.library.statuses == [("le_1", "retired")]
     # Retiring leaves the replacement to the next lookup; no job is enqueued now.
-    assert rigged.regeneration.calls == []
-
-
-@pytest.mark.asyncio
-async def test_replace_retires_and_regenerates_with_a_fresh_phrase() -> None:
-    rigged = full_rig(entries={"le_1": entry_view()})
-    await _queue_report(rigged)
-
-    response = await rigged.review.act("le_1", _action(ModerationActionName.REPLACE))
-
-    assert response.status.value == "retired"
-    assert response.state is ReviewState.ACTIONED
-    assert rigged.library.statuses == [("le_1", "retired")]
-    assert rigged.regeneration.calls == [("le_1", None)]
+    assert rigged.pipeline.regenerations == []
 
 
 @pytest.mark.asyncio
@@ -297,7 +343,8 @@ async def test_edit_phrase_records_the_phrase_and_regenerates_from_it() -> None:
     assert response.status.value == "retired"
     # A phrase edit regenerates and leaves the entry under review.
     assert response.state is ReviewState.REVIEWED
-    assert rigged.regeneration.calls == [("le_1", "to arrive somewhere")]
+    assert rigged.library.statuses == [("le_1", "retired")]
+    assert rigged.pipeline.regenerations == [("le_1", "to arrive somewhere")]
     actions = await rigged.store.moderation_actions()
     assert actions[0].phrase == "to arrive somewhere"
 
@@ -315,10 +362,12 @@ async def test_edit_phrase_without_a_phrase_is_refused() -> None:
 async def test_a_second_action_after_the_entry_moved_conflicts() -> None:
     rigged = full_rig(entries={"le_1": entry_view()})
     await _queue_report(rigged)
-    await rigged.review.act("le_1", _action(ModerationActionName.CLEAR))
+    await rigged.review.act("le_1", _action(ModerationActionName.RETIRE))
 
     with pytest.raises(ReviewConflictError):
-        await rigged.review.act("le_1", _action(ModerationActionName.HOLD))
+        await rigged.review.act(
+            "le_1", _action(ModerationActionName.CHOOSE, chosen_clip=ChosenClip.SERVING)
+        )
 
 
 @pytest.mark.asyncio
@@ -326,7 +375,7 @@ async def test_acting_on_an_entry_with_nothing_queued_is_not_found() -> None:
     rigged = full_rig(entries={"le_1": entry_view()})
 
     with pytest.raises(ReviewEntryNotFoundError):
-        await rigged.review.act("le_1", _action(ModerationActionName.CLEAR))
+        await rigged.review.act("le_1", _action(ModerationActionName.RETIRE))
 
 
 @pytest.mark.asyncio
@@ -335,7 +384,7 @@ async def test_acting_when_the_library_lost_the_entry_is_not_found() -> None:
     await _queue_report(rigged)
 
     with pytest.raises(ReviewEntryNotFoundError):
-        await rigged.review.act("le_1", _action(ModerationActionName.CLEAR))
+        await rigged.review.act("le_1", _action(ModerationActionName.RETIRE))
 
 
 @pytest.mark.asyncio
@@ -344,13 +393,15 @@ async def test_an_unreachable_library_is_unavailable() -> None:
     await _queue_report(rigged)
 
     with pytest.raises(ReviewUnavailableError):
-        await rigged.review.act("le_1", _action(ModerationActionName.CLEAR))
+        await rigged.review.act("le_1", _action(ModerationActionName.RETIRE))
 
 
 @pytest.mark.asyncio
-async def test_an_unreachable_pipeline_makes_a_replace_unavailable() -> None:
-    rigged = full_rig(entries={"le_1": entry_view()}, regeneration_unavailable=True)
+async def test_an_unreachable_pipeline_makes_a_phrase_edit_unavailable() -> None:
+    rigged = full_rig(entries={"le_1": entry_view()}, pipeline_unavailable=True)
     await _queue_report(rigged)
 
     with pytest.raises(ReviewUnavailableError):
-        await rigged.review.act("le_1", _action(ModerationActionName.REPLACE))
+        await rigged.review.act(
+            "le_1", _action(ModerationActionName.EDIT_PHRASE, phrase="to arrive somewhere")
+        )

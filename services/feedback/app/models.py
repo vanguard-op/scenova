@@ -7,7 +7,8 @@ sends no identity and the recorded rating belongs to the caller.
 
 The records mirror the `schema.md` entities "Feedback" and "Report"; the review
 queue the two feed is the curator console's operator surface (FEAT-015), whose
-wire shapes are C-014 to C-016.
+wire shapes are C-014 to C-016. A report opens a queue item and regenerates one
+clip for the entry, held as the candidate the curator chooses between.
 """
 
 from __future__ import annotations
@@ -99,22 +100,25 @@ class ReportResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     reportId: str
-    status: ReportStatus
+    state: ReportStatus
 
 
 class EntryStatus(StrEnum):
-    """Whether a library entry is served, held after a report, or retired."""
+    """Whether a library entry is served or retired (C-015, C-016).
+
+    An entry under review keeps serving; its review state lives on its queue
+    item, so there is no `held` status (FEAT-015).
+    """
 
     ACTIVE = "active"
-    HELD = "held"
     RETIRED = "retired"
 
 
 class ReviewState(StrEnum):
     """Where an entry sits in the curator's queue (C-014 `state`).
 
-    `queued` awaits a curator; `actioned` is a recorded decision (clear, hold,
-    retire, or replace); `reviewed` is a phrase edit that regenerates the entry
+    `queued` awaits a curator; `actioned` is a recorded decision (a choice of
+    clip or a retirement); `reviewed` is a phrase edit that regenerates the entry
     and leaves it under review for the curator to decide on.
     """
 
@@ -124,13 +128,22 @@ class ReviewState(StrEnum):
 
 
 class ModerationActionName(StrEnum):
-    """What a curator did to an entry (schema "ModerationAction")."""
+    """What a curator did to an entry (schema "ModerationAction").
 
-    CLEAR = "clear"
-    HOLD = "hold"
+    `choose` makes a named clip the one served to every reader, `retire` stops
+    serving the entry, and `edit_phrase` regenerates the entry from a new phrase.
+    """
+
+    CHOOSE = "choose"
     RETIRE = "retire"
-    REPLACE = "replace"
     EDIT_PHRASE = "edit_phrase"
+
+
+class ChosenClip(StrEnum):
+    """Which clip a `choose` action makes the one served (C-016 `chosenClip`)."""
+
+    SERVING = "serving"
+    CANDIDATE = "candidate"
 
 
 class QueueItem(BaseModel):
@@ -204,11 +217,14 @@ class EntryFeedback(BaseModel):
 
 
 class EntryDetailResponse(BaseModel):
-    """The C-015 200 response: the entry, its evidence, and its review state."""
+    """The C-015 200 response: the entry, its candidate, its evidence, and state."""
 
     model_config = ConfigDict(extra="forbid")
 
     entry: ReviewEntry
+    # The clip regenerated for the reporting reader, held for the curator; null
+    # when no report has produced one (FEAT-011).
+    candidate: ReviewClip | None
     reports: list[EntryReport]
     feedback: list[EntryFeedback]
     state: ReviewState
@@ -220,6 +236,9 @@ class ActionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     action: ModerationActionName
+    # Which clip a `choose` makes the one served: the clip already serving, or
+    # the candidate regenerated for the reporting reader.
+    chosenClip: ChosenClip | None = None
     phrase: str | None = Field(default=None, max_length=60)
     notes: str | None = Field(default=None, max_length=MAX_ACTION_NOTES_LENGTH)
     expectedState: ReviewState

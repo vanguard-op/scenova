@@ -481,3 +481,37 @@ async def test_a_failed_job_reports_failed() -> None:
 async def test_the_state_of_an_unknown_job_is_not_found() -> None:
     with pytest.raises(JobNotFoundError):
         await rig().service.get_status("job-missing")
+
+
+@pytest.mark.asyncio
+async def test_a_report_candidate_is_held_beside_the_entry_not_stored_as_an_entry() -> None:
+    # A report-triggered generation writes its clip as the entry's candidate, so
+    # the entry keeps serving the clip it already serves (FEAT-011).
+    test_rig = rig()
+    await test_rig.service.submit(request(phrase=None, lookup_id="cand:le_1:lk_reader"))
+
+    job = await test_rig.service.run("job-1")
+
+    assert job.status == JobStatus.SUCCEEDED
+    assert test_rig.library.all() == (), "a candidate must not replace the entry"
+    candidate = test_rig.library.candidate_for("le_1")
+    assert candidate is not None and candidate.id == "clip-1"
+    # The reporting reader is notified, so the fresh clip reaches them.
+    assert len(test_rig.notifier.ready) == 1
+    assert test_rig.notifier.ready[0][0] == "lk_reader"
+
+
+@pytest.mark.asyncio
+async def test_a_curator_phrase_edit_is_stored_as_a_replacement_entry() -> None:
+    # A curator's phrase edit regenerates the entry from the curator's phrase,
+    # and reaches no reader, so it raises no notice (FEAT-015).
+    test_rig = rig()
+    await test_rig.service.submit(request(phrase="a key in a lock", lookup_id="edit:le_1"))
+
+    job = await test_rig.service.run("job-1")
+
+    assert job.status == JobStatus.SUCCEEDED
+    stored = test_rig.library.find("key", "door_opener", PartOfSpeech.NOUN)
+    assert stored is not None
+    assert stored.entry.gloss_phrase == "a key in a lock"
+    assert test_rig.notifier.ready == []

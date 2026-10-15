@@ -5,6 +5,7 @@ from __future__ import annotations
 from feedback.app.models import LookupStatus
 from feedback.tests.fakes import (
     AUTH,
+    entry_view,
     make_client,
     phrase_lookup,
     report_body,
@@ -13,17 +14,19 @@ from feedback.tests.fakes import (
 )
 
 
-def test_a_report_is_queued_and_the_entry_is_held() -> None:
-    rigged = rig(word_lookup())
+def test_a_report_is_queued_and_starts_the_candidate() -> None:
+    rigged = rig(word_lookup(), entries={"le_1": entry_view()})
 
     with make_client(service=rigged.service) as client:
         response = client.post("/v1/reports", headers=AUTH, json=report_body())
 
     assert response.status_code == 202
     body = response.json()
-    assert body["status"] == "queued"
+    assert body["state"] == "queued"
     assert body["reportId"].startswith("rp_")
-    assert rigged.library.held == ["le_1"]
+    # The report starts one candidate for the entry; the entry keeps serving.
+    assert len(rigged.pipeline.candidates) == 1
+    assert rigged.library.statuses == []
 
 
 def test_a_missing_token_is_unauthorized() -> None:
@@ -78,7 +81,7 @@ def test_a_lookup_without_a_served_clip_is_a_bad_request() -> None:
 
 
 def test_a_second_report_from_one_reader_conflicts() -> None:
-    rigged = rig(word_lookup())
+    rigged = rig(word_lookup(), entries={"le_1": entry_view()})
 
     with make_client(service=rigged.service) as client:
         client.post("/v1/reports", headers=AUTH, json=report_body())
@@ -95,12 +98,12 @@ def test_a_phrase_report_is_accepted_with_no_shared_effect() -> None:
         response = client.post("/v1/reports", headers=AUTH, json=report_body())
 
     assert response.status_code == 202
-    assert response.json()["status"] == "queued"
-    assert rigged.library.held == []
+    assert response.json()["state"] == "queued"
+    assert rigged.pipeline.candidates == []
 
 
 def test_a_flood_is_rate_limited() -> None:
-    rigged = rig(word_lookup())
+    rigged = rig(word_lookup(), entries={"le_1": entry_view()})
 
     with make_client(service=rigged.service, rate_limit=1) as client:
         first = client.post("/v1/reports", headers=AUTH, json=report_body())

@@ -1,32 +1,27 @@
-"""Port to the shared library for holding and reviewing a reported entry (C-011).
+"""Port to the shared library for reviewing a reported entry (C-011, C-017).
 
-A report holds the entry it is about from new readers until a curator reviews it,
-so the intake moves the entry's status to `held` through the library's internal
-update route. Holding is the only library write the feedback path makes: a rating
-never changes the shared library (FEAT-010), and a report on a phrase clip has no
-shared entry to hold at all (FEAT-011).
+A report no longer holds the entry it is about: the entry keeps serving to other
+readers while it is under review, and a curator decides which clip serves it
+afterwards (FEAT-011, FEAT-015). So the feedback path never moves an entry's
+status on a report; the review surface moves it only when a curator retires the
+entry or edits its phrase.
 
-The curator review surface (FEAT-015) reads an entry by id — the word, sense,
-generation phrase, clip, and status a curator decides on — and moves its status
-as the decision requires. An unreachable library raises `LibraryUnavailableError`;
-an entry that no longer exists is reported as missing so the review surface can
-answer the contract's 404.
+The review surface reads an entry by id — the word, sense, generation phrase,
+clip, and status a curator decides on — and reads the candidate clip regenerated
+for the reporting reader, held beside the entry until the curator chooses. A
+`choose candidate` promotes that candidate to the clip the entry serves.
 
-An unreachable library raises `LibraryUnavailableError`, which the intake reports
-as the store being unavailable so the client retries; an entry that no longer
-exists is not an outage — a replacement may have superseded it — so the intake
-logs it and leaves it alone.
+An unreachable library raises `LibraryUnavailableError`; an entry that no longer
+exists is reported as missing so the review surface can answer the contract's
+404.
 """
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
 from typing import Any, Protocol
 
 import httpx2
-
-logger = logging.getLogger(__name__)
 
 
 class LibraryUnavailableError(Exception):
@@ -35,6 +30,16 @@ class LibraryUnavailableError(Exception):
 
 class EntryMissingError(Exception):
     """The library holds no entry for the id the review surface addressed."""
+
+
+@dataclass(frozen=True)
+class LibraryClipView:
+    """A clip as the review surface reads it (C-015 `clip` and `candidate`)."""
+
+    url: str
+    duration_seconds: float
+    resolution: str
+    has_audio: bool
 
 
 @dataclass(frozen=True)
@@ -47,25 +52,26 @@ class LibraryEntryView:
     part_of_speech: str
     gloss_phrase: str
     status: str
-    clip_url: str
-    clip_duration_seconds: float
-    clip_resolution: str
-    clip_has_audio: bool
+    clip: LibraryClipView
 
 
 class LibraryPort(Protocol):
-    """Holds an entry after a report and serves the curator review surface."""
-
-    async def hold(self, entry_id: str) -> None:
-        """Move an entry to `held`; a missing entry is a no-op."""
-        ...
+    """Reads entries and candidates, and moves an entry's status."""
 
     async def get_entry(self, entry_id: str) -> LibraryEntryView | None:
         """Read an entry by id, or None when the library holds none."""
         ...
 
+    async def get_candidate(self, entry_id: str) -> LibraryClipView | None:
+        """Read the candidate clip held for an entry, or None when there is none."""
+        ...
+
     async def set_status(self, entry_id: str, status: str) -> None:
         """Move an entry's status, or raise when the id is unknown."""
+        ...
+
+    async def promote_candidate(self, entry_id: str) -> None:
+        """Make the entry's candidate the clip it serves, or raise when there is none."""
         ...
 
     async def aclose(self) -> None: ...
@@ -89,25 +95,6 @@ class HttpLibrary:
             transport=transport,
         )
 
-    async def hold(self, entry_id: str) -> None:
-        try:
-            response = await self._client.patch(
-                f"/internal/library/entries/{entry_id}",
-                headers={"x-internal-audience": self._internal_audience},
-                json={"status": "held"},
-            )
-        except httpx2.HTTPError as exc:
-            raise LibraryUnavailableError("The shared library is unreachable.") from exc
-
-        if response.status_code == 200:
-            return
-        if response.status_code == 404:
-            # The entry was replaced or removed between the lookup read and the
-            # hold; there is nothing left to hold.
-            logger.warning("library entry %s no longer exists; nothing was held", entry_id)
-            return
-        raise LibraryUnavailableError("The shared library could not hold the entry.")
-
     async def get_entry(self, entry_id: str) -> LibraryEntryView | None:
         try:
             response = await self._client.get(
@@ -122,6 +109,21 @@ class HttpLibrary:
         if response.status_code != 200:
             raise LibraryUnavailableError("The shared library could not serve the entry.")
         return _entry_view(response)
+
+    async def get_candidate(self, entry_id: str) -> LibraryClipView | None:
+        try:
+            response = await self._client.get(
+                f"/internal/library/entries/{entry_id}/candidate",
+                headers={"x-internal-audience": self._internal_audience},
+            )
+        except httpx2.HTTPError as exc:
+            raise LibraryUnavailableError("The shared library is unreachable.") from exc
+
+        if response.status_code == 404:
+            return None
+        if response.status_code != 200:
+            raise LibraryUnavailableError("The shared library could not serve the candidate.")
+        return _candidate_view(response)
 
     async def set_status(self, entry_id: str, status: str) -> None:
         try:
@@ -139,6 +141,21 @@ class HttpLibrary:
             raise EntryMissingError("The shared library holds no such entry.")
         raise LibraryUnavailableError("The shared library could not move the entry.")
 
+    async def promote_candidate(self, entry_id: str) -> None:
+        try:
+            response = await self._client.post(
+                f"/internal/library/entries/{entry_id}/candidate/promote",
+                headers={"x-internal-audience": self._internal_audience},
+            )
+        except httpx2.HTTPError as exc:
+            raise LibraryUnavailableError("The shared library is unreachable.") from exc
+
+        if response.status_code == 200:
+            return
+        if response.status_code == 404:
+            raise EntryMissingError("The shared library holds no candidate for this entry.")
+        raise LibraryUnavailableError("The shared library could not promote the candidate.")
+
     async def aclose(self) -> None:
         await self._client.aclose()
 
@@ -147,7 +164,6 @@ def _entry_view(response: httpx2.Response) -> LibraryEntryView:
     try:
         body: dict[str, Any] = response.json()
         entry = body["entry"]
-        clip = entry["clip"]
         return LibraryEntryView(
             entry_id=str(entry["entryId"]),
             lemma=str(entry["lemma"]),
@@ -155,10 +171,27 @@ def _entry_view(response: httpx2.Response) -> LibraryEntryView:
             part_of_speech=str(entry["partOfSpeech"]),
             gloss_phrase=str(entry["glossPhrase"]),
             status=str(entry["status"]),
-            clip_url=str(clip["url"]),
-            clip_duration_seconds=float(clip["durationSeconds"]),
-            clip_resolution=str(clip["resolution"]),
-            clip_has_audio=bool(clip["hasAudio"]),
+            clip=_clip(entry["clip"]),
         )
     except (KeyError, TypeError, ValueError) as exc:
         raise LibraryUnavailableError("The shared library returned an unreadable entry.") from exc
+
+
+def _candidate_view(response: httpx2.Response) -> LibraryClipView | None:
+    try:
+        body: dict[str, Any] = response.json()
+        clip = body.get("clip")
+        return None if clip is None else _clip(clip)
+    except (KeyError, TypeError, ValueError) as exc:
+        raise LibraryUnavailableError(
+            "The shared library returned an unreadable candidate."
+        ) from exc
+
+
+def _clip(clip: dict[str, Any]) -> LibraryClipView:
+    return LibraryClipView(
+        url=str(clip["url"]),
+        duration_seconds=float(clip["durationSeconds"]),
+        resolution=str(clip["resolution"]),
+        has_audio=bool(clip["hasAudio"]),
+    )

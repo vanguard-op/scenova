@@ -3,23 +3,23 @@
 The review console works the entries reader reports (FEAT-011) and repeated
 negative feedback (FEAT-010) queued. `queue` lists the entries awaiting review,
 newest first, one item per entry however many reports it holds (C-014). `entry`
-shows one queued entry with its clip, generation phrase, reports, and negative
-feedback, and its review state (C-015). `act` records a curator's clear, hold,
-retire, replace, or edit_phrase, moves the entry's library status through C-011,
-and resolves or advances the queue item (C-016).
+shows one queued entry with the clip it serves beside the candidate regenerated
+for the reporting reader, its generation phrase, reports, and negative feedback,
+and its review state (C-015). `act` records a curator's choice of clip, a
+retirement, or a phrase edit and resolves or advances the queue item (C-016).
 
-The effects follow the feature doc: `clear` returns the entry to serving, `hold`
-withholds it, `retire` stops serving it so the next lookup generates a
-replacement, `replace` retires it and regenerates, and `edit_phrase` records the
-new phrase and regenerates the entry from it. Every action records a
-`ModerationAction` and moves the entry's reports to the matching review state.
+The effects follow the feature doc: `choose` makes the named clip the one served
+to every reader — the clip already serving, or the candidate regenerated for the
+reporting reader; `retire` stops serving the entry, and the next lookup generates
+a replacement; `edit_phrase` records the new phrase and regenerates the entry
+from it. Until a `choose` or a `retire`, the entry keeps serving the clip it
+already serves. Every action records a `ModerationAction`.
 
-The state the contract returns per action follows the console's own flow: clear,
-hold, retire, and replace return to the queue and mark the item `actioned`;
-`edit_phrase` returns to the entry and marks it `reviewed`, because the
-regeneration it starts leaves the entry under review. `expectedState` guards
-against two curators acting at once: the second action carries the state the
-curator saw and is told the entry has moved (C-016 409).
+`edit_phrase` returns the item to the entry screen and marks it `reviewed`,
+because the regeneration it starts leaves the entry under review; every other
+action resolves the item and marks it `actioned`. `expectedState` guards against
+two curators acting at once: the second action carries the state the curator saw
+and is told the entry has moved (C-016 409).
 """
 
 from __future__ import annotations
@@ -38,6 +38,7 @@ from .errors import (
 from .library import (
     EntryMissingError,
     HttpLibrary,
+    LibraryClipView,
     LibraryEntryView,
     LibraryPort,
     LibraryUnavailableError,
@@ -45,6 +46,7 @@ from .library import (
 from .models import (
     ActionRequest,
     ActionResponse,
+    ChosenClip,
     EntryDetailResponse,
     EntryFeedback,
     EntryReport,
@@ -79,13 +81,11 @@ PAGE_SIZE = 20
 FEEDBACK_REASON = "feedback_threshold"
 
 # Where each action leaves the queue item. A phrase edit regenerates the entry
-# and stays on the entry screen, so it is `reviewed`; every other action is a
-# recorded decision that resolves the item.
+# and stays on the entry screen, so it is `reviewed`; a choice or a retirement is
+# a recorded decision that resolves the item.
 _ACTION_STATE = {
-    ModerationActionName.CLEAR: ReviewState.ACTIONED,
-    ModerationActionName.HOLD: ReviewState.ACTIONED,
+    ModerationActionName.CHOOSE: ReviewState.ACTIONED,
     ModerationActionName.RETIRE: ReviewState.ACTIONED,
-    ModerationActionName.REPLACE: ReviewState.ACTIONED,
     ModerationActionName.EDIT_PHRASE: ReviewState.REVIEWED,
 }
 
@@ -154,16 +154,18 @@ class ReviewService:
         )
 
     async def entry(self, entry_id: str) -> EntryDetailResponse:
-        """Show one queued entry with its evidence and state (C-015)."""
+        """Show one queued entry with its candidate, evidence, and state (C-015)."""
 
         item = await self._store.queue_item(entry_id)
         if item is None:
             raise ReviewEntryNotFoundError("No entry is queued for review.")
         entry = await self._read_entry(entry_id)
+        candidate = await self._read_candidate(entry_id)
         reports = await self._reports(entry_id)
         feedback = await self._feedback(entry_id)
         return EntryDetailResponse(
             entry=_entry(entry),
+            candidate=_clip(candidate) if candidate is not None else None,
             reports=reports,
             feedback=feedback,
             state=item.state,
@@ -179,7 +181,7 @@ class ReviewService:
             entry = await self._read_entry(entry_id)
             if item.state is not request.expectedState:
                 raise ReviewConflictError("The entry has already moved since you saw it.")
-            phrase = _validated_phrase(request)
+            chosen_clip, phrase = _validated(request)
 
             reports = await self._store.reports_for_entry(entry_id)
             action = ModerationActionRecord(
@@ -188,13 +190,14 @@ class ReviewService:
                 report_id=_newest_report_id(reports),
                 action=request.action,
                 actor_role="curator",
+                chosen_clip=None if chosen_clip is None else chosen_clip.value,
                 phrase=phrase,
                 notes=request.notes,
                 created_at=_now(),
             )
             await self._store.add_moderation_action(action)
 
-            status = await self._apply(request.action, entry, phrase)
+            status = await self._apply(request.action, entry, chosen_clip, phrase)
             state = _ACTION_STATE[request.action]
             await self._store.save_queue_item(replace(item, state=state, updated_at=_now()))
             await self._store.set_reports_status(
@@ -218,35 +221,40 @@ class ReviewService:
         self,
         action: ModerationActionName,
         entry: LibraryEntryView,
+        chosen_clip: ChosenClip | None,
         phrase: str | None,
     ) -> EntryStatus:
         """Move the entry's library status and start any regeneration."""
 
-        if action is ModerationActionName.CLEAR:
-            await self._set_status(entry.entry_id, EntryStatus.ACTIVE)
+        if action is ModerationActionName.CHOOSE:
+            # The entry already serves its clip, so choosing the serving clip
+            # changes nothing; choosing the candidate makes it the serving clip
+            # for every reader from now on (FEAT-015).
+            if chosen_clip is ChosenClip.CANDIDATE:
+                await self._promote_candidate(entry.entry_id)
             return EntryStatus.ACTIVE
-        if action is ModerationActionName.HOLD:
-            await self._set_status(entry.entry_id, EntryStatus.HELD)
-            return EntryStatus.HELD
 
-        # retire, replace, and edit_phrase all stop the old clip serving; the
-        # replacement is generated from the phrase (a fresh one for replace, the
-        # curator's for an edit).
+        if action is ModerationActionName.RETIRE:
+            # Retiring stops the entry serving; the replacement is left to the
+            # next lookup of the word.
+            await self._set_status(entry.entry_id, EntryStatus.RETIRED)
+            return EntryStatus.RETIRED
+
+        # edit_phrase: retire the old clip and regenerate the entry from the
+        # curator's phrase, so the entry comes back under review.
         await self._set_status(entry.entry_id, EntryStatus.RETIRED)
-        regeneration_phrase = phrase if action is ModerationActionName.EDIT_PHRASE else None
-        if action in (ModerationActionName.REPLACE, ModerationActionName.EDIT_PHRASE):
-            try:
-                await self._regeneration.regenerate(
-                    entry_id=entry.entry_id,
-                    lemma=entry.lemma,
-                    sense_label=entry.sense_label,
-                    part_of_speech=entry.part_of_speech,
-                    phrase=regeneration_phrase,
-                )
-            except RegenerationUnavailableError as exc:
-                raise ReviewUnavailableError(
-                    "The review service is unavailable. Please try again."
-                ) from exc
+        try:
+            await self._regeneration.regenerate(
+                entry_id=entry.entry_id,
+                lemma=entry.lemma,
+                sense_label=entry.sense_label,
+                part_of_speech=entry.part_of_speech,
+                phrase=phrase,
+            )
+        except RegenerationUnavailableError as exc:
+            raise ReviewUnavailableError(
+                "The review service is unavailable. Please try again."
+            ) from exc
         return EntryStatus.RETIRED
 
     async def _set_status(self, entry_id: str, status: EntryStatus) -> None:
@@ -254,6 +262,18 @@ class ReviewService:
             await self._library.set_status(entry_id, status.value)
         except EntryMissingError as exc:
             raise ReviewEntryNotFoundError("The library holds no such entry.") from exc
+        except LibraryUnavailableError as exc:
+            raise ReviewUnavailableError(
+                "The review service is unavailable. Please try again."
+            ) from exc
+
+    async def _promote_candidate(self, entry_id: str) -> None:
+        try:
+            await self._library.promote_candidate(entry_id)
+        except EntryMissingError as exc:
+            # There is no candidate to choose; the curator cannot choose a clip
+            # the entry does not hold.
+            raise InvalidRequestError("No candidate clip is held for this entry.") from exc
         except LibraryUnavailableError as exc:
             raise ReviewUnavailableError(
                 "The review service is unavailable. Please try again."
@@ -284,6 +304,14 @@ class ReviewService:
     async def _read_entry_or_none(self, entry_id: str) -> LibraryEntryView | None:
         try:
             return await self._library.get_entry(entry_id)
+        except LibraryUnavailableError as exc:
+            raise ReviewUnavailableError(
+                "The review service is unavailable. Please try again."
+            ) from exc
+
+    async def _read_candidate(self, entry_id: str) -> LibraryClipView | None:
+        try:
+            return await self._library.get_candidate(entry_id)
         except LibraryUnavailableError as exc:
             raise ReviewUnavailableError(
                 "The review service is unavailable. Please try again."
@@ -335,13 +363,21 @@ def _matches(
     return word is None or entry.lemma.casefold() == word.strip().casefold()
 
 
-def _validated_phrase(request: ActionRequest) -> str | None:
-    if request.action is not ModerationActionName.EDIT_PHRASE:
-        return None
-    phrase = (request.phrase or "").strip()
-    if not phrase:
-        raise InvalidRequestError("A phrase edit needs the new generation phrase.")
-    return phrase
+def _validated(request: ActionRequest) -> tuple[ChosenClip | None, str | None]:
+    """Validate an action's own requirements, or refuse it (C-016 400)."""
+
+    if request.action is ModerationActionName.CHOOSE:
+        if request.chosenClip is None:
+            raise InvalidRequestError("A choose action needs the clip to serve.")
+        return request.chosenClip, None
+
+    if request.action is ModerationActionName.EDIT_PHRASE:
+        phrase = (request.phrase or "").strip()
+        if not phrase:
+            raise InvalidRequestError("A phrase edit needs the new generation phrase.")
+        return None, phrase
+
+    return None, None
 
 
 def _newest_report(reports: list[ReportRecord]) -> ReportRecord | None:
@@ -362,12 +398,16 @@ def _entry(entry: LibraryEntryView) -> ReviewEntry:
         senseLabel=entry.sense_label,
         glossPhrase=entry.gloss_phrase,
         status=EntryStatus(entry.status),
-        clip=ReviewClip(
-            url=entry.clip_url,
-            durationSeconds=entry.clip_duration_seconds,
-            resolution=entry.clip_resolution,
-            hasAudio=entry.clip_has_audio,
-        ),
+        clip=_clip(entry.clip),
+    )
+
+
+def _clip(clip: LibraryClipView) -> ReviewClip:
+    return ReviewClip(
+        url=clip.url,
+        durationSeconds=clip.duration_seconds,
+        resolution=clip.resolution,
+        hasAudio=clip.has_audio,
     )
 
 

@@ -43,7 +43,7 @@ class LibraryEntry:
     sense_label: str
     gloss_phrase: str
     clip_asset_id: str
-    status: Literal["active", "held", "retired"]
+    status: Literal["active", "retired"]
     source: Literal["seeded", "generated"]
     created_at: str
     updated_at: str

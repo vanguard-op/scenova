@@ -1,10 +1,10 @@
 """Internal client for the feedback intake (C-012, C-013).
 
 The gateway routes a reader's rating and report to the feedback service, which
-owns the feedback store, the review queue, and the hold on a reported entry. The
-caller's Authorization header is forwarded unchanged, so the intake resolves the
-token subject the same way the gateway authenticated it and scopes the work to
-that reader; the gateway never rewrites or records the identity.
+owns the feedback store and the review queue and starts the candidate a report
+triggers. The caller's Authorization header is forwarded unchanged, so the intake
+resolves the token subject the same way the gateway authenticated it and scopes
+the work to that reader; the gateway never rewrites or records the identity.
 """
 
 from __future__ import annotations

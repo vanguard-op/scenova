@@ -1,10 +1,11 @@
 """HTTP API for the feedback service (C-012 to C-016).
 
 `POST /v1/feedback` records a reader's rating of a clip and `POST /v1/reports`
-records a report and holds the entry it is about. Both authenticate the caller,
-rate-limit the intake, and scope the work to the token subject. Authentication
-and rate limiting are also applied at the gateway in the deployed topology;
-enforcing them here keeps the intake correct when it is addressed directly.
+records a report, opens its entry's queue item, and starts one candidate
+generation for the entry. Both authenticate the caller, rate-limit the intake,
+and scope the work to the token subject. Authentication and rate limiting are
+also applied at the gateway in the deployed topology; enforcing them here keeps
+the intake correct when it is addressed directly.
 
 `GET /internal/review/queue`, `GET /internal/review/entries/{entryId}`, and
 `POST /internal/review/entries/{entryId}/actions` are the curator console's

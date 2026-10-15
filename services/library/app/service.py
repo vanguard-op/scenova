@@ -1,9 +1,9 @@
 """Library operations: store a word clip, find it by sense, move its status.
 
 The lookup service reads an entry for a sense; the generation pipeline writes a
-finished word clip; the content review service holds or retires an entry after a
-report. All three share this seam, so the store's rules live in one place and the
-HTTP routes stay thin.
+finished word clip, and a report-triggered candidate clip beside it; the content
+review service chooses which clip serves or retires an entry. All of them share
+this seam, so the store's rules live in one place and the HTTP routes stay thin.
 """
 
 from __future__ import annotations
@@ -53,3 +53,24 @@ class LibraryService:
         if updated is None:
             raise EntryNotFoundError("No library entry exists for this id.")
         return updated
+
+    async def set_candidate(self, entry_id: str, asset: ClipAssetBody) -> StoredEntry:
+        """Hold the clip regenerated for a reporting reader, or fail if unknown."""
+
+        updated = await self._store.set_candidate(entry_id, asset)
+        if updated is None:
+            raise EntryNotFoundError("No library entry exists for this id.")
+        return updated
+
+    async def promote_candidate(self, entry_id: str) -> StoredEntry:
+        """Make an entry's candidate the clip it serves, or fail if there is none."""
+
+        stored = await self._store.get(entry_id)
+        if stored is None:
+            raise EntryNotFoundError("No library entry exists for this id.")
+        if stored.candidate is None:
+            raise EntryNotFoundError("No candidate clip is held for this entry.")
+        promoted = await self._store.promote_candidate(entry_id)
+        if promoted is None:
+            raise EntryNotFoundError("No candidate clip is held for this entry.")
+        return promoted

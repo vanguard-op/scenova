@@ -17,12 +17,15 @@ from fastapi.responses import JSONResponse
 from .config import Settings
 from .errors import LibraryError, UnauthorizedError
 from .models import (
+    CandidateResponse,
+    ClipAssetBody,
     EntryDetail,
     FindEntryResponse,
     GetEntryResponse,
     PartOfSpeech,
     ServedClip,
     ServedEntry,
+    StoreCandidateResponse,
     StoreEntryRequest,
     StoreEntryResponse,
     UpdateEntryRequest,
@@ -102,6 +105,36 @@ def create_app(
         updated = await resolved_service.set_status(entry_id, payload.status)
         return UpdateEntryResponse(entryId=updated.entry.id, status=updated.entry.status)
 
+    @app.post("/internal/library/entries/{entry_id}/candidate", status_code=202)
+    async def store_candidate(
+        entry_id: str,
+        payload: ClipAssetBody,
+        x_internal_audience: Annotated[str | None, Header()] = None,
+    ) -> StoreCandidateResponse:
+        _require_internal(resolved_settings, x_internal_audience)
+        stored = await resolved_service.set_candidate(entry_id, payload)
+        return StoreCandidateResponse(entryId=stored.entry.id)
+
+    @app.get("/internal/library/entries/{entry_id}/candidate")
+    async def get_candidate(
+        entry_id: str,
+        x_internal_audience: Annotated[str | None, Header()] = None,
+    ) -> CandidateResponse:
+        _require_internal(resolved_settings, x_internal_audience)
+        stored = await resolved_service.get(entry_id)
+        return CandidateResponse(
+            clip=None if stored.candidate is None else _clip_asset(stored.candidate)
+        )
+
+    @app.post("/internal/library/entries/{entry_id}/candidate/promote")
+    async def promote_candidate(
+        entry_id: str,
+        x_internal_audience: Annotated[str | None, Header()] = None,
+    ) -> UpdateEntryResponse:
+        _require_internal(resolved_settings, x_internal_audience)
+        promoted = await resolved_service.promote_candidate(entry_id)
+        return UpdateEntryResponse(entryId=promoted.entry.id, status=promoted.entry.status)
+
     return app
 
 
@@ -127,11 +160,15 @@ def _detail(stored: StoredEntry) -> EntryDetail:
 
 
 def _clip(stored: StoredEntry) -> ServedClip:
+    return _clip_asset(stored.asset)
+
+
+def _clip_asset(asset: ClipAssetBody) -> ServedClip:
     return ServedClip(
-        url=stored.asset.url,
-        durationSeconds=stored.asset.durationSeconds,
-        resolution=stored.asset.resolution,
-        hasAudio=stored.asset.hasAudio,
+        url=asset.url,
+        durationSeconds=asset.durationSeconds,
+        resolution=asset.resolution,
+        hasAudio=asset.hasAudio,
     )
 
 

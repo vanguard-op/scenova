@@ -7,12 +7,14 @@ negative rating flags the entry, and when enough readers' latest ratings are
 negative the entry is queued for a curator to review. A rating on a phrase lookup
 is recorded against the lookup alone and never touches the shared library.
 
-`record_report` records a reader's report of a clip (C-013). The report queues
-each entry it is about and holds that entry from new readers through the library
-(C-011), until a curator reviews it. A report on an entry already under review
-joins the queue item that is there; a second report of the same entry from one
-reader is refused. A report on a phrase lookup is recorded against the lookup and
-has no shared effect, because a phrase clip is never in the shared library.
+`record_report` records a reader's report of a clip (C-013). The report opens a
+queue item for the entry, or joins the one already open, and starts one
+generation for the entry: the pipeline holds the fresh clip as the entry's
+candidate and serves it to the reporting reader, while the entry keeps serving
+the clip it already serves to everyone else until a curator decides (FEAT-011).
+A second report of the same entry from one reader is refused; a report on a
+phrase lookup is recorded against the lookup and has no shared effect, because a
+phrase clip is never in the shared library.
 
 Both are idempotent on the client's key, so a report or rating made offline and
 resent when the connection returns is recorded once.
@@ -21,6 +23,8 @@ resent when the connection returns is recorded once.
 from __future__ import annotations
 
 import asyncio
+import logging
+from dataclasses import replace
 from datetime import UTC, datetime
 
 from .config import Settings
@@ -43,6 +47,11 @@ from .models import (
     ReportResponse,
     ReportStatus,
 )
+from .regeneration import (
+    HttpRegenerationTrigger,
+    RegenerationTrigger,
+    RegenerationUnavailableError,
+)
 from .store import (
     FeedbackRecord,
     FeedbackStore,
@@ -55,6 +64,8 @@ from .store import (
     queue_feedback,
     queue_report,
 )
+
+logger = logging.getLogger(__name__)
 
 # A phrase lookup that resolved without a clip has nothing for the reader to rate
 # or report. A phrase clip is delivered by the clip-ready notice, never on the
@@ -73,11 +84,13 @@ class FeedbackService:
         store: FeedbackStore,
         lookups: LookupDirectory,
         library: LibraryPort,
+        pipeline: RegenerationTrigger,
         negative_feedback_threshold: int,
     ) -> None:
         self._store = store
         self._lookups = lookups
         self._library = library
+        self._pipeline = pipeline
         self._threshold = max(1, negative_feedback_threshold)
         # Serialises the idempotency check and the write, so a duplicate client
         # key is replayed rather than recorded twice.
@@ -121,18 +134,12 @@ class FeedbackService:
                     raise ClientReportIdConflictError(
                         "This clientReportId was already used with a different report."
                     )
-                return ReportResponse(reportId=existing.id, status=existing.status)
+                return ReportResponse(reportId=existing.id, state=existing.status)
 
             record = await self._read_lookup(request.lookupId, subject)
             for entry_id in record.served_entry_ids:
                 if await self._store.has_reported(subject, entry_id):
                     raise AlreadyReportedError("You have already reported this clip.")
-
-            # Hold the entry before the report is recorded, so a report the store
-            # could not hold is not left queued but unheld: the retry re-attempts
-            # the hold from the start (C-013).
-            for entry_id in record.served_entry_ids:
-                await self._hold(entry_id)
 
             report = ReportRecord(
                 id=new_report_id(),
@@ -150,13 +157,15 @@ class FeedbackService:
                 item = await self._queue_item(entry_id)
                 item = queue_report(item, report_id=report.id, reason=report.reason)
                 await self._store.save_queue_item(item)
-        return ReportResponse(reportId=report.id, status=report.status)
+                await self._start_candidate(entry_id, item, reader_lookup_id=request.lookupId)
+        return ReportResponse(reportId=report.id, state=report.status)
 
     async def aclose(self) -> None:
-        """Release the lookup and library clients' connections."""
+        """Release the lookup, library, and pipeline clients' connections."""
 
         await self._lookups.aclose()
         await self._library.aclose()
+        await self._pipeline.aclose()
 
     async def _read_lookup(self, lookup_id: str, subject: str) -> LookupRecord:
         """Read the lookup, or fail with the contract's 404 / 400 / 503."""
@@ -188,15 +197,47 @@ class FeedbackService:
         item = await self._queue_item(entry_id)
         await self._store.save_queue_item(queue_feedback(item))
 
-    async def _hold(self, entry_id: str) -> None:
-        """Hold a reported entry from new readers through the library (C-011)."""
+    async def _start_candidate(
+        self, entry_id: str, item: ReviewItem, *, reader_lookup_id: str
+    ) -> None:
+        """Start the item's one report-triggered generation, if it has not run.
 
+        The candidate generation is a secondary effect of the report: the report
+        and its queue item stand whether or not the pipeline can be reached, and a
+        later report retries the generation. One generation per item keeps the
+        spend to one however many readers report the entry (FEAT-011).
+        """
+
+        if item.candidate_requested:
+            return
         try:
-            await self._library.hold(entry_id)
-        except LibraryUnavailableError as exc:
-            raise FeedbackStoreUnavailableError(
-                "The feedback store is unavailable. Please try again."
-            ) from exc
+            entry = await self._library.get_entry(entry_id)
+        except LibraryUnavailableError:
+            logger.warning(
+                "the shared library was unreachable; no candidate was started for entry %s",
+                entry_id,
+            )
+            return
+        if entry is None:
+            # The entry was superseded before the report reached us; there is
+            # nothing left to regenerate a candidate for.
+            return
+        try:
+            await self._pipeline.generate_candidate(
+                entry_id=entry_id,
+                reader_lookup_id=reader_lookup_id,
+                lemma=entry.lemma,
+                sense_label=entry.sense_label,
+                part_of_speech=entry.part_of_speech,
+                nonce=item.created_at,
+            )
+        except RegenerationUnavailableError:
+            logger.warning(
+                "the generation pipeline could not start a candidate for entry %s",
+                entry_id,
+            )
+            return
+        await self._store.save_queue_item(replace(item, candidate_requested=True))
 
     async def _queue_item(self, entry_id: str) -> ReviewItem:
         existing = await self._store.queue_item(entry_id)
@@ -206,7 +247,7 @@ class FeedbackService:
 def build_default_service(
     settings: Settings, store: FeedbackStore | None = None
 ) -> FeedbackService:
-    """Build the service with its store, lookup reader, and library client."""
+    """Build the service with its store, lookup reader, library, and pipeline."""
 
     return FeedbackService(
         store=store if store is not None else InMemoryFeedbackStore(),
@@ -219,6 +260,12 @@ def build_default_service(
             base_url=settings.library_base_url,
             internal_audience=settings.internal_audience,
             timeout_seconds=settings.library_timeout_seconds,
+        ),
+        pipeline=HttpRegenerationTrigger(
+            base_url=settings.pipeline_base_url,
+            internal_audience=settings.internal_audience,
+            clip_model_pin=settings.clip_model_pin,
+            timeout_seconds=settings.pipeline_timeout_seconds,
         ),
         negative_feedback_threshold=settings.negative_feedback_threshold,
     )

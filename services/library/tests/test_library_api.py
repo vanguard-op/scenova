@@ -232,3 +232,60 @@ def test_a_status_outside_the_review_states_is_refused() -> None:
 
     assert response.status_code == 400
     assert response.json()["code"] == "invalid_request"
+
+
+def test_a_candidate_is_stored_read_and_promoted() -> None:
+    # A report-triggered clip is held as the entry's candidate, then made the
+    # clip the entry serves when a curator chooses it (FEAT-011, FEAT-015).
+    with _client() as client:
+        _store(client)
+        stored = client.post(
+            "/internal/library/entries/le_1/candidate",
+            headers=_INTERNAL,
+            json=_asset(id="clip_cand", url="https://cdn.example/clip_cand.mp4"),
+        )
+        candidate = client.get("/internal/library/entries/le_1/candidate", headers=_INTERNAL)
+        promoted = client.post(
+            "/internal/library/entries/le_1/candidate/promote", headers=_INTERNAL
+        )
+        served = _find(client)
+
+    assert stored.status_code == 202
+    assert stored.json() == {"entryId": "le_1"}
+    assert candidate.status_code == 200
+    assert candidate.json()["clip"]["url"] == "https://cdn.example/clip_cand.mp4"
+    assert promoted.status_code == 200
+    assert promoted.json() == {"entryId": "le_1", "status": "active"}
+    assert served.json()["entry"]["clip"]["url"] == "https://cdn.example/clip_cand.mp4"
+
+
+def test_an_entry_without_a_candidate_reads_null() -> None:
+    with _client() as client:
+        _store(client)
+        candidate = client.get("/internal/library/entries/le_1/candidate", headers=_INTERNAL)
+
+    assert candidate.status_code == 200
+    assert candidate.json() == {"clip": None}
+
+
+def test_storing_a_candidate_for_an_unknown_entry_is_not_found() -> None:
+    with _client() as client:
+        response = client.post(
+            "/internal/library/entries/le_missing/candidate",
+            headers=_INTERNAL,
+            json=_asset(),
+        )
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "entry_not_found"
+
+
+def test_promoting_without_a_candidate_is_not_found() -> None:
+    with _client() as client:
+        _store(client)
+        response = client.post(
+            "/internal/library/entries/le_1/candidate/promote", headers=_INTERNAL
+        )
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "entry_not_found"

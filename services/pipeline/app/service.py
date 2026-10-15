@@ -83,6 +83,7 @@ from .phrase_client import (
 from .phrase_fallback import fallback_phrase
 from .pins import ModelPins
 from .queue import InMemoryJobQueue, JobQueue
+from .review_jobs import ReviewRoute, ReviewRouteKind, review_route
 
 logger = logging.getLogger(__name__)
 
@@ -275,9 +276,19 @@ class GenerationService:
             logger.info("withheld a clip outside the duration range (job %s)", running.id)
             return await self._fail(running, JobStatus.FAILED, COST_UNITS_PER_CLIP, withheld)
 
+        route = review_route(running.lookup_id)
         if running.kind is Kind.WORD:
-            await self._store_word_clip(running, clip, phrase)
-        await self._notifier.clip_ready(lookup_id=running.lookup_id, job_id=running.id, clip=clip)
+            # A report-triggered generation holds its clip as the entry's
+            # candidate, not as a new entry: the entry keeps serving the clip it
+            # already serves until a curator chooses (FEAT-011). A curator's
+            # phrase edit is a normal replacement and is written as a new entry.
+            if route is not None and route.kind is ReviewRouteKind.CANDIDATE:
+                await self._store_candidate(running, route.entry_id, clip)
+            else:
+                await self._store_word_clip(running, clip, phrase)
+        notice_lookup = _notice_lookup(running.lookup_id, route)
+        if notice_lookup is not None:
+            await self._notifier.clip_ready(lookup_id=notice_lookup, job_id=running.id, clip=clip)
         return await self._succeed(running, clip, started_at)
 
     async def aclose(self) -> None:
@@ -359,16 +370,7 @@ class GenerationService:
         """
 
         now = _now()
-        asset = ClipAsset(
-            id=clip.clip_id,
-            duration_seconds=clip.duration_seconds,
-            resolution="360p",
-            storage_key=clip.storage_key,
-            url=clip.url,
-            has_audio=clip.has_audio,
-            synth_id_watermark=clip.synth_id_watermark,
-            created_at=now,
-        )
+        asset = _clip_asset(clip, now)
         entry = LibraryEntry(
             id=f"le_{uuid4().hex}",
             lemma=job.lemma or phrase,
@@ -382,6 +384,36 @@ class GenerationService:
             updated_at=now,
         )
         await self._store_with_retry(job, entry, asset)
+
+    async def _store_candidate(self, job: GenerationJob, entry_id: str, clip: ClipResult) -> None:
+        """Hold a report-triggered clip as the entry's candidate, retrying.
+
+        The candidate is a secondary effect of a generation that already produced
+        a clip: a library write that cannot be accepted must not cost the
+        reporting reader the clip it just produced, so the job still succeeds and
+        the write is retried (FEAT-011).
+        """
+
+        asset = _clip_asset(clip, _now())
+        attempts = max(1, self._settings.library_store_attempts)
+        for attempt in range(1, attempts + 1):
+            try:
+                await self._library.store_candidate(entry_id, asset)
+                return
+            except LibraryUnavailableError:
+                logger.warning(
+                    "candidate write failed (job %s, entry %s, attempt %d/%d)",
+                    job.id,
+                    entry_id,
+                    attempt,
+                    attempts,
+                )
+                if attempt < attempts and self._settings.library_store_retry_delay_seconds:
+                    await asyncio.sleep(self._settings.library_store_retry_delay_seconds)
+        logger.error(
+            "candidate write gave up (job %s); the reporting reader still got the clip",
+            job.id,
+        )
 
     async def _store_with_retry(
         self, job: GenerationJob, entry: LibraryEntry, asset: ClipAsset
@@ -498,6 +530,34 @@ def build_default_service(settings: Settings) -> GenerationService:
         spawner=AsyncioTaskSpawner(),
         events=LoggingGenerationEventEmitter(),
     )
+
+
+def _clip_asset(clip: ClipResult, now: str) -> ClipAsset:
+    """The stored asset for a produced clip."""
+
+    return ClipAsset(
+        id=clip.clip_id,
+        duration_seconds=clip.duration_seconds,
+        resolution="360p",
+        storage_key=clip.storage_key,
+        url=clip.url,
+        has_audio=clip.has_audio,
+        synth_id_watermark=clip.synth_id_watermark,
+        created_at=now,
+    )
+
+
+def _notice_lookup(lookup_id: str, route: ReviewRoute | None) -> str | None:
+    """The lookup a finished clip's notice goes to, or None when none should.
+
+    An ordinary reader lookup is its own notice target. A report-triggered
+    candidate reaches the reporting reader through their own lookup; a curator's
+    phrase edit reaches no reader, so it raises no notice.
+    """
+
+    if route is None:
+        return lookup_id
+    return route.reader_lookup_id
 
 
 def _duration_out_of_range(clip: ClipResult, low: float, high: float) -> str | None:

@@ -86,6 +86,7 @@ def test_a_reported_entry_appears_in_the_queue_and_opens() -> None:
     detail = entry.json()
     assert detail["entry"]["lemma"] == "come"
     assert detail["entry"]["clip"]["url"] == "https://cdn.example/clip_1.mp4"
+    assert detail["candidate"] is None
     assert detail["reports"][0]["reason"] == "wrong_meaning"
     assert detail["state"] == "queued"
 
@@ -116,15 +117,15 @@ def test_an_entry_with_nothing_queued_is_not_found() -> None:
     assert response.json()["code"] == "review_entry_not_found"
 
 
-def test_a_clear_action_returns_the_entry_to_serving() -> None:
-    rigged = full_rig(word_lookup(), entries={"le_1": entry_view(status="held")})
+def test_a_choose_action_makes_the_named_clip_serve() -> None:
+    rigged = full_rig(word_lookup(), entries={"le_1": entry_view()})
 
     with make_review_client(rigged) as client:
         _report(client)
         response = client.post(
             "/internal/review/entries/le_1/actions",
             headers=OPERATOR,
-            json=queue_body(action="clear"),
+            json=queue_body(action="choose", chosenClip="serving"),
         )
 
     assert response.status_code == 200
@@ -133,7 +134,38 @@ def test_a_clear_action_returns_the_entry_to_serving() -> None:
     assert body["entryId"] == "le_1"
     assert body["status"] == "active"
     assert body["state"] == "actioned"
-    assert rigged.library.statuses == [("le_1", "active")]
+
+
+def test_a_choose_without_a_clip_is_a_bad_request() -> None:
+    rigged = full_rig(word_lookup(), entries={"le_1": entry_view()})
+
+    with make_review_client(rigged) as client:
+        _report(client)
+        response = client.post(
+            "/internal/review/entries/le_1/actions",
+            headers=OPERATOR,
+            json=queue_body(action="choose", chosenClip=None),
+        )
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "invalid_request"
+
+
+def test_a_retire_action_stops_the_entry_serving() -> None:
+    rigged = full_rig(word_lookup(), entries={"le_1": entry_view()})
+
+    with make_review_client(rigged) as client:
+        _report(client)
+        response = client.post(
+            "/internal/review/entries/le_1/actions",
+            headers=OPERATOR,
+            json=queue_body(action="retire", chosenClip=None),
+        )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "retired"
+    assert response.json()["state"] == "actioned"
+    assert rigged.library.statuses == [("le_1", "retired")]
 
 
 def test_an_edit_phrase_without_a_phrase_is_a_bad_request() -> None:
@@ -189,12 +221,12 @@ def test_a_stale_action_conflicts() -> None:
         client.post(
             "/internal/review/entries/le_1/actions",
             headers=OPERATOR,
-            json=queue_body(action="hold"),
+            json=queue_body(action="retire", chosenClip=None),
         )
         response = client.post(
             "/internal/review/entries/le_1/actions",
             headers=OPERATOR,
-            json=queue_body(action="clear", expectedState="queued"),
+            json=queue_body(action="choose", chosenClip="serving", expectedState="queued"),
         )
 
     assert response.status_code == 409

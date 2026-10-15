@@ -67,9 +67,13 @@ class ReviewItem:
     by itself create an item, so the queue holds exactly the entries a report or
     the threshold queued.
 
+    `candidate_requested` records that the item's one report-triggered generation
+    has been started, so a later report on the same entry reuses that candidate
+    rather than paying for a second one (FEAT-011).
+
     `state` moves the item out of `queued` when a curator acts: `actioned` for a
-    recorded decision (clear, hold, retire, replace) and `reviewed` for a phrase
-    edit, which regenerates the entry and leaves it under review.
+    recorded decision (a choice of clip or a retirement) and `reviewed` for a
+    phrase edit, which regenerates the entry and leaves it under review.
     """
 
     entry_id: str
@@ -78,6 +82,7 @@ class ReviewItem:
     created_at: str
     updated_at: str
     state: ReviewState = ReviewState.QUEUED
+    candidate_requested: bool = False
 
 
 @dataclass(frozen=True)
@@ -89,6 +94,7 @@ class ModerationActionRecord:
     report_id: str | None
     action: ModerationActionName
     actor_role: str
+    chosen_clip: str | None
     phrase: str | None
     notes: str | None
     created_at: str

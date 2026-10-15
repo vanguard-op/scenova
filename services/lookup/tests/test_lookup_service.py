@@ -702,11 +702,12 @@ async def test_a_poll_with_an_unreachable_library_keeps_generating() -> None:
     assert polled.senses[0].clip is None
 
 
-@pytest.mark.parametrize("status", [LibraryEntryStatus.HELD, LibraryEntryStatus.RETIRED])
+@pytest.mark.parametrize("status", [LibraryEntryStatus.RETIRED])
 @pytest.mark.asyncio
-async def test_a_held_or_retired_clip_is_not_served(status: LibraryEntryStatus) -> None:
-    # FEAT-006: an entry held after a report, or retired after review, is not
-    # served to new readers; a generation is requested instead.
+async def test_a_retired_clip_is_not_served(status: LibraryEntryStatus) -> None:
+    # FEAT-006: an entry retired after review is not served to new readers; a
+    # generation is requested instead. An entry under review keeps serving, so
+    # only a retired entry is a miss.
     library = InMemoryLibrary()
     library.add(
         "come",

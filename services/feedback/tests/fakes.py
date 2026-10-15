@@ -10,6 +10,7 @@ from feedback.app.api import create_app
 from feedback.app.config import Settings
 from feedback.app.library import (
     EntryMissingError,
+    LibraryClipView,
     LibraryEntryView,
     LibraryUnavailableError,
 )
@@ -58,10 +59,11 @@ class FakeLookupDirectory:
 
 
 class FakeLibrary:
-    """A library that records the entries it was asked to hold and move.
+    """A library that records the status moves, candidates, and promotions.
 
     `entries` maps an entry id to the view the review surface reads; a missing key
-    is an entry the library no longer holds.
+    is an entry the library no longer holds. `candidates` maps an entry id to the
+    candidate clip held for it.
     """
 
     def __init__(
@@ -69,21 +71,23 @@ class FakeLibrary:
         *,
         unavailable: bool = False,
         entries: dict[str, LibraryEntryView] | None = None,
+        candidates: dict[str, LibraryClipView] | None = None,
     ) -> None:
-        self.held: list[str] = []
         self.statuses: list[tuple[str, str]] = []
+        self.promotions: list[str] = []
         self.unavailable = unavailable
         self.entries: dict[str, LibraryEntryView] = dict(entries or {})
-
-    async def hold(self, entry_id: str) -> None:
-        if self.unavailable:
-            raise LibraryUnavailableError("The shared library is unreachable.")
-        self.held.append(entry_id)
+        self.candidates: dict[str, LibraryClipView] = dict(candidates or {})
 
     async def get_entry(self, entry_id: str) -> LibraryEntryView | None:
         if self.unavailable:
             raise LibraryUnavailableError("The shared library is unreachable.")
         return self.entries.get(entry_id)
+
+    async def get_candidate(self, entry_id: str) -> LibraryClipView | None:
+        if self.unavailable:
+            raise LibraryUnavailableError("The shared library is unreachable.")
+        return self.candidates.get(entry_id)
 
     async def set_status(self, entry_id: str, status: str) -> None:
         if self.unavailable:
@@ -94,16 +98,42 @@ class FakeLibrary:
         self.statuses.append((entry_id, status))
         self.entries[entry_id] = replace(current, status=status)
 
+    async def promote_candidate(self, entry_id: str) -> None:
+        if self.unavailable:
+            raise LibraryUnavailableError("The shared library is unreachable.")
+        current = self.entries.get(entry_id)
+        candidate = self.candidates.get(entry_id)
+        if current is None or candidate is None:
+            raise EntryMissingError("The shared library holds no candidate for this entry.")
+        self.promotions.append(entry_id)
+        self.entries[entry_id] = replace(current, clip=candidate)
+        self.candidates.pop(entry_id, None)
+
     async def aclose(self) -> None:
         return None
 
 
-class FakeRegeneration:
-    """A generation pipeline that records the regeneration jobs it accepted."""
+class FakePipeline:
+    """A generation pipeline that records the candidate and regeneration jobs."""
 
     def __init__(self, *, unavailable: bool = False) -> None:
-        self.calls: list[tuple[str, str | None]] = []
+        self.candidates: list[tuple[str, str | None, str]] = []
+        self.regenerations: list[tuple[str, str | None]] = []
         self.unavailable = unavailable
+
+    async def generate_candidate(
+        self,
+        *,
+        entry_id: str,
+        reader_lookup_id: str | None,
+        lemma: str,
+        sense_label: str,
+        part_of_speech: str,
+        nonce: str,
+    ) -> None:
+        if self.unavailable:
+            raise RegenerationUnavailableError("The generation pipeline is unreachable.")
+        self.candidates.append((entry_id, reader_lookup_id, nonce))
 
     async def regenerate(
         self,
@@ -116,10 +146,27 @@ class FakeRegeneration:
     ) -> None:
         if self.unavailable:
             raise RegenerationUnavailableError("The generation pipeline is unreachable.")
-        self.calls.append((entry_id, phrase))
+        self.regenerations.append((entry_id, phrase))
 
     async def aclose(self) -> None:
         return None
+
+
+def clip_view(
+    *,
+    url: str = "https://cdn.example/clip_1.mp4",
+    duration_seconds: float = 3.0,
+    resolution: str = "360p",
+    has_audio: bool = False,
+) -> LibraryClipView:
+    """A clip as the review surface reads it."""
+
+    return LibraryClipView(
+        url=url,
+        duration_seconds=duration_seconds,
+        resolution=resolution,
+        has_audio=has_audio,
+    )
 
 
 def entry_view(
@@ -144,10 +191,12 @@ def entry_view(
         part_of_speech=part_of_speech,
         gloss_phrase=gloss_phrase,
         status=status,
-        clip_url=url,
-        clip_duration_seconds=duration_seconds,
-        clip_resolution=resolution,
-        clip_has_audio=has_audio,
+        clip=clip_view(
+            url=url,
+            duration_seconds=duration_seconds,
+            resolution=resolution,
+            has_audio=has_audio,
+        ),
     )
 
 
@@ -159,6 +208,7 @@ class Rig:
     store: InMemoryFeedbackStore
     lookups: FakeLookupDirectory
     library: FakeLibrary
+    pipeline: FakePipeline
     records: dict[tuple[str, str], LookupRecord] = field(default_factory=dict)
 
 
@@ -167,18 +217,22 @@ def rig(
     *,
     lookup_unavailable: bool = False,
     library_unavailable: bool = False,
+    pipeline_unavailable: bool = False,
+    entries: dict[str, LibraryEntryView] | None = None,
     threshold: int = 3,
 ) -> Rig:
-    """Wire the service with a fake directory and library."""
+    """Wire the service with a fake directory, library, and pipeline."""
 
     resolved = dict(records or {})
     lookups = FakeLookupDirectory(resolved, unavailable=lookup_unavailable)
-    library = FakeLibrary(unavailable=library_unavailable)
+    library = FakeLibrary(unavailable=library_unavailable, entries=entries)
+    pipeline = FakePipeline(unavailable=pipeline_unavailable)
     store = InMemoryFeedbackStore()
     service = FeedbackService(
         store=store,
         lookups=lookups,
         library=library,
+        pipeline=pipeline,
         negative_feedback_threshold=threshold,
     )
     return Rig(
@@ -186,6 +240,7 @@ def rig(
         store=store,
         lookups=lookups,
         library=library,
+        pipeline=pipeline,
         records=resolved,
     )
 
@@ -288,16 +343,17 @@ class FullRig:
     store: InMemoryFeedbackStore
     lookups: FakeLookupDirectory
     library: FakeLibrary
-    regeneration: FakeRegeneration
+    pipeline: FakePipeline
 
 
 def full_rig(
     records: dict[tuple[str, str], LookupRecord] | None = None,
     *,
     entries: dict[str, LibraryEntryView] | None = None,
+    candidates: dict[str, LibraryClipView] | None = None,
     lookup_unavailable: bool = False,
     library_unavailable: bool = False,
-    regeneration_unavailable: bool = False,
+    pipeline_unavailable: bool = False,
     threshold: int = 3,
 ) -> FullRig:
     """Wire the intake and the review surface on one store.
@@ -308,22 +364,23 @@ def full_rig(
 
     store = InMemoryFeedbackStore()
     lookups = FakeLookupDirectory(dict(records or {}), unavailable=lookup_unavailable)
-    library = FakeLibrary(unavailable=library_unavailable, entries=entries)
-    regeneration = FakeRegeneration(unavailable=regeneration_unavailable)
+    library = FakeLibrary(unavailable=library_unavailable, entries=entries, candidates=candidates)
+    pipeline = FakePipeline(unavailable=pipeline_unavailable)
     service = FeedbackService(
         store=store,
         lookups=lookups,
         library=library,
+        pipeline=pipeline,
         negative_feedback_threshold=threshold,
     )
-    review = ReviewService(store=store, library=library, regeneration=regeneration)
+    review = ReviewService(store=store, library=library, regeneration=pipeline)
     return FullRig(
         service=service,
         review=review,
         store=store,
         lookups=lookups,
         library=library,
-        regeneration=regeneration,
+        pipeline=pipeline,
     )
 
 
@@ -352,7 +409,8 @@ def queue_body(**overrides: object) -> dict[str, object]:
     """A valid `actions` body, with any field overridden."""
 
     body: dict[str, object] = {
-        "action": "clear",
+        "action": "choose",
+        "chosenClip": "serving",
         "phrase": None,
         "notes": None,
         "expectedState": "queued",

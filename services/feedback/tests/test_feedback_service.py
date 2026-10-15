@@ -24,7 +24,7 @@ from feedback.app.models import (
     ReportRequest,
     ReportStatus,
 )
-from feedback.tests.fakes import SUBJECT, phrase_lookup, rig, word_lookup
+from feedback.tests.fakes import SUBJECT, entry_view, phrase_lookup, rig, word_lookup
 
 
 def _rating(
@@ -164,23 +164,28 @@ async def test_a_lookup_service_outage_reports_the_store_unavailable() -> None:
 
 
 @pytest.mark.asyncio
-async def test_a_report_queues_the_entry_and_holds_it() -> None:
-    rigged = rig(word_lookup())
+async def test_a_report_queues_the_entry_and_starts_one_candidate() -> None:
+    rigged = rig(word_lookup(), entries={"le_1": entry_view()})
 
     response = await rigged.service.record_report(_report(), SUBJECT)
 
     assert response.reportId.startswith("rp_")
-    assert response.status is ReportStatus.QUEUED
-    assert rigged.library.held == ["le_1"]
+    assert response.state is ReportStatus.QUEUED
     item = await rigged.store.queue_item("le_1")
     assert item is not None
     assert "wrong_meaning" in item.reasons
     assert item.report_ids == (response.reportId,)
+    assert item.candidate_requested is True
+    # The report starts one candidate generation for the entry, carrying the
+    # reporting reader's lookup so the fresh clip reaches them (FEAT-011).
+    assert rigged.pipeline.candidates == [("le_1", "lk_1", item.created_at)]
+    # The entry keeps serving: no status is moved on a report.
+    assert rigged.library.statuses == []
 
 
 @pytest.mark.asyncio
 async def test_a_second_report_from_one_reader_is_refused() -> None:
-    rigged = rig(word_lookup())
+    rigged = rig(word_lookup(), entries={"le_1": entry_view()})
     await rigged.service.record_report(_report(client_id="cr_1"), SUBJECT)
 
     with pytest.raises(AlreadyReportedError):
@@ -188,8 +193,11 @@ async def test_a_second_report_from_one_reader_is_refused() -> None:
 
 
 @pytest.mark.asyncio
-async def test_reports_from_two_readers_share_one_queue_item() -> None:
-    rigged = rig(word_lookup(subjects=("reader-1", "reader-2")))
+async def test_reports_from_two_readers_share_one_item_and_one_candidate() -> None:
+    rigged = rig(
+        word_lookup(subjects=("reader-1", "reader-2")),
+        entries={"le_1": entry_view()},
+    )
 
     first = await rigged.service.record_report(_report(client_id="cr_1"), "reader-1")
     second = await rigged.service.record_report(
@@ -200,24 +208,25 @@ async def test_reports_from_two_readers_share_one_queue_item() -> None:
     assert len(items) == 1
     assert set(items[0].report_ids) == {first.reportId, second.reportId}
     assert {"wrong_meaning", "offensive"} <= set(items[0].reasons)
-    assert rigged.library.held == ["le_1", "le_1"]
+    # One item, so one candidate: the second report reuses the first's (FEAT-011).
+    assert len(rigged.pipeline.candidates) == 1
 
 
 @pytest.mark.asyncio
 async def test_a_replayed_report_is_not_queued_twice() -> None:
-    rigged = rig(word_lookup())
+    rigged = rig(word_lookup(), entries={"le_1": entry_view()})
 
     first = await rigged.service.record_report(_report(), SUBJECT)
     second = await rigged.service.record_report(_report(), SUBJECT)
 
     assert second.reportId == first.reportId
     assert len(rigged.store._report_by_client) == 1
-    assert rigged.library.held == ["le_1"]
+    assert len(rigged.pipeline.candidates) == 1
 
 
 @pytest.mark.asyncio
 async def test_a_reused_report_key_with_a_different_report_conflicts() -> None:
-    rigged = rig(word_lookup())
+    rigged = rig(word_lookup(), entries={"le_1": entry_view()})
     await rigged.service.record_report(_report(), SUBJECT)
 
     with pytest.raises(ClientReportIdConflictError):
@@ -230,28 +239,33 @@ async def test_a_phrase_report_has_no_shared_effect() -> None:
 
     response = await rigged.service.record_report(_report(), SUBJECT)
 
-    assert response.status is ReportStatus.QUEUED
-    assert rigged.library.held == []
+    assert response.state is ReportStatus.QUEUED
+    assert rigged.pipeline.candidates == []
     assert await rigged.store.queue_items() == []
 
 
 @pytest.mark.asyncio
-async def test_an_unholdable_report_is_not_recorded_and_retries() -> None:
-    rigged = rig(word_lookup(), library_unavailable=True)
+async def test_a_report_survives_an_unreachable_pipeline_and_retries_the_candidate() -> None:
+    # The candidate generation is a secondary effect: an unreachable pipeline
+    # leaves the report and its queue item standing, and a later report starts
+    # the candidate that never went out (FEAT-011).
+    rigged = rig(
+        word_lookup(subjects=("reader-1", "reader-2")),
+        entries={"le_1": entry_view()},
+        pipeline_unavailable=True,
+    )
 
-    with pytest.raises(FeedbackStoreUnavailableError):
-        await rigged.service.record_report(_report(), SUBJECT)
+    response = await rigged.service.record_report(_report(client_id="cr_1"), "reader-1")
 
-    # Nothing was recorded, so the retry starts clean and completes the hold.
-    assert await rigged.store.report_for_client(SUBJECT, "cr_1") is None
-    assert await rigged.store.queue_items() == []
-
-    rigged.library.unavailable = False
-    response = await rigged.service.record_report(_report(), SUBJECT)
-
-    assert response.status is ReportStatus.QUEUED
-    assert rigged.library.held == ["le_1"]
+    assert response.state is ReportStatus.QUEUED
     assert len(await rigged.store.queue_items()) == 1
+    item = await rigged.store.queue_item("le_1")
+    assert item is not None and item.candidate_requested is False
+
+    rigged.pipeline.unavailable = False
+    await rigged.service.record_report(_report(client_id="cr_2"), "reader-2")
+
+    assert len(rigged.pipeline.candidates) == 1
 
 
 @pytest.mark.asyncio

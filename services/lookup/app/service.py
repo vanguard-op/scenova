@@ -13,9 +13,9 @@ clip the pipeline wrote to the shared library. When the pipeline cannot accept
 the job the reader still gets the word and phrase, marked as the fallback.
 
 FEAT-006 is wired here too. The shared library is read on the fast path: an
-active entry is served without a generation, a held or retired one is a miss
-whose id seeds the replacement, and an unreachable library falls back to
-generation rather than failing the reader.
+active entry is served without a generation, a retired one is a miss whose id
+seeds the replacement, and an unreachable library falls back to generation
+rather than failing the reader.
 
 FEAT-007's `enable_phrase_clip` release flag is honoured here: when it is off, a
 short phrase is not routed to the phrase path and falls back to the word path, so
@@ -96,8 +96,8 @@ class _SenseResolution:
     """One sense resolved against the shared library.
 
     ``sense`` is what the reader is served, with its clip when the library held an
-    active entry. ``regeneration_seed`` is the id of a held or retired entry the
-    miss superseded, which salts the replacement job so it is not refused as a
+    active entry. ``regeneration_seed`` is the id of a retired entry the miss
+    superseded, which salts the replacement job so it is not refused as a
     duplicate (FEAT-006).
     """
 
@@ -278,10 +278,10 @@ class LookupService:
     async def _sense(self, lemma: str, record: SenseRecord) -> _SenseResolution:
         """Resolve one sense to a served clip, a miss, and a regeneration seed.
 
-        Only an active entry is served. A held or retired entry is a miss whose
-        id seeds the replacement generation, so the retired clip is not served
-        and a new one can be produced (FEAT-006). An unreachable library is a
-        miss too: the lookup falls back to generation rather than failing.
+        Only an active entry is served. A retired entry is a miss whose id seeds
+        the replacement generation, so the retired clip is not served and a new
+        one can be produced (FEAT-006). An unreachable library is a miss too: the
+        lookup falls back to generation rather than failing.
         """
 
         try:
@@ -375,7 +375,7 @@ class LookupService:
     async def _refresh_sense(self, lemma: str, sense: Sense) -> Sense:
         """Re-resolve one sense against the library.
 
-        An already-served sense is left as it is. A held or retired entry and an
+        An already-served sense is left as it is. A retired entry and an
         unreachable library are both still a miss.
         """
 

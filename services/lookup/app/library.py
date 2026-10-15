@@ -2,7 +2,7 @@
 
 The lookup service asks the library for the entry of a sense and serves its clip
 when the entry is active. A miss is handed to the generation path. The store
-returns an entry whatever its status, so a held or retired one is a miss too: the
+returns an entry whatever its status, so a retired one is a miss too: the
 entry's id seeds the regeneration, which lets a replacement be produced even
 though the pipeline already recorded a generation for the sense key.
 
@@ -30,10 +30,13 @@ class LibraryUnavailableError(Exception):
 
 
 class LibraryEntryStatus(StrEnum):
-    """Whether an entry is served, held after a report, or retired (schema)."""
+    """Whether an entry is served or retired (schema).
+
+    An entry under review keeps serving; only a retired entry is withheld, and
+    the lookup treats it as a miss and regenerates (FEAT-006).
+    """
 
     ACTIVE = "active"
-    HELD = "held"
     RETIRED = "retired"
 
 
