@@ -4,11 +4,11 @@ Frozen interfaces between layers. The lead is the only writer. A change after `F
 change request: mark it `Frozen (revision N)` and re-dispatch both sides.
 
 ### C-001: POST /v1/lookups
-Status: Frozen (revision 3)
+Status: Frozen (revision 4)
 Auth: Firebase ID token in `Authorization` (anonymous before sign-in; upgraded to the reader's account at sign-in); rate-limited at the gateway. The caller asserts consent; generation is refused when consent is absent.
-Request: selection: string (raw selected text, trimmed, at most six words), clientLookupId: string (idempotency key), platform: android|ios, locale: string, consentModelProcessing: boolean
+Request: selection: string (raw selected text, trimmed, at most six words and at most 80 characters), clientLookupId: string (idempotency key), platform: android|ios, locale: string, consentModelProcessing: boolean
 Response 200: lookupId: string, kind: word|phrase, rawSelection: string, normalisedLemma: string|null, status: served|generating|fallback|denied|empty (a phrase lookup is never `served`; a phrase clip reaches the client by C-008's notice, never on this response), senses: [{ senseLabel: string, partOfSpeech: string, glossPhrase: string, entryId: string|null, clip: { url: string, durationSeconds: number, resolution: "360p", hasAudio: boolean }|null }], notice: string|null, allowance: { used: integer, limit: integer, periodEnd: string }|null (null for a reader who is not signed in, whose allowance is device-local), correlationId: string
-Errors: 400 (empty or whitespace selection; selection over the six-word phrase limit), 401 (missing or invalid token), 409 (clientLookupId reused with a different selection), 429 (rate limited), 503 (upstream lookup unavailable; retryable)
+Errors: 400 (empty or whitespace selection; selection over the six-word phrase limit or over the 80-character bound), 401 (missing or invalid token), 409 (clientLookupId reused with a different selection), 429 (rate limited), 503 (upstream lookup unavailable; retryable)
 Body: error responses are `{"code": string, "message": string}`. `notice` carries a clip-availability advisory; `senseLabel` is a plain human label and is not a signal. A signed-in reader's lookup spends one unit of their monthly allowance whether it is served or generated; when the allowance is spent the lookup resolves to `fallback` with the word and phrase and no clip, and `allowance.used` equals `allowance.limit`. A reader who is not signed in is metered on the device and never carries an allowance here.
 
 ### C-002: GET /v1/lookups/{lookupId}
