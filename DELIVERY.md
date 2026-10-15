@@ -99,7 +99,7 @@ docs/           BPRD (product-shaper)
 | T-105 | — | backend-engineer | Done | — |
 | T-106 | FEAT-008, FEAT-011 | backend-engineer | Done | C-008 |
 | T-107 | FEAT-015 | frontend-engineer | Done | — |
-| T-109 | FEAT-015 | backend-engineer | In Progress | C-016 |
+| T-109 | FEAT-015 | backend-engineer | Done | C-016 |
 | T-108 | FEAT-009, FEAT-010, FEAT-011, FEAT-015 | qa-engineer | Done | C-003, C-008, C-009, C-010, C-011, C-013, C-014, C-015, C-016, C-017 |
 
 ## Decisions Log
