@@ -369,6 +369,58 @@ void main() {
     });
   });
 
+  group('ScenovaButton — disabled tint', () {
+    // The button table reduces a disabled control's background to its own
+    // family's tinted shade. A destructive control must keep the error tint,
+    // not borrow the primary one, in both themes.
+    for (final brightness in Brightness.values) {
+      final colors = ScenovaColors.resolve(brightness);
+      testWidgets('a disabled Destructive keeps the error tint ($brightness)', (
+        tester,
+      ) async {
+        await pumpThemed(
+          tester,
+          ScenovaButton(
+            label: 'Retire',
+            variant: ScenovaButtonVariant.destructive,
+            onPressed: null,
+          ),
+          brightness: brightness,
+        );
+
+        final material = tester.widget<Material>(
+          find
+              .descendant(
+                of: find.byType(ScenovaButton),
+                matching: find.byType(Material),
+              )
+              .first,
+        );
+        expect(material.color, colors.error.tint);
+        expect(material.color, isNot(colors.primaryTint));
+
+        await pumpThemed(
+          tester,
+          ScenovaButton(
+            label: 'Retire',
+            variant: ScenovaButtonVariant.primary,
+            onPressed: null,
+          ),
+          brightness: brightness,
+        );
+        final primary = tester.widget<Material>(
+          find
+              .descendant(
+                of: find.byType(ScenovaButton),
+                matching: find.byType(Material),
+              )
+              .first,
+        );
+        expect(primary.color, colors.primaryTint);
+      });
+    }
+  });
+
   group('ScenovaButton — solid contrast', () {
     // The button table gives both solid variants the `on-solid` ink; the
     // accessibility target holds the label to 4.5:1 in both themes. This reads

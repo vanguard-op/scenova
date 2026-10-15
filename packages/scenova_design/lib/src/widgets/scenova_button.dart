@@ -14,10 +14,11 @@ enum ScenovaButtonVariant { primary, secondary, outline, ghost, destructive }
 ///
 /// The component tokens fix the background, text, border, radius, height, and
 /// padding per variant; pressed states move to the adjacent darker shade and
-/// disabled states drop to the tinted shade. A focused control draws the brand
-/// focus ring, and its height is the token scale's control height for the
-/// device class, so a reader's control meets the 44px minimum touch target and
-/// the console's stays above the 24px minimum pointer target.
+/// disabled states drop to the variant's own family's tinted shade. A focused
+/// control draws the brand focus ring, and its height is the token scale's
+/// control height for the device class, so a reader's control meets the 44px
+/// minimum touch target and the console's stays above the 24px minimum pointer
+/// target.
 class ScenovaButton extends StatefulWidget {
   const ScenovaButton({
     super.key,
@@ -231,8 +232,10 @@ class _VariantPalette {
     if (!enabled) {
       return _VariantPalette(
         background: switch (variant) {
-          ScenovaButtonVariant.primary ||
-          ScenovaButtonVariant.destructive => colors.primaryTint,
+          // Each variant drops to its own family's tinted shade; a destructive
+          // control keeps the error tint rather than borrowing the primary one.
+          ScenovaButtonVariant.primary => colors.primaryTint,
+          ScenovaButtonVariant.destructive => colors.error.tint,
           ScenovaButtonVariant.secondary => colors.surfaceSecondary,
           ScenovaButtonVariant.outline ||
           ScenovaButtonVariant.ghost => ScenovaPalette.transparent,
