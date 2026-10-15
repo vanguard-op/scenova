@@ -144,3 +144,11 @@ Auth: Firebase ID token belonging to the reader's account
 Request: consentModelProcessing: boolean|null, locale: string|null (at least one)
 Response 200: consentModelProcessing: boolean, locale: string
 Errors: 400 (no field given; an unknown locale), 401 (missing or invalid token, or a token with no account), 503 (account store unavailable). The consent choice is stored on the account and follows the reader to a new device; before sign-in it is held on the device alone.
+
+### C-021: DELETE /v1/account
+Status: Frozen
+Auth: Firebase ID token belonging to the reader's account
+Request: none
+Response 202: deleted: boolean
+Errors: 401 (missing or invalid token, or a token with no account), 503 (account store unavailable). The account and its entitlement are removed and the reader's personal data is deleted within the documented window; the shared library is unchanged; an active store subscription is not cancelled by the product, so the reader is told to cancel it in the store. After deletion the token's subject has no account: the client signs out and clears the device history.
+
