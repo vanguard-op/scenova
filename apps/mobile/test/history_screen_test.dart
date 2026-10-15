@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,7 +8,9 @@ import 'package:scenova/screens/clip_view_screen.dart';
 import 'package:scenova/services/feature_flags.dart';
 import 'package:scenova/services/history_store.dart';
 import 'package:scenova/services/lookup_api.dart';
+import 'package:scenova/services/poster_frame_store.dart';
 import 'package:scenova/widgets/app_icons.dart';
+import 'package:scenova/widgets/clip_still_frame.dart';
 import 'package:scenova/widgets/offline_banner.dart';
 import 'package:scenova/widgets/skeleton.dart';
 import 'package:scenova/widgets/states.dart';
@@ -98,6 +101,101 @@ void main() {
     await teardown(tester);
   });
 
+  testWidgets('a row draws the poster frame kept with its entry', (
+    tester,
+  ) async {
+    await pumpHistory(
+      tester,
+      posterFrames: InMemoryPosterFrameStore(
+        seed: <String, Uint8List>{'poster-come': testPosterFrame()},
+      ),
+      history: InMemoryHistoryStore(
+        seed: <HistoryEntry>[
+          seededEntry(
+            word: 'come',
+            phrase: 'to arrive',
+            clipUrl: 'https://clips.example/come.mp4',
+            posterLocalKey: 'poster-come',
+          ),
+        ],
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byType(Image), findsOneWidget);
+    expect(find.byType(ClipStillFrame), findsNothing);
+    await teardown(tester);
+  });
+
+  testWidgets(
+    'a row shows the still-frame stand-in when no frame was derived',
+    (tester) async {
+      await pumpHistory(
+        tester,
+        history: InMemoryHistoryStore(
+          seed: <HistoryEntry>[
+            seededEntry(
+              word: 'come',
+              phrase: 'to arrive',
+              clipUrl: 'https://clips.example/come.mp4',
+            ),
+          ],
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byType(ClipStillFrame), findsOneWidget);
+      expect(find.byType(Image), findsNothing);
+      await teardown(tester);
+    },
+  );
+
+  testWidgets('an entry with no clip shows the same still-frame stand-in', (
+    tester,
+  ) async {
+    await pumpHistory(
+      tester,
+      history: InMemoryHistoryStore(
+        seed: <HistoryEntry>[seededEntry(word: 'come', phrase: 'to arrive')],
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byType(ClipStillFrame), findsOneWidget);
+    await teardown(tester);
+  });
+
+  testWidgets('frames for entries the device no longer keeps are swept', (
+    tester,
+  ) async {
+    final posters = InMemoryPosterFrameStore(
+      seed: <String, Uint8List>{
+        'poster-come': testPosterFrame(),
+        'poster-gone': testPosterFrame(),
+      },
+    );
+    await pumpHistory(
+      tester,
+      posterFrames: posters,
+      history: InMemoryHistoryStore(
+        seed: <HistoryEntry>[
+          seededEntry(
+            word: 'come',
+            phrase: 'to arrive',
+            clipUrl: 'https://clips.example/come.mp4',
+            posterLocalKey: 'poster-come',
+          ),
+        ],
+      ),
+    );
+    await tester.pump();
+
+    expect(await posters.frame('poster-come'), isNotNull);
+    expect(await posters.frame('poster-gone'), isNull);
+    await teardown(tester);
+  });
+
   testWidgets('a long word truncates to two lines', (tester) async {
     const long = 'antidisestablishmentarianismcontinuingonandonandon';
     await pumpHistory(
@@ -181,6 +279,35 @@ void main() {
     await teardown(tester);
   });
 
+  testWidgets('removing an entry deletes its poster frame', (tester) async {
+    final posters = InMemoryPosterFrameStore(
+      seed: <String, Uint8List>{'poster-come': testPosterFrame()},
+    );
+    await pumpHistory(
+      tester,
+      posterFrames: posters,
+      history: InMemoryHistoryStore(
+        seed: <HistoryEntry>[
+          seededEntry(
+            word: 'come',
+            phrase: 'to arrive',
+            clipUrl: 'https://clips.example/come.mp4',
+            posterLocalKey: 'poster-come',
+          ),
+        ],
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.byTooltip('Remove come'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Remove'));
+    await tester.pumpAndSettle();
+
+    expect(await posters.frame('poster-come'), isNull);
+    await teardown(tester);
+  });
+
   testWidgets('keeping a lookup leaves it in the list', (tester) async {
     final store = InMemoryHistoryStore(
       seed: <HistoryEntry>[seededEntry(word: 'come', phrase: 'to arrive')],
@@ -222,6 +349,43 @@ void main() {
 
     expect(find.byType(EmptyState), findsOneWidget);
     expect(await store.all(), isEmpty);
+    await teardown(tester);
+  });
+
+  testWidgets('clearing history deletes every poster frame', (tester) async {
+    final posters = InMemoryPosterFrameStore(
+      seed: <String, Uint8List>{
+        'poster-come': testPosterFrame(),
+        'poster-bank': testPosterFrame(),
+      },
+    );
+    final store = InMemoryHistoryStore(
+      seed: <HistoryEntry>[
+        seededEntry(
+          word: 'come',
+          phrase: 'to arrive',
+          clipUrl: 'https://clips.example/come.mp4',
+          posterLocalKey: 'poster-come',
+        ),
+        seededEntry(
+          word: 'bank',
+          phrase: 'a place for money',
+          clipUrl: 'https://clips.example/bank.mp4',
+          posterLocalKey: 'poster-bank',
+        ),
+      ],
+      storageFull: true,
+    );
+    await pumpHistory(tester, history: store, posterFrames: posters);
+    await tester.pump();
+
+    await tester.tap(find.text('Clear history'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Clear'));
+    await tester.pumpAndSettle();
+
+    expect(await posters.frame('poster-come'), isNull);
+    expect(await posters.frame('poster-bank'), isNull);
     await teardown(tester);
   });
 

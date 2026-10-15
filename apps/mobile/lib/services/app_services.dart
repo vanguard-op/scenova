@@ -18,6 +18,7 @@ import 'feedback_store.dart';
 import 'history_store.dart';
 import 'identity.dart';
 import 'lookup_api.dart';
+import 'poster_frame_store.dart';
 import 'push_registration_api.dart';
 import 'push_registrar.dart';
 import 'push_tokens.dart';
@@ -47,6 +48,7 @@ class ScenovaServices {
     required this.featureFlags,
     required this.feedbackOutbox,
     required this.reportOutbox,
+    required this.posterFrames,
     this.locale = 'en',
   });
 
@@ -87,6 +89,10 @@ class ScenovaServices {
   /// connection returns (`C-013`, `FEAT-011`).
   final ReportOutbox reportOutbox;
 
+  /// The poster frames kept beside the device history, one per saved lookup
+  /// (`FEAT-009`). The History row draws its thumbnail from here.
+  final PosterFrameStore posterFrames;
+
   /// The reader's locale, sent with a lookup.
   final String locale;
 
@@ -101,6 +107,7 @@ class ScenovaServices {
     FeatureFlags? featureFlags,
     PendingFeedbackStore? feedbackStore,
     PendingReportStore? reportStore,
+    PosterFrameStore? posterFrames,
   }) {
     // The live intakes carry reader input over the network, so the gateway must
     // be reached over TLS (`NFR-022`). A build that points at a plaintext remote
@@ -208,6 +215,7 @@ class ScenovaServices {
         store: reportStore ?? SharedPreferencesPendingReportStore(),
         connectivity: connectivity,
       ),
+      posterFrames: posterFrames ?? DevicePosterFrameStore(),
       locale: locale,
     );
   }

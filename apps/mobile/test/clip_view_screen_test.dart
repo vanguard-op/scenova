@@ -14,6 +14,7 @@ import 'package:scenova/services/clip_notice_source.dart';
 import 'package:scenova/services/feature_flags.dart';
 import 'package:scenova/services/history_store.dart';
 import 'package:scenova/services/lookup_api.dart';
+import 'package:scenova/services/poster_frame_store.dart';
 import 'package:scenova/services/push_registration_api.dart';
 import 'package:scenova/services/push_tokens.dart';
 import 'package:scenova/services/settings_controller.dart';
@@ -97,6 +98,44 @@ void main() {
 
     final saved = await services.historyStore.all();
     expect(saved.single.word, 'come');
+    await teardown(tester);
+  });
+
+  testWidgets('a lookup that resolves keeps a poster frame with its entry', (
+    tester,
+  ) async {
+    final posters = InMemoryPosterFrameStore(
+      onCapture: (clipUrl) async => testPosterFrame(),
+    );
+    final services = buildServices(api: MockLookupApi(), posterFrames: posters);
+    final controller = controllerFor(services, 'come');
+    addTearDown(controller.dispose);
+
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+    await tester.pump();
+
+    final saved = (await services.historyStore.all()).single;
+    // The frame is derived as the entry is stored and keyed to it (`FEAT-009`).
+    expect(saved.posterLocalKey, saved.id);
+    expect(await posters.frame(saved.id), isNotNull);
+    await teardown(tester);
+  });
+
+  testWidgets('a frame that cannot be derived leaves the entry without one', (
+    tester,
+  ) async {
+    // The default in-memory store derives nothing, as a clip the platform
+    // cannot read does not.
+    final services = buildServices(api: MockLookupApi());
+    final controller = controllerFor(services, 'come');
+    addTearDown(controller.dispose);
+
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+    await tester.pump();
+
+    expect((await services.historyStore.all()).single.posterLocalKey, isNull);
     await teardown(tester);
   });
 

@@ -870,9 +870,32 @@ class ClipViewController extends ChangeNotifier {
     // never resolves to served, and its clip is the reader's to keep
     // (`FEAT-007`).
     if (result.status != LookupStatus.served && (sense?.clip == null)) return;
-    await services.historyStore.save(
-      historyEntryFrom(result, savedAt: DateTime.now(), sense: sense),
+    // The entry is stored first, so the reader's lookup is durable before the
+    // frame is derived from the clip; the frame is added beside it after.
+    final entry = historyEntryFrom(
+      result,
+      savedAt: DateTime.now(),
+      sense: sense,
     );
+    await services.historyStore.save(entry);
+    await _keepPoster(entry);
+  }
+
+  /// Derives the poster frame for [entry] and keeps it with the stored entry.
+  ///
+  /// The frame is derived from the clip and kept beside the entry on the device
+  /// (`FEAT-009`), so the History row draws it without opening the clip. A clip
+  /// the platform cannot read keeps no frame, and the row falls back to the
+  /// shared still-frame stand-in.
+  Future<void> _keepPoster(HistoryEntry entry) async {
+    final clipUrl = entry.clipUrl;
+    if (clipUrl == null) return;
+    final key = await services.posterFrames.capture(
+      clipUrl: clipUrl,
+      key: entry.id,
+    );
+    if (key == null) return;
+    await services.historyStore.save(entry.copyWith(posterLocalKey: key));
   }
 
   String _clientLookupId() =>

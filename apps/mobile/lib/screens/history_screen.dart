@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
@@ -6,11 +7,12 @@ import '../app_router.dart';
 import '../models/history_entry.dart';
 import '../services/app_services.dart';
 import '../services/history_store.dart';
+import '../services/poster_frame_store.dart';
 import '../theme/colors.dart';
 import '../theme/tokens.dart';
 import '../theme/typography.dart';
 import '../widgets/app_icons.dart';
-import '../widgets/brand_mark.dart';
+import '../widgets/clip_still_frame.dart';
 import '../widgets/offline_banner.dart';
 import '../widgets/scenova_button.dart';
 import '../widgets/skeleton.dart';
@@ -84,6 +86,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     try {
       final entries = await _scope.historyStore.all();
       final storage = await _scope.historyStore.storageState();
+      await _prunePosters(entries);
       if (!mounted) return;
       setState(() {
         _entries = entries;
@@ -95,6 +98,21 @@ class _HistoryScreenState extends State<HistoryScreen> {
     } on Object {
       if (!mounted) return;
       setState(() => _status = _HistoryStatus.error);
+    }
+  }
+
+  /// Drops the poster frames of entries the device no longer keeps.
+  ///
+  /// History keeps only the most recent lookups, so an entry that drops off
+  /// must not leave its frame behind. A sweep that fails costs the reader
+  /// nothing, so it never surfaces as an error.
+  Future<void> _prunePosters(List<HistoryEntry> entries) async {
+    try {
+      await _scope.posterFrames.pruneTo(
+        entries.map((entry) => entry.posterLocalKey).whereType<String>(),
+      );
+    } on Object {
+      // The frames stay until the next sweep.
     }
   }
 
@@ -139,6 +157,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       _showMessage('That lookup could not be removed. Try again.');
       return;
     }
+    await _removePoster(entry);
     if (!mounted) return;
     setState(() {
       _deletingId = null;
@@ -147,6 +166,21 @@ class _HistoryScreenState extends State<HistoryScreen> {
           .toList(growable: false);
       if (_entries.isEmpty) _status = _HistoryStatus.empty;
     });
+  }
+
+  /// Deletes the frame kept for [entry], best-effort.
+  ///
+  /// The entry is already gone from the list, so a frame the device refuses to
+  /// delete is swept on the next load rather than surfacing as an error
+  /// (`FEAT-009` → "the item and its clip are deleted from the device").
+  Future<void> _removePoster(HistoryEntry entry) async {
+    final key = entry.posterLocalKey;
+    if (key == null) return;
+    try {
+      await _scope.posterFrames.remove(key);
+    } on Object {
+      // The frame is swept when history is next loaded.
+    }
   }
 
   Future<void> _confirmClearHistory() async {
@@ -161,6 +195,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     if (!confirmed) return;
     try {
       await _scope.historyStore.clear();
+      await _scope.posterFrames.clear();
     } on Object {
       if (!mounted) return;
       _showMessage('History could not be cleared. Try again.');
@@ -353,6 +388,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
             final entry = visible[index];
             return _HistoryRow(
               entry: entry,
+              posters: _scope.posterFrames,
               deleting: entry.id == _deletingId,
               onOpen: () => widget.router.openSavedLookup(entry),
               onRemove: () => _confirmRemove(entry),
@@ -367,12 +403,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
 class _HistoryRow extends StatelessWidget {
   const _HistoryRow({
     required this.entry,
+    required this.posters,
     required this.deleting,
     required this.onOpen,
     required this.onRemove,
   });
 
   final HistoryEntry entry;
+
+  /// The device's poster frames, which the thumbnail draws from.
+  final PosterFrameStore posters;
+
   final bool deleting;
   final VoidCallback onOpen;
   final VoidCallback onRemove;
@@ -402,7 +443,7 @@ class _HistoryRow extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                _Thumbnail(entry: entry),
+                _Thumbnail(entry: entry, posters: posters),
                 SizedBox(width: tokens.spacing.md),
                 Expanded(
                   child: Column(
@@ -458,41 +499,80 @@ class _HistoryRow extends StatelessWidget {
   }
 }
 
-/// A frame of the clip.
+/// The saved clip's poster frame, or the shared still-frame stand-in.
 ///
-/// The clip is a video and the device holds its 360p source rather than a
-/// still, so the frame is drawn as the shared poster — the brand mark on the
-/// primary tint — the same stand-in the Clip Player uses when it has no frame
-/// to draw. A saved lookup with no clip shows the muted mark instead.
-class _Thumbnail extends StatelessWidget {
-  const _Thumbnail({required this.entry});
+/// The frame is derived from the clip when the lookup is saved and kept on the
+/// device under the entry's key (`FEAT-009`), so the row shows the lookup at a
+/// glance without opening the clip. When the entry has no frame — no clip, or a
+/// frame that could not be derived — the row shows the same still-frame stand-in
+/// the shared Clip Player uses (`docs/Scenova/screens/06-history.md` → Edge
+/// Cases).
+class _Thumbnail extends StatefulWidget {
+  const _Thumbnail({required this.entry, required this.posters});
 
   final HistoryEntry entry;
+  final PosterFrameStore posters;
+
+  @override
+  State<_Thumbnail> createState() => _ThumbnailState();
+}
+
+class _ThumbnailState extends State<_Thumbnail> {
+  Uint8List? _frame;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFrame();
+  }
+
+  @override
+  void didUpdateWidget(_Thumbnail oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.entry.posterLocalKey != oldWidget.entry.posterLocalKey) {
+      _loadFrame();
+    }
+  }
+
+  Future<void> _loadFrame() async {
+    final key = widget.entry.posterLocalKey;
+    if (key == null) {
+      if (_frame != null) setState(() => _frame = null);
+      return;
+    }
+    final frame = await widget.posters.frame(key);
+    if (!mounted) return;
+    setState(() => _frame = frame);
+  }
+
+  /// What the frame is, for a reader who cannot see it.
+  String get _label {
+    if (_frame != null) return 'Poster frame for ${widget.entry.word}';
+    if (widget.entry.hasClip) return 'Clip for ${widget.entry.word}';
+    return 'No clip saved for ${widget.entry.word}';
+  }
 
   @override
   Widget build(BuildContext context) {
-    final colors = ScenovaColors.of(context);
     final tokens = ScenovaTokens.of(context);
     // The frame is sized from the icon scale, composed to the clip's 16:9.
     final width = tokens.sizing.iconLg * 3;
-    final hasClip = entry.hasClip;
+    final frame = _frame;
 
     return Semantics(
       image: true,
-      label: hasClip
-          ? 'Clip for ${entry.word}'
-          : 'No clip saved for ${entry.word}',
-      child: Container(
+      label: _label,
+      child: SizedBox(
         width: width,
         height: width * 9 / 16,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: hasClip ? colors.primaryTint : colors.surfaceSecondary,
+        child: ClipRRect(
           borderRadius: BorderRadius.circular(ScenovaRadius.md),
-        ),
-        child: BrandMark(
-          size: tokens.sizing.iconSm,
-          color: hasClip ? colors.primaryDeep : colors.iconDisabled,
+          child: frame == null
+              ? ClipStillFrame(
+                  markSize: tokens.sizing.iconSm,
+                  padding: EdgeInsets.zero,
+                )
+              : Image.memory(frame, fit: BoxFit.cover),
         ),
       ),
     );

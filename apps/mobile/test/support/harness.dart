@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -27,6 +28,7 @@ import 'package:scenova/services/feedback_store.dart';
 import 'package:scenova/services/history_store.dart';
 import 'package:scenova/services/identity.dart';
 import 'package:scenova/services/lookup_api.dart';
+import 'package:scenova/services/poster_frame_store.dart';
 import 'package:scenova/services/push_registration_api.dart';
 import 'package:scenova/services/push_registrar.dart';
 import 'package:scenova/services/push_tokens.dart';
@@ -56,6 +58,7 @@ ScenovaServices buildServices({
   PendingFeedbackStore? feedbackStore,
   ReportApi? reportApi,
   PendingReportStore? reportStore,
+  PosterFrameStore? posterFrames,
   String locale = 'en',
 }) {
   final connectivity = ManualConnectivity(online: online);
@@ -98,6 +101,7 @@ ScenovaServices buildServices({
       store: reportStore ?? InMemoryPendingReportStore(),
       connectivity: connectivity,
     ),
+    posterFrames: posterFrames ?? InMemoryPosterFrameStore(),
     locale: locale,
   );
 }
@@ -187,6 +191,7 @@ Future<Harness> pumpHistory(
   WidgetTester tester, {
   LookupApi? api,
   HistoryStore? history,
+  PosterFrameStore? posterFrames,
   bool online = true,
   FeatureFlags? featureFlags,
 }) async {
@@ -194,6 +199,7 @@ Future<Harness> pumpHistory(
   final services = buildServices(
     api: api,
     history: history,
+    posterFrames: posterFrames,
     online: online,
     featureFlags: featureFlags,
   );
@@ -466,11 +472,18 @@ class RecordingLookupApi implements LookupApi {
       delegate.getLookup(lookupId);
 }
 
+/// A tiny valid image standing in for a poster frame the device derived, so a
+/// test can view the row's poster path.
+Uint8List testPosterFrame() => base64Decode(
+  'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR42mOM8T7CwMDAxMDAwMDAAAAQxgFvBQ8kxwAAAABJRU5ErkJggg==',
+);
+
 /// A saved lookup, for seeding history.
 HistoryEntry seededEntry({
   required String word,
   required String phrase,
   String? clipUrl,
+  String? posterLocalKey,
   bool hasAudio = false,
   LookupKind kind = LookupKind.word,
   Duration age = const Duration(minutes: 1),
@@ -483,6 +496,7 @@ HistoryEntry seededEntry({
     kind: kind,
     savedAt: DateTime.now().subtract(age),
     clipUrl: clipUrl,
+    posterLocalKey: posterLocalKey,
     hasAudio: hasAudio,
     lookupId: lookupId,
   );

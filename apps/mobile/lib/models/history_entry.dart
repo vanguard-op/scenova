@@ -5,8 +5,8 @@ import 'lookup.dart';
 /// A lookup kept on the device.
 ///
 /// Device history lives only on the device (`docs/Scenova/nfr.md` → "Data
-/// lifecycle") and carries the word, its gloss phrase, and the clip when one
-/// was saved.
+/// lifecycle") and carries the word, its gloss phrase, the clip when one was
+/// saved, and the poster frame derived from that clip.
 @immutable
 class HistoryEntry {
   const HistoryEntry({
@@ -16,6 +16,7 @@ class HistoryEntry {
     required this.kind,
     required this.savedAt,
     this.clipUrl,
+    this.posterLocalKey,
     this.hasAudio = false,
     this.lookupId,
   });
@@ -26,6 +27,15 @@ class HistoryEntry {
   final LookupKind kind;
   final DateTime savedAt;
   final String? clipUrl;
+
+  /// The key of the poster frame derived from the saved clip, in the device
+  /// store; null when no frame could be derived (`FEAT-009`).
+  ///
+  /// The frame is kept with the entry so the History row can show the lookup at
+  /// a glance, and the row falls back to the shared still-frame stand-in when
+  /// this is null.
+  final String? posterLocalKey;
+
   final bool hasAudio;
 
   /// The service's id for the lookup this entry was saved from, when it had one.
@@ -52,6 +62,7 @@ class HistoryEntry {
           DateTime.tryParse(json['savedAt'] as String? ?? '')?.toLocal() ??
           DateTime.fromMillisecondsSinceEpoch(0),
       clipUrl: json['clipUrl'] as String?,
+      posterLocalKey: json['posterLocalKey'] as String?,
       hasAudio: json['hasAudio'] as bool? ?? false,
       lookupId: json['lookupId'] as String?,
     );
@@ -64,6 +75,7 @@ class HistoryEntry {
     'kind': kind.wire,
     'savedAt': savedAt.toUtc().toIso8601String(),
     'clipUrl': clipUrl,
+    'posterLocalKey': posterLocalKey,
     'hasAudio': hasAudio,
     'lookupId': lookupId,
   };
@@ -74,6 +86,7 @@ class HistoryEntry {
     LookupKind? kind,
     DateTime? savedAt,
     String? clipUrl,
+    String? posterLocalKey,
     bool? hasAudio,
     String? lookupId,
   }) {
@@ -84,6 +97,7 @@ class HistoryEntry {
       kind: kind ?? this.kind,
       savedAt: savedAt ?? this.savedAt,
       clipUrl: clipUrl ?? this.clipUrl,
+      posterLocalKey: posterLocalKey ?? this.posterLocalKey,
       hasAudio: hasAudio ?? this.hasAudio,
       lookupId: lookupId ?? this.lookupId,
     );

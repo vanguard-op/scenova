@@ -27,6 +27,7 @@ void main() {
     expect(relaunched.single.phrase, 'to move towards someone');
     expect(relaunched.single.kind, LookupKind.word);
     expect(relaunched.single.clipUrl, 'https://clips.example/come.mp4');
+    expect(relaunched.single.posterLocalKey, 'poster-come');
     expect(relaunched.single.hasAudio, isTrue);
   });
 
@@ -135,6 +136,7 @@ HistoryEntry _entry({
     kind: LookupKind.word,
     savedAt: DateTime.now().subtract(age),
     clipUrl: 'https://clips.example/$word.mp4',
+    posterLocalKey: 'poster-$word',
     hasAudio: true,
   );
 }

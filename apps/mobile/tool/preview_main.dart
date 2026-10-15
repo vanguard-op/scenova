@@ -5,6 +5,8 @@
 // `?device=tablet` for the tablet device class. Built with `flutter build web -t tool/preview_main.dart`; this is tooling, never
 // shipped.
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:scenova/app_router.dart';
@@ -15,6 +17,7 @@ import 'package:scenova/models/history_entry.dart';
 import 'package:scenova/models/lookup.dart';
 import 'package:scenova/screens/clip_controller.dart';
 import 'package:scenova/screens/clip_view_screen.dart';
+import 'package:scenova/screens/history_screen.dart';
 import 'package:scenova/screens/home_screen.dart';
 import 'package:scenova/screens/onboarding_screen.dart';
 import 'package:scenova/services/analytics.dart';
@@ -33,6 +36,7 @@ import 'package:scenova/services/feedback_store.dart';
 import 'package:scenova/services/history_store.dart';
 import 'package:scenova/services/identity.dart';
 import 'package:scenova/services/lookup_api.dart';
+import 'package:scenova/services/poster_frame_store.dart';
 import 'package:scenova/services/push_registration_api.dart';
 import 'package:scenova/services/push_registrar.dart';
 import 'package:scenova/services/push_tokens.dart';
@@ -177,6 +181,16 @@ List<(String, Widget)> _frames() {
         settings: SettingsController()..actionEnabled = false,
       ),
     ),
+    (
+      'History — loaded (poster frames kept)',
+      _history(history: _savedLookups(), posters: _posterFrames()),
+    ),
+    (
+      'History — poster frame could not be derived',
+      _history(history: _savedLookups()),
+    ),
+    ('History — empty', _history(history: const <HistoryEntry>[])),
+    ('History — offline', _history(history: _savedLookups(), online: false)),
     ('Clip — serving from library (playing)', _clip('come')),
     ('Clip — sense choice', _clip('bank')),
     ('Clip — rating noted', _clip('come', rating: ClipRating.helpful)),
@@ -345,6 +359,62 @@ Widget _home({
   );
 }
 
+/// The History screen, with the poster frames the device keeps.
+Widget _history({
+  required List<HistoryEntry> history,
+  bool online = true,
+  PosterFrameStore? posters,
+}) {
+  final services = _services(
+    history: history,
+    online: online,
+    posterFrames: posters,
+  );
+  return ScenovaScope(
+    services: services,
+    child: HistoryScreen(router: AppRouter(services: services)),
+  );
+}
+
+/// Two saved lookups for the History frames.
+///
+/// The first carries the poster frame a device derived from its clip; the
+/// second carries none, so the row falls back to the shared still-frame
+/// stand-in (`FEAT-009` → Edge Cases).
+List<HistoryEntry> _savedLookups() {
+  final now = DateTime.now();
+  return <HistoryEntry>[
+    HistoryEntry(
+      id: 'come-1',
+      word: 'come',
+      phrase: 'to move towards someone or something',
+      kind: LookupKind.word,
+      savedAt: now.subtract(const Duration(minutes: 6)),
+      clipUrl: 'https://clips.example/come.mp4',
+      posterLocalKey: 'come-1',
+    ),
+    HistoryEntry(
+      id: 'bank-1',
+      word: 'bank',
+      phrase: 'a place that keeps money safe',
+      kind: LookupKind.word,
+      savedAt: now.subtract(const Duration(hours: 2)),
+      clipUrl: 'https://clips.example/bank.mp4',
+    ),
+  ];
+}
+
+/// The poster frames the History frames draw, keyed by the entry that owns
+/// them. Tooling only: a device derives its own from the clip.
+PosterFrameStore _posterFrames() => InMemoryPosterFrameStore(
+  seed: <String, Uint8List>{'come-1': base64Decode(_posterFrameJpeg)},
+);
+
+/// A small still standing in for a frame derived from a clip, so the poster
+/// path can be looked at without a device. Tooling only.
+const String _posterFrameJpeg =
+    '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';
+
 Widget _clip(
   String selection, {
   LookupApi? api,
@@ -475,6 +545,7 @@ ScenovaServices _services({
   PendingFeedbackStore? feedbackStore,
   ReportApi? reportApi,
   PendingReportStore? reportStore,
+  PosterFrameStore? posterFrames,
 }) {
   final connectivity = ManualConnectivity(online: online);
   final settingsController = settings ?? SettingsController();
@@ -514,6 +585,7 @@ ScenovaServices _services({
       store: reportStore ?? InMemoryPendingReportStore(),
       connectivity: connectivity,
     ),
+    posterFrames: posterFrames ?? InMemoryPosterFrameStore(),
     locale: 'en-GB',
   );
 }

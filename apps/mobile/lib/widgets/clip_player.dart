@@ -9,7 +9,7 @@ import '../theme/colors.dart';
 import '../theme/tokens.dart';
 import '../theme/typography.dart';
 import 'app_icons.dart';
-import 'brand_mark.dart';
+import 'clip_still_frame.dart';
 import 'scenova_button.dart';
 
 /// What the clip surface is doing.
@@ -321,7 +321,7 @@ class _ClipPlayerState extends State<ClipPlayer>
                 onRetry: _retryVideo,
               )
             else
-              Center(child: _poster(context)),
+              const Center(child: ClipStillFrame()),
             if (showPlayAffordance && !_videoFailed)
               Center(
                 child: AppIconView(
@@ -402,19 +402,6 @@ class _ClipPlayerState extends State<ClipPlayer>
         borderRadius: BorderRadius.circular(ScenovaRadius.sm),
       ),
       child: child,
-    );
-  }
-
-  Widget _poster(BuildContext context) {
-    final colors = ScenovaColors.of(context);
-    final tokens = ScenovaTokens.of(context);
-    return Container(
-      padding: EdgeInsets.all(tokens.spacing.md),
-      decoration: BoxDecoration(
-        color: colors.primaryTint,
-        borderRadius: BorderRadius.circular(ScenovaRadius.md),
-      ),
-      child: BrandMark(size: tokens.sizing.iconLg),
     );
   }
 
