@@ -120,13 +120,13 @@ BARS: tuple[Bar, ...] = (
 PHASE_FEATURES: Mapping[str, tuple[str, ...]] = {
     "Phase 1: Foundations": ("FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004", "FEAT-005"),
     "Phase 2: The Reading Loop": ("FEAT-006", "FEAT-007", "FEAT-008"),
-    "Phase 3: Trust and Continuity": ("FEAT-009", "FEAT-010", "FEAT-011"),
+    "Phase 3: Trust and Continuity": ("FEAT-009", "FEAT-010", "FEAT-011", "FEAT-015"),
     "Phase 4: Polish and Account": ("FEAT-012", "FEAT-013"),
 }
 
 # The phase the gate is closing (roadmap.md's active phase). A phase advances by
 # moving this to the next heading in `PHASE_FEATURES`.
-CURRENT_PHASE = "Phase 2: The Reading Loop"
+CURRENT_PHASE = "Phase 3: Trust and Continuity"
 
 
 class GoldenSetMissing(Exception):
