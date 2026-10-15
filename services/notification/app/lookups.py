@@ -1,11 +1,11 @@
 """Port to the lookup service for the lookup a registration is about (C-008).
 
-A registration is only meaningful for a lookup the reader owns and is still
-waiting on, so the intake asks the lookup service for that lookup before it
-stores a token: an unknown or foreign lookup is refused, and a lookup that has
-already resolved needs no notice. The lookup service owns lookups, so this reads
-its internal lookup route scoped by the caller's subject (the C-002 ownership
-rule, applied on the server side).
+A registration is only meaningful for a lookup the reader owns and that can
+still put a clip in front of them, so the intake asks the lookup service for that
+lookup before it stores a token: an unknown or foreign lookup is refused, and a
+lookup that resolved without a clip needs no notice. The lookup service owns
+lookups, so this reads its internal lookup route scoped by the caller's subject
+(the C-002 ownership rule, applied on the server side).
 
 An unreachable lookup service is not an unknown lookup: `status` raises
 `LookupUnavailableError` so the intake can decline to claim a notice it cannot

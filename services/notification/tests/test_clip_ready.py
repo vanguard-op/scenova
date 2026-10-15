@@ -80,17 +80,30 @@ def test_a_clip_ready_with_no_registration_sends_nothing() -> None:
     assert rigged.sender.sent == []
 
 
-def test_a_resolved_lookup_registers_nothing_for_a_later_notice() -> None:
+def test_a_served_lookups_regenerated_clip_reaches_the_reporting_reader() -> None:
+    # FEAT-011: a report of a served clip regenerates one for the reporting
+    # reader, and the notice is how it reaches them. The device registered
+    # against the served lookup, and the regenerated clip's notice is delivered
+    # to it while the entry keeps serving everyone else.
     statuses = {("lk_1", SUBJECT): LookupStatus.SERVED}
     rigged = rig(statuses)
+    regenerated = clip_descriptor(url="https://cdn.example/candidate_1.mp4")
 
     with make_client(service=rigged.service) as client:
         registered = client.post("/v1/push-registrations", headers=AUTH, json=register_body())
-        ready = client.post("/internal/clip-ready", headers=INTERNAL, json=clip_ready_body())
+        ready = client.post(
+            "/internal/clip-ready",
+            headers=INTERNAL,
+            json=clip_ready_body(jobId="job_candidate", clip=regenerated),
+        )
 
-    assert registered.json() == {"registered": False}
-    assert ready.json() == {"queued": 0}
-    assert rigged.sender.sent == []
+    assert registered.json() == {"registered": True}
+    assert ready.json() == {"queued": 1}
+    assert len(rigged.sender.sent) == 1
+    notice = rigged.sender.sent[0][2]
+    assert notice.lookup_id == "lk_1"
+    assert notice.job_id == "job_candidate"
+    assert notice.clip_url == "https://cdn.example/candidate_1.mp4"
 
 
 def test_the_clip_ready_route_rejects_a_missing_audience() -> None:

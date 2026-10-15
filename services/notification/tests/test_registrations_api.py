@@ -33,14 +33,17 @@ def test_a_generating_lookup_registers_the_device() -> None:
     assert rigged.lookups.calls == [("lk_1", SUBJECT)]
 
 
-def test_a_lookup_that_already_resolved_needs_no_notice() -> None:
+def test_a_served_lookup_registers_the_device_for_a_regenerated_clip() -> None:
+    # A served clip can be reported, and a report regenerates a clip for the
+    # reporting reader that reaches them by the notice, so the device is held
+    # for it (FEAT-011).
     statuses = {("lk_1", SUBJECT): LookupStatus.SERVED}
 
     with make_client(service=rig(statuses).service) as client:
         response = client.post("/v1/push-registrations", headers=AUTH, json=register_body())
 
     assert response.status_code == 202
-    assert response.json() == {"registered": False}
+    assert response.json() == {"registered": True}
 
 
 def test_a_fallback_lookup_needs_no_notice() -> None:

@@ -1,10 +1,12 @@
-"""Registration and clip-ready notice delivery (FEAT-008, C-008).
+"""Registration and clip-ready notice delivery (FEAT-008, FEAT-011, C-008).
 
 `register` binds a device's push token to the lookup the reader is waiting on.
-The lookup must be one the reader owns and that is still generating: an unknown
-lookup is refused as a bad request, and a lookup that has already resolved needs
-no notice, so `registered` reports false rather than holding a token for an
-event that will never come.
+The lookup must be one the reader owns and that can still put a clip in front of
+them: a generation that is still running, or a clip already served that the
+reader may report, since a report regenerates one for them (FEAT-011). An unknown
+lookup is refused as a bad request; a lookup that resolved without a clip — a
+fallback, a denial, an empty selection — needs no notice, so `registered` reports
+false rather than holding a token for an event that will never come.
 
 `clip_ready` is the internal call the generation pipeline makes when a clip
 finishes (architecture "Notification Service": `Gen --> Notify`). It sends one
@@ -42,6 +44,12 @@ from .store import InMemoryRegistrationStore, PushRegistration, RegistrationStor
 
 logger = logging.getLogger(__name__)
 
+# A lookup a notice can still follow. `generating` is the clip being made; a
+# `served` word clip is one the reader can report, and a report regenerates a
+# clip for the reporting reader that reaches them by the same notice (FEAT-008,
+# FEAT-011). A lookup that resolved without a clip has nothing to regenerate.
+_NOTICE_POSSIBLE = frozenset({LookupStatus.GENERATING, LookupStatus.SERVED})
+
 # A platform push token is dense printable ASCII with no spaces. A populated
 # string inside this bound is treated as readable; anything else is refused
 # rather than stored, so an empty or mangled token never becomes a dead
@@ -75,6 +83,11 @@ class NotificationService:
         lookup service that cannot be reached yields `registered=false` rather
         than a claim the service cannot honour; a lookup the reader does not own
         is refused.
+
+        A notice can follow a lookup whose clip is still generating, and one
+        whose clip is already served: reporting a served clip regenerates one for
+        the reporting reader, and it reaches them by the same notice (FEAT-011).
+        Only a lookup that resolved without a clip has nothing to send.
         """
 
         token = request.token.strip()
@@ -90,9 +103,10 @@ class NotificationService:
             return RegisterResponse(registered=False)
         if status is None:
             raise UnknownLookupError("No lookup was found for this id.")
-        if status is not LookupStatus.GENERATING:
-            # The clip is already served, or none is coming (a fallback or a
-            # denial). There is no later event to notify about.
+        if status not in _NOTICE_POSSIBLE:
+            # The lookup resolved without a clip (a fallback, a denial, an empty
+            # selection), so no clip is being made and none can be reported.
+            # There is no later event to notify about.
             return RegisterResponse(registered=False)
         await self._store.add(
             PushRegistration(
