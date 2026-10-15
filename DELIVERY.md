@@ -116,7 +116,7 @@ docs/           BPRD (product-shaper)
 | T-122 | FEAT-013 | frontend-engineer | Done | — |
 | T-123 | FEAT-013 | backend-engineer | Done | — |
 | T-124 | FEAT-013 | backend-engineer | Done | — |
-| T-125 | FEAT-012 | backend-engineer | In Progress | C-022 |
+| T-125 | FEAT-012 | backend-engineer | Done | C-022 |
 | T-126 | FEAT-012 | frontend-engineer | In Progress | C-022 |
 
 ## Decisions Log
