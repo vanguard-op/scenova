@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:scenova/models/action_label.dart';
 import 'package:scenova/screens/onboarding_controller.dart';
 import 'package:scenova/services/settings_controller.dart';
 import 'package:scenova/services/settings_store.dart';
@@ -24,6 +25,7 @@ void main() {
     before.consentModelProcessing = false;
     before.soundOn = true;
     before.reduceMotionOverride = true;
+    before.actionLabelLocale = 'pt';
     await before.pendingWrite;
 
     final after = SettingsController(store: store);
@@ -33,6 +35,22 @@ void main() {
     expect(after.consentModelProcessing, isFalse);
     expect(after.soundOn, isTrue);
     expect(after.reduceMotionOverride, isTrue);
+    expect(after.actionLabelLocale, 'pt');
+  });
+
+  test('the device reduce-motion setting overrides the app preference', () {
+    final controller = SettingsController(platformReduceMotion: true)
+      ..reduceMotionOverride = false;
+
+    // The platform setting wins, so a clip holds on a still frame whatever the
+    // app preference says (`FEAT-012` → Edge Cases).
+    expect(controller.reduceMotion, isTrue);
+  });
+
+  test('a locale the catalogue does not offer reads as English', () {
+    final controller = SettingsController(actionLabelLocale: 'xx');
+
+    expect(controller.actionLabelLanguage, ActionLabelLanguages.english);
   });
 
   test('finishing setup is stored, so the next launch opens on Home', () async {

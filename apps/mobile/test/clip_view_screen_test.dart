@@ -263,6 +263,49 @@ void main() {
     await teardown(tester);
   });
 
+  testWidgets('a clip is not kept when consent is withdrawn as it generates', (
+    tester,
+  ) async {
+    final services = buildServices(api: MockLookupApi(pollsUntilReady: 2));
+    final controller = controllerFor(services, 'xylograph');
+    addTearDown(controller.dispose);
+
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+    await tester.pump();
+    expect(controller.phase, ClipPhase.generating);
+
+    // The reader withdraws consent while the clip is being made; the clip that
+    // lands is not kept (`FEAT-012` → Edge Cases).
+    services.settings.consentModelProcessing = false;
+
+    await tester.pump(const Duration(milliseconds: 150));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 150));
+    await tester.pump();
+    await tester.pump();
+
+    expect(controller.phase, ClipPhase.playing);
+    expect(await services.historyStore.all(), isEmpty);
+    await teardown(tester);
+  });
+
+  testWidgets('a library clip is kept with consent withdrawn', (tester) async {
+    final services = buildServices(api: MockLookupApi());
+    // The library serves the clip without the reader's word leaving the device,
+    // so it is kept whatever the consent says (`FEAT-012` → Edge Cases).
+    services.settings.consentModelProcessing = false;
+    final controller = controllerFor(services, 'come');
+    addTearDown(controller.dispose);
+
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+    await tester.pump();
+
+    expect(await services.historyStore.all(), hasLength(1));
+    await teardown(tester);
+  });
+
   testWidgets('a slow generation tells the reader and offers to notify', (
     tester,
   ) async {

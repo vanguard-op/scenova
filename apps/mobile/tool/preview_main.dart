@@ -23,6 +23,9 @@ import 'package:scenova/screens/history_screen.dart';
 import 'package:scenova/screens/home_screen.dart';
 import 'package:scenova/screens/onboarding_screen.dart';
 import 'package:scenova/screens/paywall_controller.dart';
+import 'package:scenova/screens/preferences_controller.dart';
+import 'package:scenova/screens/preferences_screen.dart';
+import 'package:scenova/services/account_api.dart';
 import 'package:scenova/services/account_session.dart';
 import 'package:scenova/services/analytics.dart';
 import 'package:scenova/services/analytics_api.dart';
@@ -55,6 +58,7 @@ import 'package:scenova/services/reported_clip_watch.dart';
 import 'package:scenova/services/saved_clip_keeper.dart';
 import 'package:scenova/services/settings_controller.dart';
 import 'package:scenova/theme/app_theme.dart';
+import 'package:scenova/widgets/clear_history_dialog.dart';
 import 'package:scenova/widgets/paywall_sheet.dart';
 import 'package:scenova/widgets/report_sheet.dart';
 import 'package:scenova_design/scenova_design.dart';
@@ -499,6 +503,43 @@ List<(String, Widget)> _frames() {
         featureFlags: const FixedFeatureFlags(paidTierEnabled: false),
       ),
     ),
+    ('Preferences — default', _preferences(history: _savedLookups())),
+    (
+      'Preferences — device reduce motion on',
+      _preferences(
+        history: _savedLookups(),
+        settings: SettingsController()..platformReduceMotion = true,
+      ),
+    ),
+    (
+      'Preferences — account unreachable',
+      _preferences(
+        history: _savedLookups(),
+        signedIn: true,
+        accountApi: MockAccountApi(
+          error: const AccountApiException(
+            503,
+            'Your account is unavailable right now.',
+          ),
+        ),
+        drive: _PreferencesDrive.toggleConsent,
+      ),
+    ),
+    (
+      'Preferences — clear-history dialog',
+      _preferences(
+        history: _savedLookups(),
+        drive: _PreferencesDrive.clearDialog,
+      ),
+    ),
+    (
+      'Preferences — clearing history',
+      _preferences(
+        history: _savedLookups(),
+        slowClear: true,
+        drive: _PreferencesDrive.clearing,
+      ),
+    ),
   ];
 }
 
@@ -543,6 +584,103 @@ Widget _history({
     services: services,
     child: HistoryScreen(router: AppRouter(services: services)),
   );
+}
+
+/// The Preferences screen, with the reader's settings, device history, and the
+/// account store.
+///
+/// [drive] exercises the states that need an interaction: the account notice
+/// after a signed-in choice could not reach the account, the clear-history
+/// dialog, and the clearing state while the clear runs. [slowClear] holds the
+/// clear open so the clearing state stays on screen.
+Widget _preferences({
+  List<HistoryEntry> history = const <HistoryEntry>[],
+  SettingsController? settings,
+  bool online = true,
+  bool signedIn = false,
+  AccountApi? accountApi,
+  bool slowClear = false,
+  _PreferencesDrive drive = _PreferencesDrive.none,
+}) {
+  final services = _services(
+    settings: settings,
+    history: history,
+    historyStore: slowClear ? _SlowHistoryStore(seed: history) : null,
+    online: online,
+    accountSession: DevelopmentAccountSession(signedIn: signedIn),
+    accountApi: accountApi,
+  );
+  return ScenovaScope(
+    services: services,
+    child: _PreviewPreferences(services: services, drive: drive),
+  );
+}
+
+/// What a Preferences preview does once the screen has loaded.
+enum _PreferencesDrive { none, toggleConsent, clearDialog, clearing }
+
+/// Drives the Preferences screen through a state the gallery needs to show.
+class _PreviewPreferences extends StatefulWidget {
+  const _PreviewPreferences({required this.services, required this.drive});
+
+  final ScenovaServices services;
+  final _PreferencesDrive drive;
+
+  @override
+  State<_PreviewPreferences> createState() => _PreviewPreferencesState();
+}
+
+class _PreviewPreferencesState extends State<_PreviewPreferences> {
+  PreferencesController? _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.drive == _PreferencesDrive.none) return;
+    final controller = PreferencesController(services: widget.services);
+    _controller = controller;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _drive(controller));
+  }
+
+  Future<void> _drive(PreferencesController controller) async {
+    await controller.load();
+    if (!mounted) return;
+    switch (widget.drive) {
+      case _PreferencesDrive.none:
+        break;
+      case _PreferencesDrive.toggleConsent:
+        await controller.setConsent(false);
+      case _PreferencesDrive.clearDialog:
+        await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) =>
+              ClearHistoryDialog(onConfirm: controller.clearHistory),
+        );
+      case _PreferencesDrive.clearing:
+        // The clear is held open by the slow store, so the row's spinner and
+        // the dialog's progress state both stay on screen.
+        await controller.clearHistory();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      PreferencesScreen(controller: _controller);
+}
+
+/// A history whose clear never resolves, so the clearing state can be looked at.
+class _SlowHistoryStore extends InMemoryHistoryStore {
+  _SlowHistoryStore({super.seed});
+
+  @override
+  Future<void> clear() => Future<void>.delayed(const Duration(minutes: 30));
 }
 
 /// The Account screen, driven through the scripted entitlement, session, and
@@ -879,10 +1017,12 @@ class _ReadingPage extends StatelessWidget {
 ScenovaServices _services({
   LookupApi? api,
   List<HistoryEntry> history = const <HistoryEntry>[],
+  HistoryStore? historyStore,
   bool online = true,
   Entitlement entitlement = Entitlement.unmeteredGuest,
   EntitlementApi? entitlementsApi,
   AccountSession? accountSession,
+  AccountApi? accountApi,
   PurchaseService? purchases,
   SettingsController? settings,
   FeatureFlags featureFlags = const FixedFeatureFlags(),
@@ -899,7 +1039,7 @@ ScenovaServices _services({
 }) {
   final connectivity = ManualConnectivity(online: online);
   final settingsController = settings ?? SettingsController();
-  final resolvedHistory = InMemoryHistoryStore(seed: history);
+  final resolvedHistory = historyStore ?? InMemoryHistoryStore(seed: history);
   final resolvedClips = clips ?? InMemoryClipStore();
   final resolvedPosters = posterFrames ?? InMemoryPosterFrameStore();
   final pushRegistrar = PushRegistrar(
@@ -924,6 +1064,7 @@ ScenovaServices _services({
     entitlements: FixedEntitlementProvider(entitlement),
     entitlementsApi: entitlementsApi ?? MockEntitlementApi(),
     accountSession: accountSession ?? DevelopmentAccountSession(),
+    accountApi: accountApi ?? MockAccountApi(),
     purchases: purchases ?? MockPurchaseService(),
     captureChannel: CaptureChannel(),
     analytics: AnalyticsClient(

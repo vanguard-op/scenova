@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../models/action_label.dart';
 import 'settings_store.dart';
 
 /// Reader preferences that the clip view, the entry gate, and the app shell
@@ -19,6 +20,7 @@ class SettingsController extends ChangeNotifier {
     bool consentModelProcessing = true,
     bool actionEnabled = true,
     bool onboardingComplete = false,
+    String actionLabelLocale = ActionLabelLanguages.fallback,
     SettingsStore? store,
   }) : _store = store ?? InMemorySettingsStore() {
     _platformReduceMotion = platformReduceMotion;
@@ -26,6 +28,7 @@ class SettingsController extends ChangeNotifier {
     _consentModelProcessing = consentModelProcessing;
     _actionEnabled = actionEnabled;
     _onboardingComplete = onboardingComplete;
+    _actionLabelLocale = actionLabelLocale;
   }
 
   final SettingsStore _store;
@@ -49,6 +52,7 @@ class SettingsController extends ChangeNotifier {
     _soundOn = snapshot.soundOn;
     _consentModelProcessing = snapshot.consentModelProcessing;
     _reduceMotionOverride = snapshot.reduceMotionOverride;
+    _actionLabelLocale = snapshot.actionLabelLocale;
     _onboardingComplete = snapshot.onboardingComplete;
     notifyListeners();
   }
@@ -60,6 +64,7 @@ class SettingsController extends ChangeNotifier {
       consentModelProcessing: _consentModelProcessing,
       soundOn: _soundOn,
       reduceMotionOverride: _reduceMotionOverride,
+      actionLabelLocale: _actionLabelLocale,
     );
     // The write is best-effort and chained in order. A write that fails must not
     // break the chain for the ones after it, and must not surface as an
@@ -84,6 +89,7 @@ class SettingsController extends ChangeNotifier {
   bool _consentModelProcessing = true;
   bool _actionEnabled = true;
   bool _onboardingComplete = false;
+  String _actionLabelLocale = ActionLabelLanguages.fallback;
 
   /// Whether first-run setup has been finished or skipped.
   ///
@@ -98,9 +104,14 @@ class SettingsController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Reduce motion, honouring an explicit reader choice over the platform
-  /// setting. When on, a clip holds on a still frame and plays on tap.
-  bool get reduceMotion => _reduceMotionOverride ?? _platformReduceMotion;
+  /// Reduce motion, with the platform's setting winning over the reader's.
+  ///
+  /// When the device's own reduce-motion setting is on, a clip holds on a still
+  /// frame whatever the app preference says (`FEAT-012` → Edge Cases). Otherwise
+  /// the reader's explicit choice stands, and with no explicit choice the
+  /// platform's setting is followed.
+  bool get reduceMotion =>
+      _platformReduceMotion || (_reduceMotionOverride ?? false);
   bool? get reduceMotionOverride => _reduceMotionOverride;
   set reduceMotionOverride(bool? value) {
     if (_reduceMotionOverride == value) return;
@@ -130,6 +141,22 @@ class SettingsController extends ChangeNotifier {
     _persist();
     notifyListeners();
   }
+
+  /// The language the selection-action label is shown in (`FEAT-012`).
+  String get actionLabelLocale => _actionLabelLocale;
+  set actionLabelLocale(String value) {
+    if (_actionLabelLocale == value) return;
+    _actionLabelLocale = value;
+    _persist();
+    notifyListeners();
+  }
+
+  /// The chosen language, resolved against the offered set.
+  ///
+  /// A locale the catalogue does not offer reads as English, which is also what
+  /// the label itself falls back to where no translation exists.
+  ActionLabelLanguage get actionLabelLanguage =>
+      ActionLabelLanguages.resolve(_actionLabelLocale);
 
   /// Whether the platform entry point (Android selection action, iOS extension)
   /// is enabled. When it is not, the entry gate shows how to enable it. The

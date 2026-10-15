@@ -12,7 +12,7 @@ import 'screens/clip_action_screen.dart';
 import 'screens/history_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
-import 'screens/placeholder_screen.dart';
+import 'screens/preferences_screen.dart';
 import 'services/app_services.dart';
 import 'services/capture_channel.dart';
 import 'theme/app_theme.dart';
@@ -223,12 +223,7 @@ class _ScenovaAppState extends State<ScenovaApp> with WidgetsBindingObserver {
         home: _landing,
         routes: <String, WidgetBuilder>{
           AppRoutes.history: (_) => HistoryScreen(router: _router),
-          AppRoutes.preferences: (_) => const PlaceholderScreen(
-            title: 'Preferences',
-            message:
-                'Clip sound, reduce motion, the action label, and clearing '
-                'history arrive in a later phase.',
-          ),
+          AppRoutes.preferences: (_) => const PreferencesScreen(),
           AppRoutes.account: (_) => const AccountScreen(),
         },
       ),

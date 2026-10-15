@@ -1,13 +1,16 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/action_label.dart';
+
 /// The reader's local settings as they are stored.
 ///
 /// Only the values that outlive a launch are here: the clip's sound, the
-/// reader's reduce-motion choice, consent for model processing, and whether
-/// first-run setup is done. The platform's own reduce-motion setting is read
-/// from the platform each launch and is never stored, and neither is the entry
-/// gate's state, which the platform owns and the app re-checks.
+/// reader's reduce-motion choice, consent for model processing, the language the
+/// selection-action label is shown in, and whether first-run setup is done. The
+/// platform's own reduce-motion setting is read from the platform each launch
+/// and is never stored, and neither is the entry gate's state, which the
+/// platform owns and the app re-checks.
 @immutable
 class SettingsSnapshot {
   const SettingsSnapshot({
@@ -15,6 +18,7 @@ class SettingsSnapshot {
     this.consentModelProcessing = true,
     this.soundOn = false,
     this.reduceMotionOverride,
+    this.actionLabelLocale = ActionLabelLanguages.fallback,
   });
 
   /// Whether first-run setup has been finished or skipped.
@@ -28,6 +32,12 @@ class SettingsSnapshot {
 
   /// The reader's explicit reduce-motion choice, or null to follow the platform.
   final bool? reduceMotionOverride;
+
+  /// The language the selection-action label is shown in.
+  ///
+  /// A signed-in reader's choice is also carried on their account (`C-020`);
+  /// the device copy is what the app reads and what a signed-out reader has.
+  final String actionLabelLocale;
 }
 
 /// The durable home of the reader's local settings.
@@ -57,6 +67,7 @@ class SharedPreferencesSettingsStore implements SettingsStore {
   static const String _consentKey = 'settings.consent_model_processing';
   static const String _soundKey = 'settings.sound_on';
   static const String _reduceMotionKey = 'settings.reduce_motion_override';
+  static const String _actionLabelLocaleKey = 'settings.action_label_locale';
 
   SharedPreferencesAsync? _preferences;
 
@@ -76,6 +87,9 @@ class SharedPreferencesSettingsStore implements SettingsStore {
       consentModelProcessing: await store.getBool(_consentKey) ?? true,
       soundOn: await store.getBool(_soundKey) ?? false,
       reduceMotionOverride: await store.getBool(_reduceMotionKey),
+      actionLabelLocale:
+          await store.getString(_actionLabelLocaleKey) ??
+          ActionLabelLanguages.fallback,
     );
   }
 
@@ -92,6 +106,7 @@ class SharedPreferencesSettingsStore implements SettingsStore {
     } else {
       await store.setBool(_reduceMotionKey, override);
     }
+    await store.setString(_actionLabelLocaleKey, snapshot.actionLabelLocale);
   }
 }
 

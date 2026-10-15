@@ -899,6 +899,14 @@ class ClipViewController extends ChangeNotifier {
     // never resolves to served, and its clip is the reader's to keep
     // (`FEAT-007`).
     if (result.status != LookupStatus.served && (sense?.clip == null)) return;
+    // Consent withdrawn while a clip was generating: the clip the model made is
+    // not kept. A clip the library served never sent the reader's word to the
+    // provider, so it is saved whatever the consent says — and the sense that
+    // carries a library entry is what tells the two apart (`FEAT-012` → Edge
+    // Cases).
+    if (sense?.entryId == null && !services.settings.consentModelProcessing) {
+      return;
+    }
     // The entry is stored first, so the reader's lookup is durable before the
     // clip is fetched and the frame derived from it; both are added beside it
     // after.

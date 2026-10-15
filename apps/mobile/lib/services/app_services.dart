@@ -4,6 +4,7 @@ import '../config.dart';
 import '../models/entitlement.dart';
 import '../models/history_entry.dart';
 import '../models/lookup.dart';
+import 'account_api.dart';
 import 'account_session.dart';
 import 'analytics.dart';
 import 'analytics_api.dart';
@@ -49,6 +50,7 @@ class ScenovaServices {
     required this.entitlements,
     required this.entitlementsApi,
     required this.accountSession,
+    required this.accountApi,
     required this.purchases,
     required this.captureChannel,
     required this.analytics,
@@ -81,6 +83,11 @@ class ScenovaServices {
 
   /// The reader's account session (`FEAT-013`): sign-in and sign-out.
   final AccountSession accountSession;
+
+  /// The account store (`C-020`): the consent choice and the selection-action
+  /// language, written for a reader who holds an account so the choice follows
+  /// them to a new device.
+  final AccountApi accountApi;
 
   /// The store (`FEAT-013`): the Pro subscription, its management, and restore.
   final PurchaseService purchases;
@@ -157,7 +164,8 @@ class ScenovaServices {
         !AppConfig.useMockPushApi ||
         !AppConfig.useMockFeedbackApi ||
         !AppConfig.useMockReportApi ||
-        !AppConfig.useMockEntitlementApi;
+        !AppConfig.useMockEntitlementApi ||
+        !AppConfig.useMockAccountApi;
     if (useLiveGateway) AppConfig.ensureSecureGateway(AppConfig.apiBaseUrl);
 
     // The identity the lookup path presents: an anonymous Firebase ID token in
@@ -179,6 +187,12 @@ class ScenovaServices {
     final accountSession = AppConfig.useFirebaseAuth
         ? FirebaseAccountSession()
         : DevelopmentAccountSession();
+    final accountApi = AppConfig.useMockAccountApi
+        ? MockAccountApi(latency: AppConfig.mockLatency)
+        : HttpAccountApi(
+            baseUrl: AppConfig.apiBaseUrl,
+            idTokenProvider: identity.idToken,
+          );
     final purchases = MockPurchaseService();
 
     final connectivity = ManualConnectivity();
@@ -244,6 +258,7 @@ class ScenovaServices {
       entitlements: FixedEntitlementProvider(entitlement),
       entitlementsApi: entitlementsApi,
       accountSession: accountSession,
+      accountApi: accountApi,
       purchases: purchases,
       captureChannel: CaptureChannel(),
       analytics: AnalyticsClient(

@@ -18,6 +18,12 @@ abstract interface class AccountSession {
   /// Ends the account session on this device. The device's own history and
   /// saved clips stay (`FEAT-009`).
   Future<void> signOut();
+
+  /// Whether the reader holds an account rather than an anonymous identity.
+  ///
+  /// The account-backed preferences (`C-020`) are written only for a reader who
+  /// holds an account; before sign-in they are held on the device alone.
+  Future<bool> hasAccount();
 }
 
 /// Sign-in is not available on this build.
@@ -57,6 +63,9 @@ class DevelopmentAccountSession implements AccountSession {
     signOutCalls++;
     signedIn = false;
   }
+
+  @override
+  Future<bool> hasAccount() async => signedIn;
 }
 
 /// The account session through Firebase Authentication (D-005).
@@ -90,6 +99,10 @@ class FirebaseAccountSession implements AccountSession {
   Future<void> signOut() async {
     await (await _authInstance()).signOut();
   }
+
+  @override
+  Future<bool> hasAccount() async =>
+      (await _authInstance()).currentUser?.isAnonymous == false;
 
   Future<FirebaseAuth> _authInstance() async {
     final existing = _auth;

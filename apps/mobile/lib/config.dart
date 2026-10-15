@@ -75,6 +75,15 @@ abstract final class AppConfig {
     defaultValue: false,
   );
 
+  /// The account write (`C-020`). Live by default; opt into the scripted store
+  /// with `--dart-define=SCENOVA_USE_MOCK_ACCOUNT=true`, so the Preferences
+  /// screen's account-backed choices can be exercised before the service is
+  /// reachable.
+  static const bool useMockAccountApi = bool.fromEnvironment(
+    'SCENOVA_USE_MOCK_ACCOUNT',
+    defaultValue: false,
+  );
+
   /// The hosts that resolve to the developer's own machine, where the local
   /// stack runs over plaintext. `10.0.2.2` is the Android emulator's alias for
   /// the host's loopback interface, so it reaches the same machine as

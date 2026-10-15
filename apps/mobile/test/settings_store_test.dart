@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:scenova/models/action_label.dart';
 import 'package:scenova/services/settings_store.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
@@ -18,6 +19,7 @@ void main() {
     expect(snapshot.consentModelProcessing, isTrue);
     expect(snapshot.soundOn, isFalse);
     expect(snapshot.reduceMotionOverride, isNull);
+    expect(snapshot.actionLabelLocale, ActionLabelLanguages.fallback);
   });
 
   test('the device store round-trips every setting', () async {
@@ -28,6 +30,7 @@ void main() {
         consentModelProcessing: false,
         soundOn: true,
         reduceMotionOverride: true,
+        actionLabelLocale: 'pt',
       ),
     );
 
@@ -37,6 +40,7 @@ void main() {
     expect(snapshot.consentModelProcessing, isFalse);
     expect(snapshot.soundOn, isTrue);
     expect(snapshot.reduceMotionOverride, isTrue);
+    expect(snapshot.actionLabelLocale, 'pt');
   });
 
   test(

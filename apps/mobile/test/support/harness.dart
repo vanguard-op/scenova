@@ -14,6 +14,8 @@ import 'package:scenova/screens/clip_view_screen.dart';
 import 'package:scenova/screens/history_screen.dart';
 import 'package:scenova/screens/home_screen.dart';
 import 'package:scenova/screens/onboarding_screen.dart';
+import 'package:scenova/screens/preferences_screen.dart';
+import 'package:scenova/services/account_api.dart';
 import 'package:scenova/services/account_session.dart';
 import 'package:scenova/services/analytics.dart';
 import 'package:scenova/services/analytics_api.dart';
@@ -56,6 +58,7 @@ ScenovaServices buildServices({
   Entitlement entitlement = Entitlement.unmeteredGuest,
   EntitlementApi? entitlementsApi,
   AccountSession? accountSession,
+  AccountApi? accountApi,
   PurchaseService? purchases,
   IdentityProvider? identity,
   AnalyticsApi? analyticsApi,
@@ -101,6 +104,7 @@ ScenovaServices buildServices({
     entitlements: FixedEntitlementProvider(entitlement),
     entitlementsApi: entitlementsApi ?? MockEntitlementApi(),
     accountSession: accountSession ?? DevelopmentAccountSession(),
+    accountApi: accountApi ?? MockAccountApi(),
     purchases: purchases ?? MockPurchaseService(),
     captureChannel: CaptureChannel(),
     analytics: AnalyticsClient(
@@ -284,6 +288,45 @@ Future<ScenovaServices> pumpAccount(
       ),
     ),
   );
+  return services;
+}
+
+/// Builds the Preferences screen on its own with the real theme, so a test
+/// drives its states through the reader's settings, the account store, and the
+/// device history.
+Future<ScenovaServices> pumpPreferences(
+  WidgetTester tester, {
+  SettingsController? settings,
+  HistoryStore? history,
+  AccountApi? accountApi,
+  AccountSession? accountSession,
+  ClipStore? clips,
+  PosterFrameStore? posterFrames,
+  bool online = true,
+}) async {
+  usePhoneWindow(tester);
+  final services = buildServices(
+    settings: settings,
+    history: history,
+    accountApi: accountApi,
+    accountSession: accountSession,
+    clips: clips,
+    posterFrames: posterFrames,
+    online: online,
+  );
+  await tester.pumpWidget(
+    ScenovaScope(
+      services: services,
+      child: MaterialApp(
+        theme: AppTheme.build(
+          brightness: Brightness.light,
+          deviceClass: DeviceClass.mobile,
+        ),
+        home: const PreferencesScreen(),
+      ),
+    ),
+  );
+  await tester.pump();
   return services;
 }
 
