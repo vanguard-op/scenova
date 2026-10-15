@@ -35,7 +35,8 @@ numbered contract, triggered by a scheduled caller.
 from __future__ import annotations
 
 import hmac
-from collections.abc import Mapping
+from collections.abc import AsyncIterator, Mapping
+from contextlib import asynccontextmanager
 from typing import Annotated
 
 from fastapi import FastAPI, Header, Request
@@ -57,7 +58,7 @@ from .models import (
     SyncResponse,
 )
 from .service import EntitlementService
-from .store import InMemoryEntitlementStore
+from .store import build_default_store
 
 
 def create_app(
@@ -69,7 +70,7 @@ def create_app(
 
     resolved_settings = settings or Settings.from_env()
     resolved_service = service or EntitlementService(
-        store=InMemoryEntitlementStore(),
+        store=build_default_store(resolved_settings),
         free_lookups=resolved_settings.free_lookups,
         pro_lookups=resolved_settings.pro_lookups,
         topup_lookups=resolved_settings.topup_lookups,
@@ -79,7 +80,14 @@ def create_app(
     )
     resolved_verifier = verifier or build_token_verifier(resolved_settings)
 
-    app = FastAPI(title="Scenova Account & Entitlement Service", version="1.0.0")
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        try:
+            yield
+        finally:
+            await resolved_service.aclose()
+
+    app = FastAPI(title="Scenova Account & Entitlement Service", version="1.0.0", lifespan=lifespan)
 
     @app.exception_handler(EntitlementError)
     async def _handle_entitlement_error(_request: Request, exc: EntitlementError) -> JSONResponse:

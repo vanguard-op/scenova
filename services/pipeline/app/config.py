@@ -96,6 +96,10 @@ class Settings:
     enable_generation: bool = DEFAULT_ENABLE_GENERATION
     # The phrase-clip kill switch; when off, a phrase job stops before any provider call.
     enable_phrase_clip: bool = DEFAULT_ENABLE_PHRASE_CLIP
+    # The primary database the generation jobs live in (architecture.md "Primary
+    # Database"). Empty resolves to the in-memory queue, which the unit tests use;
+    # every deployed environment supplies it.
+    database_url: str | None = None
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Settings:
@@ -157,12 +161,18 @@ class Settings:
             enable_phrase_clip=_env_bool(
                 source, "FLAG_ENABLE_PHRASE_CLIP", DEFAULT_ENABLE_PHRASE_CLIP
             ),
+            database_url=_env_optional(source, "DATABASE_URL"),
         )
 
 
 def _env_str(env: Mapping[str, str], name: str, default: str) -> str:
     value = env.get(name)
     return value if value not in (None, "") else default
+
+
+def _env_optional(env: Mapping[str, str], name: str) -> str | None:
+    value = env.get(name)
+    return value if value not in (None, "") else None
 
 
 def _env_bool(env: Mapping[str, str], name: str, default: bool) -> bool:

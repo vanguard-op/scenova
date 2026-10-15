@@ -82,7 +82,7 @@ from .phrase_client import (
 )
 from .phrase_fallback import fallback_phrase
 from .pins import ModelPins
-from .queue import InMemoryJobQueue, JobQueue
+from .queue import JobQueue, build_default_queue
 from .review_jobs import ReviewRoute, ReviewRouteKind, review_route
 
 logger = logging.getLogger(__name__)
@@ -292,8 +292,9 @@ class GenerationService:
         return await self._succeed(running, clip, started_at)
 
     async def aclose(self) -> None:
-        """Release the model, library, and notification clients' connections."""
+        """Release the queue and the model, library, and notification clients' connections."""
 
+        await self._queue.aclose()
         await self._phrase_generator.aclose()
         await self._clip_generator.aclose()
         await self._library.aclose()
@@ -502,10 +503,10 @@ class GenerationService:
 
 
 def build_default_service(settings: Settings) -> GenerationService:
-    """Build the pipeline with its in-memory queue and the model and library clients."""
+    """Build the pipeline with its queue and the model and library clients."""
 
     return GenerationService(
-        queue=InMemoryJobQueue(),
+        queue=build_default_queue(settings),
         phrase_generator=HttpPhraseClient(
             base_url=settings.model_base_url,
             internal_audience=settings.internal_audience,

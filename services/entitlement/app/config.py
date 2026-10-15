@@ -69,6 +69,10 @@ class Settings:
     retention_days: int = RETENTION_DAYS
     # The paid-tier kill switch; when off, every reader is served as Free.
     enable_paid_tier: bool = DEFAULT_ENABLE_PAID_TIER
+    # The primary database the accounts, entitlements, and purchases live in
+    # (architecture.md "Primary Database"). Empty resolves to the in-memory
+    # store, which the unit tests use; every deployed environment supplies it.
+    database_url: str | None = None
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Settings:
@@ -89,6 +93,7 @@ class Settings:
             topup_lookups=_env_int(source, "ENTITLEMENT_TOPUP_LOOKUPS", DEFAULT_TOPUP_LOOKUPS),
             trial_days=_env_int(source, "ENTITLEMENT_TRIAL_DAYS", DEFAULT_TRIAL_DAYS),
             enable_paid_tier=_env_bool(source, "FLAG_ENABLE_PAID_TIER", DEFAULT_ENABLE_PAID_TIER),
+            database_url=_env_opt(source, "DATABASE_URL"),
         )
 
 

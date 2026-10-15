@@ -283,6 +283,11 @@ class EntitlementService:
                 await self._store.mark_lookup_applied(subject.id, client_lookup_id)
             return _spend_response(self._served(updated), allowed=True)
 
+    async def aclose(self) -> None:
+        """Release whatever the store holds open."""
+
+        await self._store.aclose()
+
     # --- Accounts and entitlements -------------------------------------------
 
     async def _account_for(
