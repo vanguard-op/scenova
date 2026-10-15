@@ -1010,7 +1010,9 @@ void main() {
   testWidgets('a very long word wraps to two lines and then truncates', (
     tester,
   ) async {
-    final longWord = 'pneumonoultramicroscopicsilicovolcanoconiosis${'x' * 40}';
+    // A word long enough to wrap, within the character bound so it is looked
+    // up rather than held back (`C-001`).
+    final longWord = 'pneumonoultramicroscopicsilicovolcanoconiosis${'x' * 34}';
     final services = buildServices(api: MockLookupApi());
     final controller = controllerFor(services, longWord);
     addTearDown(controller.dispose);
@@ -1252,6 +1254,29 @@ void main() {
     expect(controller.phase, ClipPhase.selectionTooLong);
     expect(find.text('Pick a shorter phrase'), findsOneWidget);
     // No lookup was sent for the over-limit selection.
+    expect(api.createCalls, 0);
+    await teardown(tester);
+  });
+
+  testWidgets('a selection over the character bound asks to narrow it', (
+    tester,
+  ) async {
+    final api = RecordingLookupApi(MockLookupApi());
+    final services = buildServices(api: api);
+    // Six words or fewer, but over the character bound.
+    final controller = controllerFor(
+      services,
+      'antidisestablishmentarianism antidisestablishmentarianism '
+      'antidisestablishmentarianism',
+    );
+    addTearDown(controller.dispose);
+
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+
+    expect(controller.phase, ClipPhase.selectionTooLong);
+    expect(find.text('Pick a shorter phrase'), findsOneWidget);
+    expect(find.textContaining('Select a shorter one'), findsOneWidget);
     expect(api.createCalls, 0);
     await teardown(tester);
   });

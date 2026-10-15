@@ -329,6 +329,13 @@ List<(String, Widget)> _frames() {
       'Clip — over-limit selection',
       _clip('the quick brown fox jumps over the lazy dog'),
     ),
+    (
+      'Clip — selection over the character bound',
+      _clip(
+        'antidisestablishmentarianism antidisestablishmentarianism '
+        'antidisestablishmentarianism',
+      ),
+    ),
     ('Report — default', _clip('come', openReport: true)),
     (
       'Report — phrase (private to the device)',

@@ -153,4 +153,25 @@ void main() {
     );
     await teardown(tester);
   });
+
+  testWidgets(
+    'an entry over the character bound asks the reader to narrow it',
+    (tester) async {
+      await pumpHarness(tester);
+      await tester.pump();
+
+      await tester.enterText(
+        find.byType(TextField),
+        'antidisestablishmentarianism antidisestablishmentarianism '
+        'antidisestablishmentarianism',
+      );
+      await tester.tap(find.text('Look up'));
+      await tester.pump();
+
+      // The reader is asked in place, and no lookup is opened.
+      expect(find.text(CaptureSelection.tooLongNotice), findsOneWidget);
+      expect(find.byType(ClipViewScreen), findsNothing);
+      await teardown(tester);
+    },
+  );
 }

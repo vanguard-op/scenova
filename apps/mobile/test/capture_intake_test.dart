@@ -60,9 +60,11 @@ void main() {
         'the quick brown fox jumps over the lazy dog',
       );
       expect(selection.overLimit, isTrue);
+      expect(selection.limit, SelectionLimit.words);
       expect(selection.truncatedFrom, 9);
       expect(selection.wordCount, kMaxSelectionWords);
       expect(selection.text, 'the quick brown fox jumps over');
+      expect(selection.text.length, lessThanOrEqualTo(kMaxSelectionCharacters));
       expect(selection.notice, CaptureSelection.overLimitNotice);
     });
 
@@ -70,6 +72,58 @@ void main() {
       final selection = CaptureSelection.parse('  give   up  ');
       expect(selection.text, 'give up');
       expect(selection.wordCount, 2);
+    });
+  });
+
+  group('CaptureSelection.parse and the character bound', () {
+    // Six words, but well over eighty characters.
+    const longPhrase =
+        'antidisestablishmentarianism antidisestablishmentarianism '
+        'antidisestablishmentarianism antidisestablishmentarianism '
+        'antidisestablishmentarianism antidisestablishmentarianism';
+
+    test('keeps a long phrase within the bound and notices', () {
+      final selection = CaptureSelection.parse(longPhrase);
+      expect(selection.overLimit, isTrue);
+      expect(selection.limit, SelectionLimit.characters);
+      expect(selection.text.length, lessThanOrEqualTo(kMaxSelectionCharacters));
+      expect(selection.notice, CaptureSelection.tooLongNotice);
+    });
+
+    test('drops a whole word rather than cutting one in half', () {
+      final selection = CaptureSelection.parse(
+        'antidisestablishmentarianism antidisestablishmentarianism '
+        'antidisestablishmentarianism',
+      );
+      expect(
+        selection.text,
+        'antidisestablishmentarianism '
+        'antidisestablishmentarianism',
+      );
+      expect(selection.text.length, lessThanOrEqualTo(kMaxSelectionCharacters));
+      expect(selection.wordCount, 2);
+    });
+
+    test('cuts a lone word longer than the bound', () {
+      final selection = CaptureSelection.parse('a' * 120);
+      expect(selection.overLimit, isTrue);
+      expect(selection.limit, SelectionLimit.characters);
+      expect(selection.text.length, kMaxSelectionCharacters);
+    });
+
+    test('leaves a selection at exactly the bound alone', () {
+      final text = 'a' * kMaxSelectionCharacters;
+      final selection = CaptureSelection.parse(text);
+      expect(selection.overLimit, isFalse);
+      expect(selection.limit, SelectionLimit.none);
+      expect(selection.text, text);
+    });
+
+    test('names the word limit when a selection is over both', () {
+      final selection = CaptureSelection.parse('$longPhrase and more');
+      expect(selection.limit, SelectionLimit.words);
+      expect(selection.notice, CaptureSelection.overLimitNotice);
+      expect(selection.text.length, lessThanOrEqualTo(kMaxSelectionCharacters));
     });
   });
 }

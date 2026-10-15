@@ -8,6 +8,7 @@ import '../models/feedback.dart';
 import '../models/lookup.dart';
 import '../models/report.dart';
 import '../services/app_services.dart';
+import '../services/capture_intake.dart';
 import '../services/push_registrar.dart';
 import '../services/settings_controller.dart';
 import '../widgets/paywall_sheet.dart';
@@ -261,15 +262,19 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
 
       case ClipPhase.selectionTooLong:
         // A selection over the phrase limit starts no lookup; the reader is
-        // asked to narrow it (`FEAT-007`).
+        // asked to narrow it (`FEAT-007`). The gate's own message says what
+        // Scenova handles; a selection held back for its length is told how
+        // long it was.
+        final selection = _controller.selection;
         return EmptyState(
           icon: AppIcons.search,
           headline: 'Pick a shorter phrase',
-          body:
-              'Scenova looks up single words and short phrases — up to six '
-              'words. Your selection was '
-              '${_controller.selection.truncatedFrom} words. Select up to six '
-              'and open Scenova again.',
+          body: selection.limit == SelectionLimit.words
+              ? '${selection.notice} Your selection was '
+                    '${selection.truncatedFrom} words. Select up to six and '
+                    'open Scenova again.'
+              : '${selection.notice} Select a shorter one and open Scenova '
+                    'again.',
           actionLabel: inPlace ? 'Close' : 'Back to Home',
           onAction: widget.onDismiss,
         );
