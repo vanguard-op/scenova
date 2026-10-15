@@ -125,8 +125,11 @@ PHASE_FEATURES: Mapping[str, tuple[str, ...]] = {
 }
 
 # The phase the gate is closing (roadmap.md's active phase). A phase advances by
-# moving this to the next heading in `PHASE_FEATURES`.
-CURRENT_PHASE = "Phase 3: Trust and Continuity"
+# moving this to the next heading in `PHASE_FEATURES`. The polish-and-account
+# phase delivers FEAT-012 and FEAT-013, which carry no model-backed capability,
+# so its gate asserts no judged run — the held generation-path bars (NFR-051,
+# NFR-053) stay with their flags until the generation path's release.
+CURRENT_PHASE = "Phase 4: Polish and Account"
 
 
 class GoldenSetMissing(Exception):
@@ -154,8 +157,7 @@ def load_golden_set(bar: Bar) -> list[Mapping[str, object]]:
             items.append(json.loads(stripped))
     if len(items) < bar.minimum_items:
         raise GoldenSetMissing(
-            f"{bar.nfr_id}: golden set has {len(items)} items, "
-            f"the bar requires {bar.minimum_items}"
+            f"{bar.nfr_id}: golden set has {len(items)} items, the bar requires {bar.minimum_items}"
         )
     return items
 

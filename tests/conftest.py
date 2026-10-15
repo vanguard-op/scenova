@@ -27,12 +27,25 @@ provided:
   report a served clip, the regenerated clip reaches the reporting reader by the
   clip-ready notice, and a curator can work the review queue (FEAT-010, FEAT-011,
   FEAT-015; C-008, C-012 to C-016).
+- `account_stack` — the client path plus the account and entitlement service
+  (C-001 metering, C-018 to C-022) and the analytics intake, so a signed-in
+  reader's lookup is metered end to end and the account reads and writes are
+  followed through the gateway (FEAT-012, FEAT-013).
 
 No stack reaches an external provider. The client-path stacks run without a
 model credential and the model-backed stacks point at a local double, and the
 notification stack clears the ambient push-provider configuration and aims the
 generic HTTP seam at a local double, so the shipped Firebase Cloud Messaging
 provider is never contacted.
+
+No stack reaches the primary database inside a run either: a relational store
+holds whatever earlier runs left behind, so a suite's outcome would depend on
+machine history rather than on what one run placed itself. The harness strips
+`DATABASE_URL` from the ambient environment — `.env` exports one and `make qa`
+runs under it — so every stack runs on the in-memory stores. The store-backed
+behaviour is exercised where a phase needs it by the store's own check: a
+restart-survival run in `tests/` boots a service with the primary database
+directly.
 """
 
 from __future__ import annotations
@@ -124,6 +137,22 @@ REVIEW_PORTS = {
     "push": 18491,
 }
 
+# The account stack boots the client path plus the account and entitlement
+# service (C-018 to C-022) and the analytics intake, so a signed-in reader's
+# lookup is metered through the gateway (C-001) and the account's consent and
+# locale reads and writes are followed end to end (FEAT-012, FEAT-013). The
+# generation path is the model double, so a consented miss's clip arrives and
+# the allowance can be followed across served and generated lookups alike.
+ACCOUNT_PORTS = {
+    "gateway": 18680,
+    "lookup": 18681,
+    "pipeline": 18682,
+    "library": 18683,
+    "entitlement": 18684,
+    "analytics": 18686,
+    "model": 18690,
+}
+
 # name -> (working directory, uvicorn module). Mirrors ci/lib.sh's service
 # registry for the shippable services.
 SERVICES: dict[str, tuple[Path, str]] = {
@@ -162,6 +191,14 @@ ANALYTICS_SERVICE: tuple[Path, str] = (
     "app.main:app",
 )
 
+# The account and entitlement service (C-018 to C-022): the reader-facing plan
+# and allowance read, the account's consent and locale, the account's deletion,
+# and the spend seam the lookup path meters through (FEAT-013).
+ENTITLEMENT_SERVICE: tuple[Path, str] = (
+    REPO_ROOT / "services" / "entitlement",
+    "app.main:app",
+)
+
 INTERNAL_AUDIENCE = "scenova-internal"
 CORRELATION_HEADER = "x-correlation-id"
 
@@ -181,6 +218,12 @@ def _service_env(name: str, ports: Mapping[str, int]) -> dict[str, str]:
 
     env = dict(os.environ)
     env.pop("GEMINI_API_KEY", None)
+    # The relational store is stripped the same way: `.env` exports a
+    # `DATABASE_URL`, and a store that keeps data across runs makes the outcome
+    # of a run depend on whatever earlier runs left behind. Every stack here runs
+    # on the in-memory stores; the store-backed path is exercised by the check
+    # that owns it (the restart-survival run boots the primary database itself).
+    env.pop("DATABASE_URL", None)
     # The gate exercises the pre-account dev verifier (D-011): every request
     # presents a pseudonymous `dev:<subject>` token and the review surface a
     # `dev:curator:mfa:<subject>` operator token. Pin the mode here so a
@@ -198,6 +241,11 @@ def _service_env(name: str, ports: Mapping[str, int]) -> dict[str, str]:
             # The gateway routes the reader's rating and report (C-012, C-013) and
             # the curator's review calls (C-014 to C-016) to the feedback service.
             env["FEEDBACK_PORT"] = str(ports["feedback"])
+        if "entitlement" in ports:
+            # The gateway routes the entitlement read (C-018) and the account's
+            # reads and writes (C-020 to C-022) to the entitlement service, and
+            # its deletion erases the reader's data behind it (C-021).
+            env["ENTITLEMENT_PORT"] = str(ports["entitlement"])
     elif name == "feedback":
         # The intake confirms a lookup (C-012, C-013) and holds a reported entry
         # through the library (C-011); a curator's replace or edit_phrase hands a
@@ -208,6 +256,12 @@ def _service_env(name: str, ports: Mapping[str, int]) -> dict[str, str]:
     elif name == "lookup":
         env["PIPELINE_PORT"] = str(ports["pipeline"])
         env["LIBRARY_PORT"] = str(ports["library"])
+        if "entitlement" in ports:
+            # The meter lives on the entitlement service (FEAT-013): a signed-in
+            # reader's lookup spends before it serves or generates. Without it,
+            # the meter is unreachable and every lookup proceeds on the grace
+            # path, which is the degradation the other stacks exercise.
+            env["ENTITLEMENT_PORT"] = str(ports["entitlement"])
         # The harness exercises the phrase path (FEAT-007), so the phrase-clip
         # release flag is pinned on here rather than inherited from a local
         # `.env`, which ships it off until the phase rolls out (release.md
@@ -230,6 +284,14 @@ def _service_env(name: str, ports: Mapping[str, int]) -> dict[str, str]:
         # flag on for the same reason, so the inherited `.env` default (off until
         # the phase rolls out) cannot stop a phrase job before it runs.
         env["FLAG_ENABLE_PHRASE_CLIP"] = "true"
+    elif name == "entitlement":
+        # The harness exercises the tiers this phase delivers (FEAT-013): the
+        # paid-tier kill switch is pinned on here rather than inherited from a
+        # local `.env`, which ships it off until the rollout (release.md
+        # "Rollout Phases & Feature Flags"). With it off, every reader is served
+        # as Free — the trial, the Pro plan, and a top-up on top of the Pro
+        # allowance cannot be exercised at all.
+        env["FLAG_ENABLE_PAID_TIER"] = "true"
     elif name == "notification":
         # The notification intake confirms the lookup against the lookup service
         # (C-008) and sends the clip-ready notice through the push-provider
@@ -296,8 +358,14 @@ def _boot(
     entries: Mapping[str, tuple[Path, str]],
     ports: Mapping[str, int],
     tmp_path_factory: pytest.TempPathFactory,
+    extra_env: Mapping[str, str] | None = None,
 ) -> Iterator[Stack]:
-    """Boot the named services on `ports` and yield the stack; tear it down after."""
+    """Boot the named services on `ports` and yield the stack; tear it down after.
+
+    `extra_env` carries the environment a check owns outright — the
+    restart-survival run points its own service at the primary database it
+    prepared — and wins over the shared wiring for every service in the call.
+    """
 
     for name, port in ports.items():
         if not _port_is_free(port):
@@ -331,7 +399,7 @@ def _boot(
                     "warning",
                 ],
                 cwd=str(workdir),
-                env=_service_env(name, ports),
+                env=_service_env(name, ports) | dict(extra_env or {}),
                 stdout=handle,
                 stderr=subprocess.STDOUT,
             )
@@ -423,6 +491,27 @@ def review_stack(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Stack]:
         "push": PUSH_STUB,
     }
     with _boot(entries, REVIEW_PORTS, tmp_path_factory) as booted:
+        yield booted
+
+
+@pytest.fixture(scope="session")
+def account_stack(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Stack]:
+    """Boot the account stack: the client path, the meter, and the event intake.
+
+    The account and entitlement service carries the reader's plan and allowance
+    (C-018), their account's consent and locale (C-020, C-022), their deletion
+    (C-021), and the spend seam the lookup path meters through (C-001, FEAT-013).
+    The generation path is the model double, so a consented miss actually
+    produces, and the analytics intake answers a client's events (C-007).
+    """
+
+    entries = {
+        **SERVICES,
+        "entitlement": ENTITLEMENT_SERVICE,
+        "analytics": ANALYTICS_SERVICE,
+        "model": MODEL_STUB,
+    }
+    with _boot(entries, ACCOUNT_PORTS, tmp_path_factory) as booted:
         yield booted
 
 
@@ -559,4 +648,26 @@ def review_feedback(review_stack: Stack) -> Iterator[httpx2.Client]:
     """A client for the feedback service, addressed directly (C-012 to C-016)."""
 
     with httpx2.Client(base_url=review_stack.url("feedback"), timeout=10.0) as client:
+        yield client
+
+
+@pytest.fixture()
+def account_gateway(account_stack: Stack) -> Iterator[httpx2.Client]:
+    """A gateway client for the account stack (C-001, C-018 to C-022, C-007)."""
+
+    with httpx2.Client(base_url=account_stack.url("gateway"), timeout=10.0) as client:
+        yield client
+
+
+@pytest.fixture()
+def account_entitlement(account_stack: Stack) -> Iterator[httpx2.Client]:
+    """A client for the entitlement service, addressed directly.
+
+    The spend seam (C-001 metering) and the billing sync (C-019) are internal
+    seams the gateway never exposes, so the meter's arithmetic — what a reader's
+    allowance counted at, what a stored billing event changed — is observed at
+    the service the way the lookup service and the payment processor call it.
+    """
+
+    with httpx2.Client(base_url=account_stack.url("entitlement"), timeout=10.0) as client:
         yield client

@@ -26,6 +26,10 @@ RESPONSE_KEYS = {
     "notice",
     "correlationId",
 }
+# C-001's metered reader: the create response adds the allowance of a signed-in
+# reader — null for a reader who is not signed in, whose allowance is
+# device-local (FEAT-013). The read (C-002) does not carry it.
+CREATE_RESPONSE_KEYS = RESPONSE_KEYS | {"allowance"}
 
 
 def _auth(subject: str = "reader-1") -> dict[str, str]:
@@ -61,7 +65,7 @@ def test_create_lookup_returns_the_frozen_shape(gateway: httpx2.Client) -> None:
 
     assert response.status_code == 200, response.text
     body = response.json()
-    assert set(body) == RESPONSE_KEYS
+    assert set(body) == CREATE_RESPONSE_KEYS
     assert body["kind"] == "word"
     assert body["rawSelection"] == "coming"
     assert body["correlationId"]

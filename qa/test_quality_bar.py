@@ -54,11 +54,13 @@ _DOCUMENTED_PINS = {
 # "Model Quality & Cost" feature column). The gloss phrase (FEAT-004) and the word
 # clip (FEAT-005) belong to Foundations; the phrase clip (FEAT-007) belongs to the
 # Reading Loop; the trust-and-continuity features (FEAT-009 to FEAT-011, FEAT-015)
-# carry no model-backed capability, so their gate measures no golden bar.
+# and the polish-and-account features (FEAT-012, FEAT-013) carry no model-backed
+# capability, so their gates measure no golden bar.
 _DOCUMENTED_PHASE_BARS = {
     "Phase 1: Foundations": {"NFR-050", "NFR-051", "NFR-052"},
     "Phase 2: The Reading Loop": {"NFR-053"},
     "Phase 3: Trust and Continuity": set(),
+    "Phase 4: Polish and Account": set(),
 }
 
 
