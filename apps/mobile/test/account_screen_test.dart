@@ -3,9 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scenova/models/entitlement.dart';
+import 'package:scenova/services/account_api.dart';
 import 'package:scenova/services/account_session.dart';
 import 'package:scenova/services/entitlement_api.dart';
 import 'package:scenova/services/purchase_service.dart';
+import 'package:scenova/services/settings_controller.dart';
 import 'package:scenova/widgets/sign_in_sheet.dart';
 import 'package:scenova_design/scenova_design.dart';
 
@@ -255,6 +257,40 @@ void main() {
     expect(session.signInCalls, 1);
     expect(session.lastEmail, 'marisol@example.com');
     expect(find.text('Free'), findsOneWidget);
+    await teardown(tester);
+  });
+
+  testWidgets('signing in brings the account\'s choices onto the device', (
+    tester,
+  ) async {
+    final session = DevelopmentAccountSession(signedIn: false);
+    final settings = SettingsController();
+    final accountApi = MockAccountApi(
+      consentModelProcessing: false,
+      locale: 'fr',
+    );
+    await pumpAccount(
+      tester,
+      entitlementsApi: _SessionAwareEntitlementApi(session, _free),
+      accountSession: session,
+      accountApi: accountApi,
+      settings: settings,
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(signInField(0), 'marisol@example.com');
+    await tester.enterText(signInField(1), 'hunter2');
+    await tester.tap(signInAction());
+    await tester.pumpAndSettle();
+
+    // The consent and the label language the reader set elsewhere are read back
+    // and in effect here (`C-022`).
+    expect(accountApi.reads, 1);
+    expect(settings.consentModelProcessing, isFalse);
+    expect(settings.actionLabelLocale, 'fr');
     await teardown(tester);
   });
 

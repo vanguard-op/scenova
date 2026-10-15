@@ -27,6 +27,7 @@ import 'package:scenova/screens/preferences_controller.dart';
 import 'package:scenova/screens/preferences_screen.dart';
 import 'package:scenova/screens/sign_in_controller.dart';
 import 'package:scenova/services/account_api.dart';
+import 'package:scenova/services/account_preferences_sync.dart';
 import 'package:scenova/services/account_session.dart';
 import 'package:scenova/services/analytics.dart';
 import 'package:scenova/services/analytics_api.dart';
@@ -566,6 +567,15 @@ List<(String, Widget)> _frames() {
     ),
     ('Preferences — default', _preferences(history: _savedLookups())),
     (
+      'Preferences — account choices read back',
+      _preferences(
+        history: _savedLookups(),
+        signedIn: true,
+        accountApi: MockAccountApi(consentModelProcessing: false, locale: 'fr'),
+        drive: _PreferencesDrive.adoptAccount,
+      ),
+    ),
+    (
       'Preferences — device reduce motion on',
       _preferences(
         history: _savedLookups(),
@@ -678,7 +688,13 @@ Widget _preferences({
 }
 
 /// What a Preferences preview does once the screen has loaded.
-enum _PreferencesDrive { none, toggleConsent, clearDialog, clearing }
+enum _PreferencesDrive {
+  none,
+  adoptAccount,
+  toggleConsent,
+  clearDialog,
+  clearing,
+}
 
 /// Drives the Preferences screen through a state the gallery needs to show.
 class _PreviewPreferences extends StatefulWidget {
@@ -709,6 +725,10 @@ class _PreviewPreferencesState extends State<_PreviewPreferences> {
     switch (widget.drive) {
       case _PreferencesDrive.none:
         break;
+      case _PreferencesDrive.adoptAccount:
+        // The account's own choices arrive on the device (`C-022`), so the rows
+        // show what a reader who signed in elsewhere finds here.
+        await widget.services.accountPreferences.adopt();
       case _PreferencesDrive.toggleConsent:
         await controller.setConsent(false);
       case _PreferencesDrive.clearDialog:
@@ -765,6 +785,7 @@ Widget _account({
     session: services.accountSession,
     purchases: services.purchases,
     plan: services.entitlements,
+    accountPreferences: services.accountPreferences,
   );
   return ScenovaScope(
     services: services,
@@ -1245,6 +1266,8 @@ ScenovaServices _services({
   final resolvedHistory = historyStore ?? InMemoryHistoryStore(seed: history);
   final resolvedClips = clips ?? InMemoryClipStore();
   final resolvedPosters = posterFrames ?? InMemoryPosterFrameStore();
+  final resolvedAccountApi = accountApi ?? MockAccountApi();
+  final resolvedAccountSession = accountSession ?? DevelopmentAccountSession();
   final pushRegistrar = PushRegistrar(
     api: MockPushRegistrationApi(),
     tokens: DevelopmentPushTokenProvider(token: 'preview-push'),
@@ -1271,8 +1294,14 @@ ScenovaServices _services({
     entitlements: entitlements,
     tierGates: tierGates,
     entitlementsApi: entitlementsApi ?? MockEntitlementApi(),
-    accountSession: accountSession ?? DevelopmentAccountSession(),
-    accountApi: accountApi ?? MockAccountApi(),
+    accountSession: resolvedAccountSession,
+    accountApi: resolvedAccountApi,
+    accountPreferences: AccountPreferencesSync(
+      api: resolvedAccountApi,
+      session: resolvedAccountSession,
+      settings: settingsController,
+      connectivity: connectivity,
+    ),
     purchases: purchases ?? MockPurchaseService(),
     captureChannel: CaptureChannel(),
     analytics: AnalyticsClient(

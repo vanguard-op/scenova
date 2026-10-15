@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../models/entitlement.dart';
+import '../services/account_preferences_sync.dart';
 import '../services/account_session.dart';
 import '../services/entitlement_api.dart';
 import '../services/entitlement_provider.dart';
@@ -34,11 +35,17 @@ class AccountController extends ChangeNotifier {
     required this.session,
     required this.purchases,
     required this.plan,
+    this.accountPreferences,
   });
 
   final EntitlementApi entitlements;
   final AccountSession session;
   final PurchaseService purchases;
+
+  /// Reads the account's stored consent and selection-action language onto this
+  /// device when the reader signs in (`C-022`). Absent in a bare controller
+  /// test, where there is no account store to read.
+  final AccountPreferencesSync? accountPreferences;
 
   /// The reader's plan cache, shared with the tier gates (`FEAT-013`): a
   /// purchase or a sign-in/sign-out re-reads it so the gates the plan puts on
@@ -90,12 +97,14 @@ class AccountController extends ChangeNotifier {
   /// and allowance it holds.
   ///
   /// The sign-in itself belongs to the sign-in sheet, which hands the reader's
-  /// credentials to the identity provider (`FEAT-013`, D-032); this only
-  /// re-reads what the account now holds, so the plan and the gates the plan
-  /// puts on the device take effect at once.
+  /// credentials to the identity provider (`FEAT-013`, D-032); this brings the
+  /// account's own choices onto the device (`C-022`) and re-reads what the
+  /// account now holds, so the consent, the label language, and the plan take
+  /// effect at once.
   Future<void> signedIn() async {
     _actionError = null;
     _retry = null;
+    await accountPreferences?.adopt();
     await _readEntitlement();
     await plan.refresh();
   }

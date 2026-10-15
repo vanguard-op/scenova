@@ -6,6 +6,7 @@ import '../models/entitlement.dart';
 import '../models/history_entry.dart';
 import '../models/lookup.dart';
 import 'account_api.dart';
+import 'account_preferences_sync.dart';
 import 'account_session.dart';
 import 'analytics.dart';
 import 'analytics_api.dart';
@@ -55,6 +56,7 @@ class ScenovaServices {
     required this.entitlementsApi,
     required this.accountSession,
     required this.accountApi,
+    required this.accountPreferences,
     required this.purchases,
     required this.captureChannel,
     required this.analytics,
@@ -97,6 +99,11 @@ class ScenovaServices {
   /// language, written for a reader who holds an account so the choice follows
   /// them to a new device.
   final AccountApi accountApi;
+
+  /// Reads the account's stored consent and selection-action language back onto
+  /// the device (`C-022`), so a reader who signs in on a new device — or opens
+  /// one already holding their account — finds the choices they made elsewhere.
+  final AccountPreferencesSync accountPreferences;
 
   /// The store (`FEAT-013`): the Pro subscription, its management, and restore.
   final PurchaseService purchases;
@@ -243,6 +250,14 @@ class ScenovaServices {
       actionEnabled: false,
       store: settingsStore ?? SharedPreferencesSettingsStore(),
     );
+    // The account's own choices (`C-022`), read back onto the device for a
+    // reader who holds an account.
+    final accountPreferences = AccountPreferencesSync(
+      api: accountApi,
+      session: accountSession,
+      settings: settings,
+      connectivity: connectivity,
+    );
 
     // The reader is asked for the notification permission only when they take
     // the notify offer, so the app never prompts at launch.
@@ -303,6 +318,7 @@ class ScenovaServices {
       entitlementsApi: entitlementsApi,
       accountSession: accountSession,
       accountApi: accountApi,
+      accountPreferences: accountPreferences,
       purchases: purchases,
       captureChannel: CaptureChannel(),
       analytics: AnalyticsClient(

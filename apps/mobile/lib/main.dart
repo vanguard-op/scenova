@@ -40,6 +40,11 @@ Future<void> main() async {
   // so the first frame never waits on the network for a kill switch.
   await services.settings.load();
   unawaited(services.featureFlags.refresh());
+  // A reader who opens the app already holding an account reads their stored
+  // consent and selection-label language back onto this device, so the choices
+  // they made elsewhere are in effect here (`C-022`). It runs behind the first
+  // frame; the device copy stands until the account answers.
+  unawaited(services.accountPreferences.adopt());
   // The reader's plan is read in the background too, so the tier gates and the
   // allowance are live without holding up the first frame; the cached plan
   // starts signed out, which is the safe default.

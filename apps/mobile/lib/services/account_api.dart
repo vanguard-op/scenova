@@ -55,7 +55,7 @@ class AccountPreferences {
   }
 }
 
-/// The account store, as frozen in `C-020`.
+/// The account store, as frozen in `C-020` and `C-022`.
 ///
 /// The consent choice and the action-label language are stored on the account,
 /// so they follow a signed-in reader to a new device; before sign-in they are
@@ -66,6 +66,14 @@ abstract interface class AccountApi {
     bool? consentModelProcessing,
     String? locale,
   });
+
+  /// `GET /v1/account`. The reader's own account settings, read back so a
+  /// choice made on another device — consent for model processing, or the
+  /// action-label language — is applied here (`C-022`).
+  ///
+  /// A reader who is not signed in holds both on the device and never calls
+  /// this; the service answers a token with no account with `C-022`'s 401.
+  Future<AccountPreferences> read();
 }
 
 /// Talks to the gateway over HTTP.
@@ -97,6 +105,17 @@ class HttpAccountApi implements AccountApi {
         Uri.parse('$baseUrl/v1/account'),
         headers: await _headers(),
         body: jsonEncode(body),
+      ),
+    );
+    return _decode(response);
+  }
+
+  @override
+  Future<AccountPreferences> read() async {
+    final response = await _send(
+      () async => _client.get(
+        Uri.parse('$baseUrl/v1/account'),
+        headers: await _headers(),
       ),
     );
     return _decode(response);
@@ -202,6 +221,9 @@ class MockAccountApi implements AccountApi {
   final List<({bool? consentModelProcessing, String? locale})> writes =
       <({bool? consentModelProcessing, String? locale})>[];
 
+  /// How many reads the store answered (`C-022`).
+  int reads = 0;
+
   @override
   Future<AccountPreferences> update({
     bool? consentModelProcessing,
@@ -226,6 +248,23 @@ class MockAccountApi implements AccountApi {
     return AccountPreferences(
       consentModelProcessing: this.consentModelProcessing,
       locale: this.locale,
+    );
+  }
+
+  @override
+  Future<AccountPreferences> read() async {
+    if (latency != Duration.zero) {
+      await Future<void>.delayed(latency);
+    }
+    if (signedOut) {
+      throw const AccountApiException(401, 'Sign in to keep this choice.');
+    }
+    final failure = error;
+    if (failure != null) throw failure;
+    reads++;
+    return AccountPreferences(
+      consentModelProcessing: consentModelProcessing,
+      locale: locale,
     );
   }
 }

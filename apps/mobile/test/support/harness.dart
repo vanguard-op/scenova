@@ -16,6 +16,7 @@ import 'package:scenova/screens/home_screen.dart';
 import 'package:scenova/screens/onboarding_screen.dart';
 import 'package:scenova/screens/preferences_screen.dart';
 import 'package:scenova/services/account_api.dart';
+import 'package:scenova/services/account_preferences_sync.dart';
 import 'package:scenova/services/account_session.dart';
 import 'package:scenova/services/analytics.dart';
 import 'package:scenova/services/analytics_api.dart';
@@ -83,6 +84,8 @@ ScenovaServices buildServices({
   final resolvedHistory = history ?? InMemoryHistoryStore();
   final resolvedClips = clips ?? InMemoryClipStore();
   final resolvedPosters = posterFrames ?? InMemoryPosterFrameStore();
+  final resolvedAccountApi = accountApi ?? MockAccountApi();
+  final resolvedAccountSession = accountSession ?? DevelopmentAccountSession();
   final pushRegistrar = PushRegistrar(
     api: pushApi ?? MockPushRegistrationApi(),
     tokens:
@@ -111,8 +114,14 @@ ScenovaServices buildServices({
     entitlements: entitlements,
     tierGates: tierGates,
     entitlementsApi: entitlementsApi ?? MockEntitlementApi(),
-    accountSession: accountSession ?? DevelopmentAccountSession(),
-    accountApi: accountApi ?? MockAccountApi(),
+    accountSession: resolvedAccountSession,
+    accountApi: resolvedAccountApi,
+    accountPreferences: AccountPreferencesSync(
+      api: resolvedAccountApi,
+      session: resolvedAccountSession,
+      settings: settingsController,
+      connectivity: connectivity,
+    ),
     purchases: purchases ?? MockPurchaseService(),
     captureChannel: CaptureChannel(),
     analytics: AnalyticsClient(
@@ -274,6 +283,8 @@ Future<ScenovaServices> pumpAccount(
   WidgetTester tester, {
   EntitlementApi? entitlementsApi,
   AccountSession? accountSession,
+  AccountApi? accountApi,
+  SettingsController? settings,
   PurchaseService? purchases,
   bool online = true,
 }) async {
@@ -281,6 +292,8 @@ Future<ScenovaServices> pumpAccount(
   final services = buildServices(
     entitlementsApi: entitlementsApi,
     accountSession: accountSession,
+    accountApi: accountApi,
+    settings: settings,
     purchases: purchases,
     online: online,
   );

@@ -140,6 +140,61 @@ void main() {
         );
       },
     );
+
+    test('reads the account settings back with the bearer token', () async {
+      late http.Request captured;
+      final api = apiReturning((request) async {
+        captured = request;
+        return http.Response(
+          jsonEncode(<String, dynamic>{
+            'consentModelProcessing': false,
+            'locale': 'fr',
+          }),
+          200,
+        );
+      });
+
+      final account = await api.read();
+
+      expect(captured.method, 'GET');
+      expect(captured.url.toString(), 'https://gateway.test/v1/account');
+      expect(captured.headers['authorization'], 'Bearer token-1');
+      expect(account.consentModelProcessing, isFalse);
+      expect(account.locale, 'fr');
+    });
+
+    test('a read a 401 answers reads as signed out', () async {
+      final api = apiReturning((_) async => http.Response('{}', 401));
+
+      await expectLater(
+        api.read(),
+        throwsA(
+          isA<AccountApiException>().having(
+            (error) => error.isSignedOut,
+            'isSignedOut',
+            isTrue,
+          ),
+        ),
+      );
+    });
+
+    test(
+      'a read the account store cannot answer reads as unavailable',
+      () async {
+        final api = apiReturning((_) async => http.Response('{}', 503));
+
+        await expectLater(
+          api.read(),
+          throwsA(
+            isA<AccountApiException>().having(
+              (error) => error.isUnavailable,
+              'isUnavailable',
+              isTrue,
+            ),
+          ),
+        );
+      },
+    );
   });
 
   group('MockAccountApi', () {
@@ -154,6 +209,16 @@ void main() {
       expect(api.writes.last.locale, 'pt');
       expect(account.consentModelProcessing, isFalse);
       expect(account.locale, 'pt');
+    });
+
+    test('answers a read with the values it holds', () async {
+      final api = MockAccountApi(consentModelProcessing: false, locale: 'fr');
+
+      final account = await api.read();
+
+      expect(api.reads, 1);
+      expect(account.consentModelProcessing, isFalse);
+      expect(account.locale, 'fr');
     });
 
     test('refuses a caller with no account', () async {
