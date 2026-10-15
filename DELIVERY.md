@@ -1,7 +1,7 @@
 # DELIVERY — Scenova
 
 ## Source of Truth
-`docs/Scenova/` (BPRD), a git submodule of `vanguard-op/scenova-docs`, pinned at `ff07a0c979b669da7ed49d0d6f516dd3f4d60ec4` (`ff07a0c979b6`). Read-only for the squad; `product-shaper` is the only writer. The roadmap owns the build order. The lead is the only agent who runs git against the submodule: commit and push `product-shaper`'s changes to the docs repo, then stage the pointer bump in the same commit as the code built against it, and never leave the parent pointing at an unpushed docs commit.
+`docs/Scenova/` (BPRD), a git submodule of `vanguard-op/scenova-docs`, pinned at `69fb8ae119e8096df99696424d7dff291e69beb0` (`69fb8ae119e8`). Read-only for the squad; `product-shaper` is the only writer. The roadmap owns the build order. The lead is the only agent who runs git against the submodule: commit and push `product-shaper`'s changes to the docs repo, then stage the pointer bump in the same commit as the code built against it, and never leave the parent pointing at an unpushed docs commit.
 
 ## Team & File Ownership
 | Owner | Owns |
@@ -101,12 +101,12 @@ docs/           BPRD (product-shaper)
 | T-090 | FEAT-015 | frontend-engineer | Done | C-014 |
 | T-091 | FEAT-015 | frontend-engineer | Done | C-015, C-016 |
 | T-092 | FEAT-009 | frontend-engineer | Done | — |
-| T-097 | FEAT-009 | frontend-engineer | In Progress | C-001, C-008 |
-| T-098 | FEAT-001, FEAT-002, FEAT-015 | frontend-engineer | Backlog | — |
 | T-093 | FEAT-001, FEAT-002, FEAT-009, FEAT-015 | frontend-engineer | Done | — |
 | T-094 | FEAT-001, FEAT-002, FEAT-009, FEAT-015 | frontend-engineer | Done | — |
 | T-095 | — | infra-engineer | Done | — |
 | T-096 | FEAT-001, FEAT-002, FEAT-009, FEAT-015 | frontend-engineer | Done | — |
+| T-097 | FEAT-009 | frontend-engineer | In Progress | C-001, C-008 |
+| T-098 | FEAT-001, FEAT-002, FEAT-015 | frontend-engineer | Backlog | — |
 
 ## Decisions Log
 | # | Decision | Rationale | By |
