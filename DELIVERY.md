@@ -121,7 +121,7 @@ docs/           BPRD (product-shaper)
 | T-128 | FEAT-006 | backend-engineer | Done | C-009, C-010, C-011, C-017 |
 | T-129 | FEAT-010, FEAT-011 | backend-engineer | In Progress | C-007, C-008, C-012, C-013, C-014, C-015, C-016 |
 | T-130 | FEAT-013 | backend-engineer | Backlog | C-003, C-006, C-018, C-019, C-020, C-021, C-022 |
-| T-132 | FEAT-001, FEAT-002 | frontend-engineer | In Progress | C-001 |
+| T-132 | FEAT-001, FEAT-002 | frontend-engineer | Done | C-001 |
 | T-133 | FEAT-003 | backend-engineer | Backlog | C-001 |
 | T-131 | — | infra-engineer | Done | — |
 
