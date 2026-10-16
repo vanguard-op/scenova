@@ -11,7 +11,7 @@
 # revision, so it takes effect immediately. The per-environment tfvars stays the
 # source of truth — restore it after the incident so the next plan agrees.
 #
-# Usage: ci/flag.sh <dev|staging|prod> <FLAG_NAME> <true|false>
+# Usage: ci/flag.sh <dev|staging|prod|pre-revenue> <FLAG_NAME> <true|false>
 #   e.g. ci/flag.sh prod FLAG_ENABLE_GENERATION false
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
@@ -21,8 +21,8 @@ FLAG="${2:?usage: ci/flag.sh <env> <FLAG_NAME> <true|false>}"
 VALUE="${3:?usage: ci/flag.sh <env> <FLAG_NAME> <true|false>}"
 
 case "$ENV" in
-  dev|staging|prod) ;;
-  *) die "unknown environment '$ENV' (expected dev, staging, or prod)" ;;
+  dev|staging|prod|pre-revenue) ;;
+  *) die "unknown environment '$ENV' (expected dev, staging, prod, or pre-revenue)" ;;
 esac
 case "$VALUE" in
   true|false) ;;

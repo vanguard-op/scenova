@@ -18,7 +18,7 @@ on:
       environment:
         description: Target environment
         type: choice
-        options: [dev, staging, prod]
+        options: [dev, staging, prod, pre-revenue]
         required: true
       promote:
         description: Promote the canary to 100% after deploy

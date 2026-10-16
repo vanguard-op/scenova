@@ -6,6 +6,14 @@ variable "project_id" { type = string }
 variable "environment" { type = string }
 variable "gateway_url" { type = string }
 variable "alert_email" { type = string }
+# The lifecycle's runtime switch: with the runtime torn down there is no gateway
+# to probe, so the uptime check (and the availability alert that reads it) are
+# removed too. The generation-failure metric and alert stay: they are free and
+# belong to the environment, not the runtime.
+variable "enabled" {
+  type    = bool
+  default = true
+}
 
 resource "google_monitoring_notification_channel" "email" {
   count        = var.alert_email == "" ? 0 : 1
@@ -16,8 +24,12 @@ resource "google_monitoring_notification_channel" "email" {
   labels = { email_address = var.alert_email }
 }
 
-# NFR-010: 99.5% monthly for lookup and library serve.
+# NFR-010: 99.5% monthly for lookup and library serve. Created only while the
+# runtime exists (var.enabled); pause/destroy remove it, so nothing probes a
+# gateway that is gone.
 resource "google_monitoring_uptime_check_config" "gateway" {
+  count = var.enabled ? 1 : 0
+
   project      = var.project_id
   display_name = "scenova-${var.environment}-gateway"
   timeout      = "10s"
@@ -40,7 +52,7 @@ resource "google_monitoring_uptime_check_config" "gateway" {
 }
 
 resource "google_monitoring_alert_policy" "availability" {
-  count        = var.alert_email == "" ? 0 : 1
+  count        = var.enabled && var.alert_email != "" ? 1 : 0
   project      = var.project_id
   display_name = "Scenova ${var.environment} — lookup availability below target"
   combiner     = "OR"
@@ -49,7 +61,7 @@ resource "google_monitoring_alert_policy" "availability" {
     display_name = "Gateway uptime check failing"
 
     condition_threshold {
-      filter          = "metric.type=\"monitoring.googleapis.com/uptime_check/check_passed\" AND resource.type=\"uptime_url\" AND metric.label.check_id=\"${google_monitoring_uptime_check_config.gateway.uptime_check_id}\""
+      filter          = "metric.type=\"monitoring.googleapis.com/uptime_check/check_passed\" AND resource.type=\"uptime_url\" AND metric.label.check_id=\"${google_monitoring_uptime_check_config.gateway[0].uptime_check_id}\""
       comparison      = "COMPARISON_GT"
       threshold_value = 1
       duration        = "300s"

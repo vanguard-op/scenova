@@ -13,14 +13,14 @@
 # time from here, and anything left empty is taken at runtime from Hosting's
 # `/__/firebase/init.json`. `.env`'s local console values never reach a deploy.
 #
-# Usage: ci/deploy_console.sh <dev|staging|prod>
+# Usage: ci/deploy_console.sh <dev|staging|prod|pre-revenue>
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
 
-ENV="${1:?usage: ci/deploy_console.sh <dev|staging|prod>}"
+ENV="${1:?usage: ci/deploy_console.sh <dev|staging|prod|pre-revenue>}"
 case "$ENV" in
-  dev|staging|prod) ;;
-  *) die "unknown environment '$ENV' (expected dev, staging, or prod)" ;;
+  dev|staging|prod|pre-revenue) ;;
+  *) die "unknown environment '$ENV' (expected dev, staging, prod, or pre-revenue)" ;;
 esac
 
 has_console || die "no review console to deploy (apps/console/pubspec.yaml is missing)"

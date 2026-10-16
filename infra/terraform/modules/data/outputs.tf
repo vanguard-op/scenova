@@ -8,10 +8,11 @@ output "db_name" {
   value = google_sql_database.primary.name
 }
 output "redis_host" {
-  value = google_redis_instance.cache.host
+  # Empty when Redis is not part of the shape (var.enable_redis = false).
+  value = try(google_redis_instance.cache[0].host, "")
 }
 output "redis_port" {
-  value = google_redis_instance.cache.port
+  value = try(google_redis_instance.cache[0].port, 0)
 }
 output "bucket_name" {
   value = google_storage_bucket.clips.name

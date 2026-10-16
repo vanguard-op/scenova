@@ -13,6 +13,18 @@ variable "region" { type = string }
 variable "environment" { type = string }
 variable "labels" { type = map(string) }
 variable "connector_id" { type = string }
+variable "network_id" {
+  type    = string
+  default = ""
+}
+variable "subnetwork_id" {
+  type    = string
+  default = ""
+}
+variable "vpc_egress" {
+  type    = string
+  default = "connector"
+}
 variable "service_account_email" {
   description = "Service account the job runs as; granted cloudsql.client and secretAccessor on database-url."
   type        = string
@@ -45,8 +57,17 @@ resource "google_cloud_run_v2_job" "migrate" {
       timeout     = "600s"
 
       vpc_access {
-        connector = var.connector_id
-        egress    = "PRIVATE_RANGES_ONLY"
+        egress = "PRIVATE_RANGES_ONLY"
+
+        connector = var.vpc_egress == "connector" ? var.connector_id : null
+
+        dynamic "network_interfaces" {
+          for_each = var.vpc_egress == "direct" ? [1] : []
+          content {
+            network    = var.network_id
+            subnetwork = var.subnetwork_id
+          }
+        }
       }
 
       containers {

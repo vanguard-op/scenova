@@ -48,6 +48,7 @@ module "network" {
   region      = var.region
   environment = var.environment
   labels      = var.labels
+  vpc_egress  = var.vpc_egress
 }
 
 # --- Secrets (containers only; values live in Secret Manager) -----------------
@@ -55,10 +56,11 @@ module "network" {
 module "secrets" {
   source = "./modules/secrets"
 
-  project_id  = var.project_id
-  environment = var.environment
-  labels      = var.labels
-  secret_ids  = var.secret_ids
+  project_id      = var.project_id
+  environment     = var.environment
+  labels          = var.labels
+  secret_ids      = var.secret_ids
+  deletion_policy = var.data_deletion_policy
 
   accessors = {
     "database-url"            = concat(local.all_runtime_emails, [google_service_account.migrate.email])
@@ -84,8 +86,13 @@ module "data" {
 
   db_tier                  = var.db_tier
   db_availability          = var.db_availability
+  db_disk_type             = var.db_disk_type
+  db_disk_size_gb          = var.db_disk_size_gb
   db_backup_retention_days = var.db_backup_retention_days
+  db_activation_policy     = var.db_activation_policy
+  data_deletion_policy     = var.data_deletion_policy
 
+  enable_redis    = var.enable_redis
   redis_tier      = var.redis_tier
   redis_memory_gb = var.redis_memory_gb
 
@@ -113,6 +120,9 @@ module "db_migrate" {
   environment           = var.environment
   labels                = var.labels
   connector_id          = module.network.connector_id
+  network_id            = module.network.vpc_id
+  subnetwork_id         = module.network.subnet_id
+  vpc_egress            = var.vpc_egress
   service_account_email = google_service_account.migrate.email
   database_url_secret   = module.secrets.secret_ids["database-url"]
   image                 = local.bootstrap_image
@@ -165,9 +175,13 @@ locals {
     TASKS_LOCATION                = var.region
     TASKS_QUEUE                   = module.queue.queue_name
     TASKS_INVOKER_SERVICE_ACCOUNT = google_service_account.tasks.email
-    REDIS_URL                     = "redis://${module.data.redis_host}:${module.data.redis_port}/0"
-    FIREBASE_PROJECT_ID           = var.firebase_project_id
-    LOG_LEVEL                     = var.environment == "prod" ? "info" : "debug"
+    # Empty when Redis is not part of the shape (var.enable_redis): the gateway
+    # reads an empty REDIS_URL as "no shared cache" and serves rate limits from
+    # its in-memory counters (services/gateway/app/ratelimit.py), so the stack
+    # boots with no Redis in the path.
+    REDIS_URL           = var.enable_redis ? "redis://${module.data.redis_host}:${module.data.redis_port}/0" : ""
+    FIREBASE_PROJECT_ID = var.firebase_project_id
+    LOG_LEVEL           = var.environment == "prod" ? "info" : "debug"
   }
 
   service_extra_env = {
@@ -237,6 +251,10 @@ module "run" {
   labels        = var.labels
   artifact_repo = var.artifact_repo
   connector_id  = module.network.connector_id
+  network_id    = module.network.vpc_id
+  subnetwork_id = module.network.subnet_id
+  vpc_egress    = var.vpc_egress
+  enabled       = var.runtime_enabled
 
   internal_invokers = concat(local.all_runtime_emails, [google_service_account.tasks.email])
 
@@ -247,7 +265,7 @@ module "run" {
       image                 = local.bootstrap_image
       env                   = merge(local.common_env, var.flags, lookup(local.service_extra_env, name, {}))
       secret_env            = lookup(local.service_secret_env, name, {})
-      min_instances         = name == "gateway" ? 1 : 0
+      min_instances         = name == "gateway" ? var.gateway_min_instances : 0
       max_instances         = 10
     }
   }
@@ -365,6 +383,8 @@ module "monitoring" {
 
   project_id  = var.project_id
   environment = var.environment
-  gateway_url = module.run.service_uris["gateway"]
+  # Empty when the runtime is torn down: no gateway to probe.
+  gateway_url = try(module.run.service_uris["gateway"], "")
   alert_email = var.alert_email
+  enabled     = var.runtime_enabled
 }

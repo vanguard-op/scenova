@@ -6,12 +6,12 @@
 # change moves one environment at a time and promotion is explicit.
 
 variable "environment" {
-  description = "Environment name: dev, staging, or prod."
+  description = "Environment name: dev, staging, prod, or pre-revenue (D-034: the free-tier shape that runs before there are readers)."
   type        = string
 
   validation {
-    condition     = contains(["dev", "staging", "prod"], var.environment)
-    error_message = "environment must be one of: dev, staging, prod."
+    condition     = contains(["dev", "staging", "prod", "pre-revenue"], var.environment)
+    error_message = "environment must be one of: dev, staging, prod, pre-revenue."
   }
 }
 
@@ -73,6 +73,46 @@ variable "services" {
   }))
 }
 
+# The lifecycle's runtime switch. Off removes the Cloud Run services and the
+# uptime check from the environment (the data stores, network, and secrets stay),
+# so the paid runtime exists only during a testing window; on recreates them.
+# Everything the runtime does is scale-to-zero, so this is about removing the
+# surface, not about an idle bill — the idle bill is Cloud SQL, which
+# db_activation_policy stops.
+variable "runtime_enabled" {
+  description = "Run the Cloud Run services and their uptime check. Off tears the runtime down while keeping the data stores."
+  type        = bool
+  default     = true
+}
+
+# The production shape keeps one warm gateway instance so the first reader after
+# an idle period is not cold-started. The free-tier shape runs no min instances
+# at all: an idle min instance is billed at Cloud Run's idle rate even with no
+# traffic (cloud.google.com/run/pricing), so it sets this to 0 and accepts a cold
+# start — the availability NFR-010 asks for is not bought before there are
+# readers (D-034).
+variable "gateway_min_instances" {
+  description = "Minimum Cloud Run instances for the gateway. 0 is scale-to-zero."
+  type        = number
+  default     = 1
+}
+
+# How Cloud Run reaches the private VPC (Cloud SQL). "connector" uses a
+# Serverless VPC Access connector, which bills at least two Compute Engine
+# instances 24/7; "direct" uses Direct VPC egress, which needs no connector and
+# no always-on resource (cloud.google.com/run/docs/configuring/vpc-direct-vpc).
+# The production shape keeps the connector; the free-tier shape uses direct.
+variable "vpc_egress" {
+  description = "Cloud Run VPC egress: connector (Serverless VPC Access, always-on) or direct (Direct VPC egress, no connector)."
+  type        = string
+  default     = "connector"
+
+  validation {
+    condition     = contains(["connector", "direct"], var.vpc_egress)
+    error_message = "vpc_egress must be connector or direct."
+  }
+}
+
 variable "flags" {
   description = "Feature flags from release.md 'Rollout Phases & Feature Flags'. Runtime kill switches, owned per environment."
   type        = map(string)
@@ -97,7 +137,7 @@ variable "internal_audience" {
 }
 
 variable "db_tier" {
-  description = "Cloud SQL machine tier."
+  description = "Cloud SQL machine tier. db-f1-micro (shared core, 0.6 GB) is the cheapest reachable PostgreSQL."
   type        = string
   default     = "db-f1-micro"
 }
@@ -108,10 +148,52 @@ variable "db_availability" {
   default     = "ZONAL"
 }
 
+variable "db_disk_type" {
+  description = "Cloud SQL data disk type: PD_SSD, PD_HDD, or HYPERDISK_BALANCED. PD_HDD is the cheapest."
+  type        = string
+  default     = "PD_SSD"
+}
+
+variable "db_disk_size_gb" {
+  description = "Cloud SQL data disk size in GB (minimum 10)."
+  type        = number
+  default     = 20
+}
+
 variable "db_backup_retention_days" {
   description = "Cloud SQL automated backup retention, meeting the 1-hour RPO for account and entitlement data."
   type        = number
   default     = 7
+}
+
+# The database is the only always-on paid resource in the free-tier shape, so the
+# lifecycle's pause/destroy stops it rather than deleting it: NEVER stops the
+# instance (compute billing ends, the disk and its data stay), ALWAYS resumes it.
+variable "db_activation_policy" {
+  description = "Cloud SQL activation policy: ALWAYS (running) or NEVER (stopped, data retained)."
+  type        = string
+  default     = "ALWAYS"
+
+  validation {
+    condition     = contains(["ALWAYS", "NEVER"], var.db_activation_policy)
+    error_message = "db_activation_policy must be ALWAYS or NEVER."
+  }
+}
+
+# The teardown guard (nfr.md "Privacy & Compliance" data lifecycle): account and
+# entitlement data lives for the life of the account, financial records for seven
+# years, and shared library entries until retired, so no lifecycle action may
+# delete the data stores. PREVENT makes Terraform refuse a destroy of the stateful
+# resources outright; the free-tier shape sets it, dev/staging/prod leave DELETE.
+variable "data_deletion_policy" {
+  description = "Terraform deletion policy for stateful resources (Cloud SQL, the clip bucket, secrets): DELETE, PREVENT, or ABANDON."
+  type        = string
+  default     = "DELETE"
+
+  validation {
+    condition     = contains(["DELETE", "PREVENT", "ABANDON"], var.data_deletion_policy)
+    error_message = "data_deletion_policy must be DELETE, PREVENT, or ABANDON."
+  }
 }
 
 variable "redis_tier" {
@@ -124,6 +206,16 @@ variable "redis_memory_gb" {
   description = "Memorystore Redis capacity in GB."
   type        = number
   default     = 1
+}
+
+# Memorystore has no free tier (a 1 GB BASIC instance bills ~$35/month whether or
+# not anything reads it), so the free-tier shape leaves it out and the gateway
+# falls back to its in-memory rate-limit counters (REDIS_URL empty; see
+# services/gateway/app/ratelimit.py). Nothing else consumes Redis at boot.
+variable "enable_redis" {
+  description = "Create Memorystore for Redis. Off in the free-tier shape, where nothing may bill while idle."
+  type        = bool
+  default     = true
 }
 
 variable "deletion_protection" {

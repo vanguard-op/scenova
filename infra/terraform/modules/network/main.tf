@@ -10,6 +10,14 @@ variable "connector_name" {
   type    = string
   default = "scenova-serverless"
 }
+# "connector" creates a Serverless VPC Access connector (always-on: it bills at
+# least two Compute Engine instances whether or not traffic flows). "direct" skips
+# it and lets Cloud Run use Direct VPC egress, so the private VPC is reachable
+# with no always-on resource (cloud.google.com/run/docs/configuring/vpc-direct-vpc).
+variable "vpc_egress" {
+  type    = string
+  default = "connector"
+}
 
 resource "google_compute_network" "vpc" {
   name                    = "scenova-${var.environment}"
@@ -42,8 +50,11 @@ resource "google_service_networking_connection" "private_services" {
   reserved_peering_ranges = [google_compute_global_address.private_services.name]
 }
 
-# Serverless connector: Cloud Run → private IPs (Cloud SQL, Redis).
+# Serverless connector: Cloud Run → private IPs (Cloud SQL, Redis). Created only
+# in connector mode; Direct VPC egress needs no connector and no always-on
+# resource.
 resource "google_vpc_access_connector" "connector" {
+  count         = var.vpc_egress == "connector" ? 1 : 0
   name          = var.connector_name
   project       = var.project_id
   region        = var.region

@@ -28,6 +28,8 @@ export FIREBASE_PROJECT_ID TASKS_PROJECT
 VENV        ?= .venv
 ENVIRONMENT ?= dev
 ENV         ?= $(ENVIRONMENT)
+# The pre-revenue environment (D-034) the lifecycle starts, pauses, and destroys.
+LIFECYCLE_ENV ?= pre-revenue
 GIT_SHA     ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo local)
 TERRAFORM   ?= terraform
 TF_DIR      := infra/terraform
@@ -42,12 +44,13 @@ PYTEST    := $(VENV)/bin/pytest
 .PHONY: help setup auth fmt lint env typecheck test qa qa-model model-bar build bundle boot security \
         db-up db-migrate db-rollback db-reset db-status db-check db-migrate-cloud \
         infra-init infra-fmt infra-validate infra-plan infra-apply \
+        env-start env-pause env-destroy \
         deploy deploy-console curator promote rollback flag ci clean
 
 help: ## Show the documented commands
 	@printf '\nScenova platform commands (env=%s, venv=%s)\n\n' "$(ENVIRONMENT)" "$(VENV)"
 	@awk 'BEGIN{FS=":.*## "} /^[a-zA-Z0-9_-]+:.*## /{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
-	@printf '\nTargets: make setup · make auth · make ci · make qa · make model-bar · make db-up · make db-migrate · make deploy ENV=staging · make promote ENV=staging SVC=gateway · make rollback ENV=staging SVC=gateway · make flag ENV=prod FLAG=FLAG_ENABLE_GENERATION VALUE=false · make curator OPERATOR=…\n\n'
+	@printf '\nTargets: make setup · make auth · make ci · make qa · make model-bar · make db-up · make db-migrate · make deploy ENV=staging · make promote ENV=staging SVC=gateway · make rollback ENV=staging SVC=gateway · make flag ENV=prod FLAG=FLAG_ENABLE_GENERATION VALUE=false · make curator OPERATOR=… · make env-start · make env-pause · make env-destroy\n\n'
 
 # --- Setup -------------------------------------------------------------------
 
@@ -149,8 +152,19 @@ infra-plan: ## Plan infrastructure for an environment (ENV=dev|staging|prod)
 	$(TERRAFORM) -chdir=$(TF_DIR) init -input=false -backend-config=backend/$(ENV).hcl
 	$(TERRAFORM) -chdir=$(TF_DIR) plan -var-file=environments/$(ENV).tfvars -out=$(ENV).tfplan
 
-infra-apply: ## Apply infrastructure for an environment (ENV=dev|staging|prod)
+infra-apply: ## Apply infrastructure for an environment (ENV=dev|staging|prod|pre-revenue)
 	$(TERRAFORM) -chdir=$(TF_DIR) apply -var-file=environments/$(ENV).tfvars
+
+# --- Pre-revenue lifecycle (D-034) -------------------------------------------
+
+env-start: ## Start the pre-revenue environment (LIFECYCLE_ENV=pre-revenue)
+	@bash ci/lifecycle.sh start $(LIFECYCLE_ENV)
+
+env-pause: ## Pause the pre-revenue environment: stop the database, keep the runtime (LIFECYCLE_ENV=…)
+	@bash ci/lifecycle.sh pause $(LIFECYCLE_ENV)
+
+env-destroy: ## Destroy the pre-revenue runtime: stop the database, keep the data (LIFECYCLE_ENV=… CONFIRM_DESTROY=…)
+	@bash ci/lifecycle.sh destroy $(LIFECYCLE_ENV)
 
 # --- Release -----------------------------------------------------------------
 

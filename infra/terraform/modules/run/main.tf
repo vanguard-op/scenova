@@ -13,6 +13,29 @@ variable "environment" { type = string }
 variable "labels" { type = map(string) }
 variable "artifact_repo" { type = string }
 variable "connector_id" { type = string }
+# Direct VPC egress target, used when vpc_egress = "direct" (no connector).
+variable "network_id" {
+  type    = string
+  default = ""
+}
+variable "subnetwork_id" {
+  type    = string
+  default = ""
+}
+# "connector" attaches the Serverless VPC Access connector; "direct" uses Direct
+# VPC egress, which needs no always-on connector.
+variable "vpc_egress" {
+  type    = string
+  default = "connector"
+}
+# The lifecycle's runtime switch: off removes every Cloud Run service (and the
+# environment's runtime surface) while leaving the data stores, network, and
+# secrets untouched. Artifact Registry is kept either way — it is free up to
+# 0.5 GB and holds the images a later start would deploy.
+variable "enabled" {
+  type    = bool
+  default = true
+}
 
 variable "services" {
   description = "Cloud Run services keyed by name. Containers listen on the Cloud Run default port 8080."
@@ -51,7 +74,7 @@ resource "google_artifact_registry_repository" "images" {
 }
 
 resource "google_cloud_run_v2_service" "this" {
-  for_each = var.services
+  for_each = var.enabled ? var.services : {}
 
   name     = each.key
   project  = var.project_id
@@ -68,9 +91,21 @@ resource "google_cloud_run_v2_service" "this" {
       max_instance_count = each.value.max_instances
     }
 
+    # The private VPC (Cloud SQL) is reached either through the Serverless VPC
+    # Access connector or, in direct mode, through Direct VPC egress on this
+    # service's own network interface — no connector, no always-on resource.
     vpc_access {
-      connector = var.connector_id
-      egress    = "PRIVATE_RANGES_ONLY"
+      egress = "PRIVATE_RANGES_ONLY"
+
+      connector = var.vpc_egress == "connector" ? var.connector_id : null
+
+      dynamic "network_interfaces" {
+        for_each = var.vpc_egress == "direct" ? [1] : []
+        content {
+          network    = var.network_id
+          subnetwork = var.subnetwork_id
+        }
+      }
     }
 
     containers {
@@ -119,7 +154,7 @@ resource "google_cloud_run_v2_service" "this" {
 
 # Public invoker for the gateway only.
 resource "google_cloud_run_v2_service_iam_member" "public" {
-  for_each = { for name, svc in var.services : name => svc if svc.public }
+  for_each = { for name, svc in google_cloud_run_v2_service.this : name => svc if var.services[name].public }
 
   project  = var.project_id
   location = var.region
@@ -128,11 +163,13 @@ resource "google_cloud_run_v2_service_iam_member" "public" {
   member   = "allUsers"
 }
 
-# Authenticated service-to-service invocation of the internal services.
+# Authenticated service-to-service invocation of the internal services. Built
+# from the services that actually exist, so a torn-down runtime has no IAM
+# bindings pointing at a service that is gone.
 resource "google_cloud_run_v2_service_iam_member" "internal" {
   for_each = {
     for pair in setproduct(
-      [for name, svc in var.services : name if !svc.public],
+      [for name, svc in google_cloud_run_v2_service.this : name if !var.services[name].public],
       var.internal_invokers
     ) : "${pair[0]}__${pair[1]}" => { service = pair[0], member = pair[1] }
   }

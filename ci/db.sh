@@ -95,10 +95,10 @@ case "$cmd" in
     ;;
 
   cloud)
-    env="${1:?usage: ci/db.sh cloud <dev|staging|prod>}"
+    env="${1:?usage: ci/db.sh cloud <dev|staging|prod|pre-revenue>}"
     case "$env" in
-      dev|staging|prod) ;;
-      *) die "unknown environment '$env' (expected dev, staging, or prod)" ;;
+      dev|staging|prod|pre-revenue) ;;
+      *) die "unknown environment '$env' (expected dev, staging, prod, or pre-revenue)" ;;
     esac
     command -v gcloud >/dev/null 2>&1 || die "gcloud is required to run the cloud migration job"
     tfvars="infra/terraform/environments/${env}.tfvars"

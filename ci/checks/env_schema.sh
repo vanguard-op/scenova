@@ -203,6 +203,21 @@ for f in "${tfvars[@]}"; do
     grep -qE "^[[:space:]]*${key}[[:space:]]*=[[:space:]]*\"(true|false)\"" "$f" \
       || die "$f is missing a boolean $key"
   done
+  # The free-tier shape changes no flag (D-034): its flags equal the release
+  # defaults, so generation and the paid tier stay off and nothing spends on the
+  # model provider before the judged quality bars are met. The entitlement tier
+  # figures are likewise unchanged — they live in infra/terraform/main.tf, which
+  # this check already holds in step with .env.example above.
+  case "$f" in
+    */pre-revenue.tfvars)
+      for pair in "${FLAG_DEFAULTS[@]}"; do
+        key="${pair%%=*}"
+        value="${pair#*=}"
+        grep -qE "^[[:space:]]*${key}[[:space:]]*=[[:space:]]*\"${value}\"" "$f" \
+          || die "$f must keep the release default '$pair' (D-034: no flag changes)"
+      done
+      ;;
+  esac
   while read -r key; do
     [ -n "$key" ] || continue
     known=0

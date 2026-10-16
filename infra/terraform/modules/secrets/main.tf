@@ -7,6 +7,13 @@ variable "project_id" { type = string }
 variable "environment" { type = string }
 variable "labels" { type = map(string) }
 variable "secret_ids" { type = list(string) }
+# The teardown guard: PREVENT keeps a destroy from removing the secret containers
+# (which hold the generated database credential), so a lifecycle action cannot
+# strand the database by deleting the only copy of its password.
+variable "deletion_policy" {
+  type    = string
+  default = "DELETE"
+}
 variable "accessors" {
   description = "Map of secret id → list of service account emails granted secretAccessor."
   type        = map(list(string))
@@ -22,7 +29,8 @@ resource "google_secret_manager_secret" "this" {
     auto {}
   }
 
-  labels = merge(var.labels, { environment = var.environment })
+  labels          = merge(var.labels, { environment = var.environment })
+  deletion_policy = var.deletion_policy
 }
 
 resource "google_secret_manager_secret_iam_member" "accessor" {

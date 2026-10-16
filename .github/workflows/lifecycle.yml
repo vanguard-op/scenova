@@ -1,0 +1,84 @@
+# Lifecycle for the pre-revenue environment (D-034): start, pause, and destroy
+# the environment on demand, so the paid resources exist only during testing
+# windows.
+#
+# Manual dispatch only — this workflow has no `push` trigger, and ci/lifecycle.sh
+# refuses to run under any non-dispatch Actions event, so it can never fire on a
+# push. `destroy` additionally requires the confirmation input to match the
+# action name, and the job runs in the `pre-revenue` GitHub Environment so a
+# required-reviewer protection rule can gate it.
+#
+# Required repository configuration (values, not secrets) — the same as the
+# deploy workflow:
+#   vars.GCP_WORKLOAD_IDENTITY_PROVIDER  projects/<n>/locations/global/workloadIdentityPools/<pool>/providers/<provider>
+#   vars.GCP_DEPLOY_SERVICE_ACCOUNT      the deploy service account email
+#
+# The lifecycle runs `make env-<action>` — the same target a developer runs
+# locally — so a failure is reproducible and its log readable. It needs only
+# Terraform and the Cloud SDK, not the app toolchain.
+name: Lifecycle
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Lifecycle action to run
+        type: choice
+        options: [start, pause, destroy]
+        required: true
+      confirm:
+        description: "For destroy only: type the action name (destroy) to confirm"
+        type: string
+        required: false
+
+concurrency:
+  # One lifecycle action at a time: two applies against the same state would race.
+  group: lifecycle-pre-revenue
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  lifecycle:
+    runs-on: ubuntu-latest
+    # A protection rule on this Environment (required reviewers) is the human gate
+    # on destroy; it is not configured in the repository.
+    environment: pre-revenue
+    timeout-minutes: 30
+
+    steps:
+      - name: Guard — manual dispatch only
+        if: ${{ github.event_name != 'workflow_dispatch' }}
+        run: |
+          echo "::error::the lifecycle runs on manual dispatch only"
+          exit 1
+
+      - name: Guard — destroy confirmation
+        if: ${{ inputs.action == 'destroy' && inputs.confirm != 'destroy' }}
+        run: |
+          echo "::error::destroy is guarded; set the confirm input to 'destroy'"
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.16.5"
+          terraform_wrapper: false
+
+      - name: Run lifecycle action
+        env:
+          CONFIRM_DESTROY: ${{ inputs.confirm }}
+        run: make env-${{ inputs.action }}

@@ -1,6 +1,6 @@
 output "gateway_url" {
-  description = "Public entry point for the mobile client (the only public service)."
-  value       = module.run.service_uris["gateway"]
+  description = "Public entry point for the mobile client (the only public service). Empty while the runtime is torn down."
+  value       = try(module.run.service_uris["gateway"], "")
 }
 
 output "service_uris" {

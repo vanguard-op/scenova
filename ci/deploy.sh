@@ -16,11 +16,11 @@
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
 
-ENV="${1:?usage: ci/deploy.sh <dev|staging|prod> [service ...]}"
+ENV="${1:?usage: ci/deploy.sh <dev|staging|prod|pre-revenue> [service ...]}"
 shift || true
 case "$ENV" in
-  dev|staging|prod) ;;
-  *) die "unknown environment '$ENV' (expected dev, staging, or prod)" ;;
+  dev|staging|prod|pre-revenue) ;;
+  *) die "unknown environment '$ENV' (expected dev, staging, prod, or pre-revenue)" ;;
 esac
 
 TFVARS="infra/terraform/environments/${ENV}.tfvars"

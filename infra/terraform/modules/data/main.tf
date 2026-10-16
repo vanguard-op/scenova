@@ -16,7 +16,14 @@ variable "deletion_protection" { type = bool }
 
 variable "db_tier" { type = string }
 variable "db_availability" { type = string }
+variable "db_disk_type" { type = string }
+variable "db_disk_size_gb" { type = number }
 variable "db_backup_retention_days" { type = number }
+variable "db_activation_policy" { type = string }
+# The teardown guard: PREVENT makes Terraform refuse to destroy the stateful
+# resources, so no lifecycle action can take the data with it by accident
+# (nfr.md "Privacy & Compliance" data lifecycle).
+variable "data_deletion_policy" { type = string }
 variable "db_name" {
   type    = string
   default = "scenova"
@@ -26,6 +33,7 @@ variable "db_user" {
   default = "scenova"
 }
 
+variable "enable_redis" { type = bool }
 variable "redis_tier" { type = string }
 variable "redis_memory_gb" { type = number }
 
@@ -64,14 +72,22 @@ resource "google_sql_database_instance" "primary" {
   region              = var.region
   database_version    = "POSTGRES_16"
   deletion_protection = var.deletion_protection
+  # Terraform-level teardown guard, alongside the API-level deletion_protection:
+  # PREVENT fails a destroy in Terraform before it ever calls Cloud SQL, so the
+  # account, entitlement, and financial data a teardown may not lose (nfr.md
+  # "Privacy & Compliance") cannot be deleted by accident.
+  deletion_policy = var.data_deletion_policy
 
   settings {
     tier              = var.db_tier
     availability_type = var.db_availability
-    disk_size         = 20
-    disk_type         = "PD_SSD"
+    disk_size         = var.db_disk_size_gb
+    disk_type         = var.db_disk_type
     disk_autoresize   = true
     user_labels       = local.labels
+    # ALWAYS runs the instance; NEVER stops it (compute billing ends, the disk and
+    # its data stay). The lifecycle's pause/destroy sets NEVER.
+    activation_policy = var.db_activation_policy
 
     backup_configuration {
       enabled                        = true
@@ -134,7 +150,15 @@ resource "google_secret_manager_secret_version" "database_url" {
 
 # --- Memorystore for Redis ----------------------------------------------------
 
+# Off in the free-tier shape (var.enable_redis): Memorystore has no free tier and
+# a 1 GB BASIC instance bills whether or not anything reads it, so the free-tier
+# shape leaves it out and the gateway uses its in-memory rate-limit counters
+# (REDIS_URL empty). No other service reads Redis at boot, so the stack comes up
+# without it. The production shape keeps it for the shared counters NFR-010 needs
+# across replicas.
 resource "google_redis_instance" "cache" {
+  count = var.enable_redis ? 1 : 0
+
   name               = "scenova-${var.environment}"
   project            = var.project_id
   region             = var.region
@@ -144,6 +168,7 @@ resource "google_redis_instance" "cache" {
   authorized_network = var.network_id
   connect_mode       = "PRIVATE_SERVICE_ACCESS"
   labels             = local.labels
+  deletion_policy    = var.data_deletion_policy
 
   depends_on = [var.private_services_connection]
 }
@@ -157,6 +182,11 @@ resource "google_storage_bucket" "clips" {
   storage_class               = "STANDARD"
   uniform_bucket_level_access = true
   labels                      = local.labels
+  # The bucket holds the shared library's clip files, which are kept until
+  # retired (nfr.md "Privacy & Compliance"); force_destroy stays false so a
+  # destroy cannot empty and delete it, and the policy is the Terraform-level
+  # guard alongside it.
+  deletion_policy = var.data_deletion_policy
 
   versioning { enabled = true }
 
