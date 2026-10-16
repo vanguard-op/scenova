@@ -42,6 +42,41 @@ case "$VENV" in
   *) VENV_DIR="$REPO_ROOT/$VENV" ;;
 esac
 
+# --- Google APIs the environment calls ---------------------------------------
+# The single list of the APIs the Terraform shape needs on its project, enabled
+# once per project by `make bootstrap` (ci/bootstrap.sh) and asserted by the
+# lifecycle (ci/lifecycle.sh) before an apply. The Firebase and Identity
+# Platform APIs (firebase*, identitytoolkit, firebasehosting), Cloud Storage,
+# Logging, and Monitoring are already on for a Firebase-initialised project, so
+# they are not listed; Cloud Run, Cloud Tasks, Secret Manager, Artifact
+# Registry, and Compute all need billing attached before they can even be
+# enabled. gcloud enables transitive dependencies (e.g. containerregistry for
+# artifactregistry) and is a no-op for an API already on.
+REQUIRED_APIS=(
+  run.googleapis.com
+  cloudtasks.googleapis.com
+  secretmanager.googleapis.com
+  artifactregistry.googleapis.com
+  compute.googleapis.com
+  sqladmin.googleapis.com
+  servicenetworking.googleapis.com
+  iam.googleapis.com
+  iamcredentials.googleapis.com
+)
+
+# The APIs in REQUIRED_APIS that are not enabled on the given project. Prints one
+# per line. A call that fails (no permission) is skipped rather than reported as
+# missing, so a limited CI identity does not produce a false failure; the caller
+# checks it can list services at all first.
+missing_apis() {
+  local project="$1" api enabled
+  for api in "${REQUIRED_APIS[@]}"; do
+    enabled="$(gcloud services list --enabled --project "$project" \
+      --filter="config.name:$api" --format='value(config.name)' 2>/dev/null)" || continue
+    [ -n "$enabled" ] || printf '%s\n' "$api"
+  done
+}
+
 # --- Workspace detection -----------------------------------------------------
 # The repo is a monorepo whose workspaces are added by their owning roles. A
 # check runs only when its workspace exists, so the foundation is green before

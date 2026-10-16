@@ -7,12 +7,12 @@
 # Authentication enabled, so on an already-initialised project it is adopted once
 # with
 #
-#   terraform import google_identity_platform_config.this <project_id>
+#   terraform import module.identity.google_identity_platform_config.this projects/<project_id>
 #
-# rather than created. Terraform then owns the second-factor policy; the sign-in
-# providers are declared to match the product (an anonymous identity before an
-# account, email for the account) so this file stays the one place that describes
-# who can sign in.
+# (run by `make bootstrap`, ci/bootstrap.sh) rather than created. Terraform then
+# owns the second-factor policy; the sign-in providers are declared to match the
+# product (an anonymous identity before an account, email for the account) so
+# this file stays the one place that describes who can sign in.
 #
 # The gate: MFA is ENABLED for the project (available, not mandatory, so the
 # reader path never asks for a second factor) with TOTP as the operator factor.

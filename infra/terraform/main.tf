@@ -6,23 +6,43 @@
 
 # --- Identity: one runtime service account per service (least privilege) ------
 
+# The service-account ids and their emails are derived from the service map's
+# keys, which are known at plan time, so every `for_each` built from them is
+# known before apply. Reading the email off the created resource instead
+# (`sa.email`) would make those `for_each` values apply-time-only, which
+# `terraform import` rejects — and the resources that already exist on the
+# project must be imported before the first apply (ci/bootstrap.sh). The
+# account-id format lives here once, so an id and its email cannot drift.
+locals {
+  runtime_account_ids = { for name in keys(var.services) : name => "scenova-${name}" }
+  runtime_emails      = { for name, id in local.runtime_account_ids : name => "${id}@${var.project_id}.iam.gserviceaccount.com" }
+  all_runtime_emails  = values(local.runtime_emails)
+
+  tasks_account_id   = "scenova-tasks"
+  tasks_email        = "${local.tasks_account_id}@${var.project_id}.iam.gserviceaccount.com"
+  deploy_account_id  = "scenova-deploy"
+  deploy_email       = "${local.deploy_account_id}@${var.project_id}.iam.gserviceaccount.com"
+  migrate_account_id = "scenova-migrate"
+  migrate_email      = "${local.migrate_account_id}@${var.project_id}.iam.gserviceaccount.com"
+}
+
 resource "google_service_account" "runtime" {
-  for_each = var.services
+  for_each = local.runtime_account_ids
 
   project      = var.project_id
-  account_id   = "scenova-${each.key}"
+  account_id   = each.value
   display_name = "Scenova ${each.key} runtime (${var.environment})"
 }
 
 resource "google_service_account" "tasks" {
   project      = var.project_id
-  account_id   = "scenova-tasks"
+  account_id   = local.tasks_account_id
   display_name = "Scenova generation queue invoker (${var.environment})"
 }
 
 resource "google_service_account" "deploy" {
   project      = var.project_id
-  account_id   = "scenova-deploy"
+  account_id   = local.deploy_account_id
   display_name = "Scenova deploy pipeline (${var.environment})"
 }
 
@@ -30,13 +50,8 @@ resource "google_service_account" "deploy" {
 # the VPC connector, and it can do nothing else (least privilege, NFR-020).
 resource "google_service_account" "migrate" {
   project      = var.project_id
-  account_id   = "scenova-migrate"
+  account_id   = local.migrate_account_id
   display_name = "Scenova database migration job (${var.environment})"
-}
-
-locals {
-  runtime_emails     = { for k, sa in google_service_account.runtime : k => sa.email }
-  all_runtime_emails = values(local.runtime_emails)
 }
 
 # --- Network ------------------------------------------------------------------
@@ -63,7 +78,7 @@ module "secrets" {
   deletion_policy = var.data_deletion_policy
 
   accessors = {
-    "database-url"            = concat(local.all_runtime_emails, [google_service_account.migrate.email])
+    "database-url"            = concat(local.all_runtime_emails, [local.migrate_email])
     "db-password"             = local.all_runtime_emails
     "gemini-api-key"          = [local.runtime_emails["model"]]
     "revenuecat-api-key"      = [local.runtime_emails["entitlement"]]
@@ -123,7 +138,7 @@ module "db_migrate" {
   network_id            = module.network.vpc_id
   subnetwork_id         = module.network.subnet_id
   vpc_egress            = var.vpc_egress
-  service_account_email = google_service_account.migrate.email
+  service_account_email = local.migrate_email
   database_url_secret   = module.secrets.secret_ids["database-url"]
   image                 = local.bootstrap_image
 }
@@ -174,7 +189,7 @@ locals {
     TASKS_PROJECT                 = var.project_id
     TASKS_LOCATION                = var.region
     TASKS_QUEUE                   = module.queue.queue_name
-    TASKS_INVOKER_SERVICE_ACCOUNT = google_service_account.tasks.email
+    TASKS_INVOKER_SERVICE_ACCOUNT = local.tasks_email
     # Empty when Redis is not part of the shape (var.enable_redis): the gateway
     # reads an empty REDIS_URL as "no shared cache" and serves rate limits from
     # its in-memory counters (services/gateway/app/ratelimit.py), so the stack
@@ -256,7 +271,7 @@ module "run" {
   vpc_egress    = var.vpc_egress
   enabled       = var.runtime_enabled
 
-  internal_invokers = concat(local.all_runtime_emails, [google_service_account.tasks.email])
+  internal_invokers = concat(local.all_runtime_emails, [local.tasks_email])
 
   services = {
     for name, cfg in var.services : name => {
@@ -274,18 +289,20 @@ module "run" {
 # --- IAM: least privilege for the runtime -------------------------------------
 
 resource "google_project_iam_member" "runtime_cloudsql" {
-  for_each = google_service_account.runtime
+  # Keys come from the static account-id map, not the created resource, so the
+  # instances are known before apply (a `terraform import` requirement).
+  for_each = local.runtime_account_ids
 
   project = var.project_id
   role    = "roles/cloudsql.client"
-  member  = "serviceAccount:${each.value.email}"
+  member  = "serviceAccount:${local.runtime_emails[each.key]}"
 }
 
 # The migration job reaches Cloud SQL over the VPC connector and nothing else.
 resource "google_project_iam_member" "migrate_cloudsql" {
   project = var.project_id
   role    = "roles/cloudsql.client"
-  member  = "serviceAccount:${google_service_account.migrate.email}"
+  member  = "serviceAccount:${local.migrate_email}"
 }
 
 # The deploy pipeline runs the migration job as the migrate identity, so
@@ -294,7 +311,7 @@ resource "google_project_iam_member" "migrate_cloudsql" {
 resource "google_service_account_iam_member" "deploy_act_as_migrate" {
   service_account_id = google_service_account.migrate.name
   role               = "roles/iam.serviceAccountUser"
-  member             = "serviceAccount:${google_service_account.deploy.email}"
+  member             = "serviceAccount:${local.deploy_email}"
 }
 
 resource "google_project_iam_member" "pipeline_tasks_enqueuer" {
@@ -356,6 +373,11 @@ module "console" {
   project_id  = var.firebase_project_id
   environment = var.environment
   site_id     = var.console_site_id
+  # The adopted Firebase Hosting site and Web App carry the same teardown guard
+  # as the data stores: PREVENT in the pre-revenue shape, so a stray
+  # `terraform destroy` cannot take the console's hosting (nfr.md "Privacy &
+  # Compliance").
+  deletion_policy = var.data_deletion_policy
 }
 
 # --- Identity: the curator role's multi-factor gate (NFR-020) ------------------
@@ -367,13 +389,16 @@ module "identity" {
 
   # The console signs in through OAuth redirects, so its Hosting domains and
   # localhost are authorized; the project's own Firebase domains are implied by
-  # the provider but listed for clarity.
-  authorized_domains = [
+  # the provider but listed for clarity. `distinct` drops the console's own
+  # Hosting domain when it is already one of the project's `.web.app` domains —
+  # Identity Platform returns a de-duplicated list, so a repeated entry would
+  # otherwise show as a diff on every plan.
+  authorized_domains = distinct([
     "localhost",
     "${var.firebase_project_id}.firebaseapp.com",
     "${var.firebase_project_id}.web.app",
     replace(module.console.default_url, "https://", ""),
-  ]
+  ])
 }
 
 # --- Monitoring ---------------------------------------------------------------

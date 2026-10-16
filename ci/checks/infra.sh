@@ -52,4 +52,19 @@ if [ -f "$PREREV" ]; then
   info "pre-revenue shape ok: no Redis, no CDN, no connector, no min instances; data guarded"
 fi
 
+# --- Adopted Firebase resources carry the teardown guard ----------------------
+# The Hosting site and its Web App are adopted with `terraform import` on an
+# already-initialised project; once imported they are Terraform-managed, so a
+# stray destroy would remove the console's hosting. The console module takes the
+# same deletion policy as the data stores; assert the wiring stays in place so a
+# regression cannot quietly drop the guard.
+CONSOLE="infra/terraform/modules/console/main.tf"
+if [ -f "$CONSOLE" ]; then
+  grep -q 'deletion_policy = var.deletion_policy' "$CONSOLE" \
+    || die "$CONSOLE must set deletion_policy on the adopted Firebase resources"
+  grep -q 'deletion_policy = var.data_deletion_policy' infra/terraform/main.tf \
+    || die "infra/terraform/main.tf must pass data_deletion_policy to the console module"
+  info "adopted Firebase resources carry the teardown guard"
+fi
+
 log "Infra checks passed"

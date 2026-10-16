@@ -40,7 +40,7 @@ output "redis_host" {
 
 output "deploy_service_account" {
   description = "Service account the deploy pipeline impersonates."
-  value       = google_service_account.deploy.email
+  value       = local.deploy_email
 }
 
 output "console_url" {

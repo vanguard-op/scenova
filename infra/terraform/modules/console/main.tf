@@ -29,13 +29,30 @@ variable "site_id" {
   type        = string
 }
 
+# The teardown guard, alongside the data stores (nfr.md "Privacy & Compliance").
+# On an already-initialised project the site and its Web App are adopted with
+# `terraform import`; once adopted they are Terraform-managed, so a stray
+# `terraform destroy` would remove the console's hosting. PREVENT makes that
+# destroy fail in Terraform, the same guard the stateful resources carry.
+variable "deletion_policy" {
+  description = "Terraform deletion policy for the adopted Firebase resources: DELETE, PREVENT, or ABANDON."
+  type        = string
+  default     = "DELETE"
+
+  validation {
+    condition     = contains(["DELETE", "PREVENT", "ABANDON"], var.deletion_policy)
+    error_message = "deletion_policy must be DELETE, PREVENT, or ABANDON."
+  }
+}
+
 # The console's Web App, distinct from the reader client's: it is the identity
 # Hosting links to the site and the source of the runtime client config.
 resource "google_firebase_web_app" "console" {
   provider = google-beta
   project  = var.project_id
 
-  display_name = "Scenova review console (${var.environment})"
+  display_name    = "Scenova review console (${var.environment})"
+  deletion_policy = var.deletion_policy
 }
 
 data "google_firebase_web_app_config" "console" {
@@ -49,4 +66,6 @@ resource "google_firebase_hosting_site" "console" {
   project  = var.project_id
   site_id  = var.site_id
   app_id   = google_firebase_web_app.console.app_id
+
+  deletion_policy = var.deletion_policy
 }

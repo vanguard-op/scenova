@@ -24,6 +24,11 @@
 # It is driven only by manual dispatch (`.github/workflows/lifecycle.yml`); it
 # refuses to run in a non-dispatch Actions event, so it can never fire on a push.
 #
+# The project-level prerequisites (billing attached, the APIs the shape calls
+# enabled, the remote state bucket) are one-time setup done by `make bootstrap`
+# (ci/bootstrap.sh); this script checks them and points there when one is
+# missing, rather than failing deep inside an apply.
+#
 # The project is always named explicitly — `--project <id>` and
 # CLOUDSDK_CORE_PROJECT — never taken from the caller's gcloud default, which may
 # point at an unrelated project.
@@ -92,6 +97,22 @@ if ! gcloud projects describe "$PROJECT_ID" --format='value(projectId)' >/dev/nu
 fi
 info "project $PROJECT_ID is reachable"
 
+# The tfvars say the data is guarded, but a value that drifted (an earlier apply
+# with `-var deletion_protection=false`) would leave the live database
+# unprotected while the file still reads true. Confirm the live instance carries
+# the API-level guard too, so a teardown cannot proceed on an unprotected
+# database (nfr.md "Privacy & Compliance" data lifecycle).
+if [ "$ACTION" = "destroy" ]; then
+  db_instance="scenova-${ENV}"
+  if gcloud sql instances describe "$db_instance" --project "$PROJECT_ID" >/dev/null 2>&1; then
+    live_protection="$(gcloud sql instances describe "$db_instance" --project "$PROJECT_ID" \
+      --format='value(settings.deletionProtectionEnabled)' 2>/dev/null)"
+    [ "$live_protection" = "True" ] \
+      || die "live Cloud SQL instance '$db_instance' has deletion protection off (deletionProtectionEnabled=$live_protection); refusing to destroy"
+    info "live database deletion protection confirmed"
+  fi
+fi
+
 # Cloud SQL, Cloud Run, Secret Manager, Cloud Tasks, Artifact Registry, and
 # Monitoring all require a billing account; the Firebase free tier (Auth,
 # Hosting, FCM, Firestore) does not. Report it plainly rather than failing deep
@@ -104,15 +125,28 @@ if [ "$billing" != "True" ]; then
   [ "$ACTION" = "start" ] && die "cannot start $ENV without billing attached"
 fi
 
+# The APIs the shape calls are project-level, not environment-level, so they are
+# enabled once by `make bootstrap` (ci/bootstrap.sh). Report every missing one at
+# once rather than failing deep inside an apply.
+if gcloud services list --enabled --project "$PROJECT_ID" --limit=1 >/dev/null 2>&1; then
+  missing="$(missing_apis "$PROJECT_ID" | tr '\n' ' ')"
+  if [ -n "$missing" ]; then
+    warn "these Google APIs are not enabled on $PROJECT_ID: $missing"
+    die "run 'make bootstrap' (ci/bootstrap.sh) to enable them, then retry '$ACTION'"
+  fi
+  info "required APIs enabled"
+else
+  warn "cannot list the enabled APIs for $PROJECT_ID; skipping the API preflight"
+fi
+
 # The remote state bucket is the one resource Terraform cannot create for itself.
 STATE_BUCKET="$(sed -n 's/^[[:space:]]*bucket[[:space:]]*=[[:space:]]*"\(.*\)".*/\1/p' "$BACKEND" | head -1)"
 [ -n "$STATE_BUCKET" ] || die "no bucket in $BACKEND"
 if ! gcloud storage buckets describe "gs://${STATE_BUCKET}" --project "$PROJECT_ID" >/dev/null 2>&1; then
-  warn "remote state bucket gs://${STATE_BUCKET} does not exist; create it once:"
-  warn "  gcloud storage buckets create gs://${STATE_BUCKET} --project $PROJECT_ID --location $REGION --uniform-bucket-level-access"
-  warn "  gcloud storage buckets update gs://${STATE_BUCKET} --versioning"
-  die "cannot ${ACTION} $ENV without its remote state"
+  warn "remote state bucket gs://${STATE_BUCKET} does not exist"
+  die "run 'make bootstrap' (ci/bootstrap.sh) to create it, then retry '$ACTION'"
 fi
+info "remote state gs://${STATE_BUCKET} present"
 
 # --- Apply -------------------------------------------------------------------
 

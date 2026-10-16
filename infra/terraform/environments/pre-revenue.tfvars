@@ -22,9 +22,11 @@ artifact_repo       = "scenova"
 clip_bucket         = "scenova-clips-pre-revenue"
 firebase_project_id = "scenova-hq"
 # The Firebase Hosting site already exists on this project (it was initialised
-# with Firebase), so the site and its Web App are adopted once with
-# `terraform import` before the first apply, the same way the Identity Platform
-# config is (modules/identity/main.tf).
+# with Firebase), so the site, its Web App, and the Identity Platform config
+# (modules/identity/main.tf) are adopted once with `terraform import` before the
+# first apply. `make bootstrap` (ci/bootstrap.sh) runs those imports, alongside
+# the billing check, the API enablement, and the state bucket, so the first
+# `make env-start` changes the existing resources instead of recreating them.
 console_site_id = "scenova-hq"
 
 # The data must survive every lifecycle action (nfr.md "Privacy & Compliance":

@@ -152,9 +152,11 @@ resource "google_cloud_run_v2_service" "this" {
   }
 }
 
-# Public invoker for the gateway only.
+# Public invoker for the gateway only. The instance keys come from the static
+# service map (not the created resource), so they are known before apply — a
+# `terraform import` requirement; the resource body reads the created service.
 resource "google_cloud_run_v2_service_iam_member" "public" {
-  for_each = { for name, svc in google_cloud_run_v2_service.this : name => svc if var.services[name].public }
+  for_each = var.enabled ? { for name, svc in var.services : name => svc if svc.public } : {}
 
   project  = var.project_id
   location = var.region
@@ -164,15 +166,15 @@ resource "google_cloud_run_v2_service_iam_member" "public" {
 }
 
 # Authenticated service-to-service invocation of the internal services. Built
-# from the services that actually exist, so a torn-down runtime has no IAM
-# bindings pointing at a service that is gone.
+# from the static service map, so a torn-down runtime has no IAM bindings
+# pointing at a service that is gone and the keys are known before apply.
 resource "google_cloud_run_v2_service_iam_member" "internal" {
-  for_each = {
+  for_each = var.enabled ? {
     for pair in setproduct(
-      [for name, svc in google_cloud_run_v2_service.this : name if !var.services[name].public],
+      [for name, svc in var.services : name if !svc.public],
       var.internal_invokers
     ) : "${pair[0]}__${pair[1]}" => { service = pair[0], member = pair[1] }
-  }
+  } : {}
 
   project  = var.project_id
   location = var.region
