@@ -93,6 +93,8 @@ docs/           BPRD (product-shaper)
 ### Active Phase: Phase 4: Polish and Account
 | Task | Feature | Owner | Status | Contract |
 |---|---|---|---|---|
+| T-143 | — | infra-engineer | Done | — |
+| T-144 | — | infra-engineer | In Progress | — |
 
 ## Decisions Log
 | # | Decision | Rationale | By |
@@ -130,6 +132,7 @@ docs/           BPRD (product-shaper)
 | D-031 | The report-triggered generation spend is absorbed; the cost and monetization documents are left as they are | The per-clip cost ceiling still applies; only the volume is unaccounted for, and the user chose not to carry the change into the margin model | user |
 | D-032 | Readers sign in with email and password; no third-party sign-in | Keeps store review simple, since offering third-party sign-in would oblige Sign in with Apple alongside it; the identity provider is already Firebase and its providers are declared | user |
 | D-033 | The selection-action label ships in English only; the choice is stored and every other language reads that it is shown in English | No translated label set exists to ship, so the platform per-app-locale wiring waits for real translations rather than shipping a choice that does nothing | user |
+| D-034 | Pre-revenue the product runs on the free tiers with no always-on infrastructure: scale-to-zero services, the cheapest reachable Postgres, no Redis, no CDN, and Firebase's free tier — with the paid resources started, paused and destroyed on demand rather than left running | There are no readers yet, so the availability the production shape exists to meet buys nothing; every choice reverses by configuration because the stores sit behind ports, and the lifecycle action means the paid parts exist only during testing windows | user |
 
 ## Definition of Done
 - **Task:** the acceptance criteria in the cited feature doc are met; the frozen contract is conformed; unit tests pass; format, lint, analyze, and build are clean; work is committed to the dev branch and confined to `Own`.
