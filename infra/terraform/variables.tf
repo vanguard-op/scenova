@@ -54,6 +54,12 @@ variable "console_site_id" {
   default     = "scenova-console"
 }
 
+variable "identity_gcip" {
+  description = "The project is on Identity Platform (GCIP), enabling the MFA gate (NFR-020) and auth activity logging (NFR-029). On for the production shape; off for the pre-revenue Firebase free-tier shape (D-034)."
+  type        = bool
+  default     = true
+}
+
 variable "console_review_api_base_url" {
   description = "Base URL the review console calls for the review endpoints (C-014 to C-016). Empty uses the console's own origin, which Firebase Hosting rewrites to the gateway."
   type        = string
@@ -128,6 +134,18 @@ variable "secret_ids" {
     "revenuecat-api-key",
     "revenuecat-webhook-auth",
   ]
+}
+
+# The provider credentials (Gemini, RevenueCat) are written out-of-band, so their
+# containers may have no version when the runtime first starts; Cloud Run refuses
+# to mount a versionless secret. The provider-backed features (generation, the
+# paid tier) are off in the free-tier shape, so it leaves these mounts off and the
+# services read them as optional; the production shape mounts them and its
+# operator seeds the values.
+variable "mount_provider_secrets" {
+  description = "Mount the Gemini and RevenueCat provider credentials on the model and entitlement services. Off in the free-tier shape, where generation and the paid tier are off and their values are not yet seeded."
+  type        = bool
+  default     = true
 }
 
 variable "internal_audience" {

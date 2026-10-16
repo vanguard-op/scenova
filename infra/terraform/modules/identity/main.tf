@@ -29,6 +29,12 @@ variable "authorized_domains" {
   type        = list(string)
 }
 
+variable "gcip" {
+  description = "The project is on Identity Platform (GCIP), which the GCIP-only MFA gate (NFR-020) and auth activity logging (NFR-029) require. On for the production shape; off for the pre-revenue Firebase free-tier shape (D-034), which does not upgrade the project's identity product."
+  type        = bool
+  default     = true
+}
+
 resource "google_identity_platform_config" "this" {
   project                    = var.project_id
   autodelete_anonymous_users = true
@@ -50,19 +56,29 @@ resource "google_identity_platform_config" "this" {
     }
   }
 
-  mfa {
-    # Enabled for the project, not mandatory: the reader path never asks for a
-    # second factor, while the operator path requires one.
-    state = "ENABLED"
-
-    provider_configs {
+  # MFA and activity logging are GCIP-only: on a Firebase-only project the API
+  # refuses them ("MFA can only be enabled in GCIP or Firebase Auth upgraded to
+  # aligned product"; "activity logging can only be enabled in GCIP"). The
+  # pre-revenue free-tier shape (D-034) does not upgrade the project's identity
+  # product, so both are off there and the production shape turns them back on by
+  # configuration. Sign-in, the anonymous identity, and the authorized domains
+  # apply on Firebase Auth either way.
+  dynamic "mfa" {
+    for_each = var.gcip ? [1] : []
+    content {
+      # Enabled for the project, not mandatory: the reader path never asks for a
+      # second factor, while the operator path requires one.
       state = "ENABLED"
 
-      # TOTP is the operator's second factor. Phone SMS is deliberately not
-      # enabled: it is the weaker factor and would attach a phone number to an
-      # operator account for no benefit.
-      totp_provider_config {
-        adjacent_intervals = 1
+      provider_configs {
+        state = "ENABLED"
+
+        # TOTP is the operator's second factor. Phone SMS is deliberately not
+        # enabled: it is the weaker factor and would attach a phone number to an
+        # operator account for no benefit.
+        totp_provider_config {
+          adjacent_intervals = 1
+        }
       }
     }
   }
@@ -72,9 +88,12 @@ resource "google_identity_platform_config" "this" {
   # Auth events are logged to Cloud Logging (NFR-029): the curator gate's refusals
   # and sign-ins are auditable alongside the privileged actions the review service
   # records.
-  monitoring {
-    request_logging {
-      enabled = true
+  dynamic "monitoring" {
+    for_each = var.gcip ? [1] : []
+    content {
+      request_logging {
+        enabled = true
+      }
     }
   }
 }

@@ -157,7 +157,10 @@ log "Lifecycle · terraform init ($BACKEND)"
 # pause/destroy only make sense on an environment that exists; applying them on a
 # fresh state would create the data stores instead of stopping them.
 if [ "$ACTION" != "start" ]; then
-  if ! "$TF" -chdir="$TF_DIR" state list 2>/dev/null | grep -q .; then
+  # Capture the output rather than piping to `grep -q`: grep exits at the first
+  # match, the writer takes SIGPIPE, and `set -o pipefail` then reports the whole
+  # pipeline as failed even though the state is non-empty.
+  if [ -z "$("$TF" -chdir="$TF_DIR" state list 2>/dev/null)" ]; then
     die "$ENV has no state to ${ACTION}; run 'start' first"
   fi
 fi

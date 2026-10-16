@@ -79,12 +79,25 @@ resource "google_sql_database_instance" "primary" {
   deletion_policy = var.data_deletion_policy
 
   settings {
+    # The shared-core tiers this shape uses (db-f1-micro in dev and pre-revenue)
+    # exist only in the ENTERPRISE edition. The project's default is
+    # ENTERPRISE_PLUS, which rejects them ("Invalid Tier (db-f1-micro) for
+    # (ENTERPRISE_PLUS) Edition"); the custom tiers staging and prod use are valid
+    # in ENTERPRISE as well, so pinning the edition keeps every environment on the
+    # cheapest reachable instance.
+    edition = "ENTERPRISE"
+
     tier              = var.db_tier
     availability_type = var.db_availability
     disk_size         = var.db_disk_size_gb
     disk_type         = var.db_disk_type
     disk_autoresize   = true
     user_labels       = local.labels
+    # The API-level guard (settings.deletionProtectionEnabled): the live instance
+    # refuses deletion through the API or console. The lifecycle's destroy guard
+    # reads this back from the live instance before it will run (ci/lifecycle.sh),
+    # so the Terraform-level `deletion_protection` alone is not enough.
+    deletion_protection_enabled = var.deletion_protection
     # ALWAYS runs the instance; NEVER stops it (compute billing ends, the disk and
     # its data stay). The lifecycle's pause/destroy sets NEVER.
     activation_policy = var.db_activation_policy
@@ -93,7 +106,11 @@ resource "google_sql_database_instance" "primary" {
       enabled                        = true
       point_in_time_recovery_enabled = true
       start_time                     = "03:00"
-      transaction_log_retention_days = 7
+      # The API requires the transaction log retention to be no longer than the
+      # backup retention, and caps it at 7 days. The free-tier shape keeps 1 day
+      # of backups, so it keeps 1 day of logs; dev/staging keep 7, and prod keeps
+      # the 7-day cap over its 30-day backup window.
+      transaction_log_retention_days = min(var.db_backup_retention_days, 7)
       backup_retention_settings {
         retained_backups = var.db_backup_retention_days
         retention_unit   = "COUNT"
@@ -200,8 +217,13 @@ resource "google_storage_bucket" "clips" {
 
   lifecycle_rule {
     condition {
-      age                   = 30
-      matches_storage_class = ["MULTI_REGIONAL", "STANDARD"]
+      age = 30
+      # The bucket is regional (var.region), so its objects are never
+      # MULTI_REGIONAL; the GCS API refuses to create a bucket whose lifecycle
+      # rule matches a class impossible for the location ("may not create
+      # storageClass MULTI_REGIONAL buckets with locationConstraint ...").
+      # STANDARD is the class the clips are written in.
+      matches_storage_class = ["STANDARD"]
     }
     action {
       type          = "SetStorageClass"

@@ -78,7 +78,10 @@ for key in "${DB_KEYS[@]}"; do
   grep -qE "^${key}=" "$SCHEMA" || die "$SCHEMA is missing the database key $key"
 done
 if [ -f infra/terraform/main.tf ]; then
-  grep -qE '^[[:space:]]*DATABASE_URL[[:space:]]*=' infra/terraform/main.tf \
+  # The services receive DATABASE_URL from the secret map; the assignment may sit
+  # inline in a map (`{ DATABASE_URL = ... }`) or on its own line, so match the
+  # assignment wherever it appears rather than only at the start of a line.
+  grep -qE 'DATABASE_URL[[:space:]]*=' infra/terraform/main.tf \
     || die "infra/terraform/main.tf must wire DATABASE_URL into the services"
   grep -q 'point_in_time_recovery_enabled = true' infra/terraform/modules/data/main.tf \
     || die "the Cloud SQL instance must keep point-in-time recovery for the 1-hour RPO (nfr.md)"

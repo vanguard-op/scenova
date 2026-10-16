@@ -48,6 +48,11 @@ resource "google_cloud_run_v2_job" "migrate" {
   location = var.region
   labels   = merge(var.labels, { environment = var.environment })
 
+  # The provider default is true; the job is stateless (its image is replaced by
+  # the deploy pipeline, and Terraform replaces it after a failed create), so it
+  # must be destroyable.
+  deletion_protection = false
+
   template {
     template {
       service_account = var.service_account_email

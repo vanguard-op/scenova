@@ -29,6 +29,22 @@ firebase_project_id = "scenova-hq"
 # `make env-start` changes the existing resources instead of recreating them.
 console_site_id = "scenova-hq"
 
+# The curator MFA gate (NFR-020) and auth activity logging (NFR-029) are Identity
+# Platform (GCIP) features. The Firebase free-tier shape (D-034) does not upgrade
+# the project's identity product, so both are left off here and the production
+# shape turns them back on by configuration. The audit trail this shape keeps is
+# the Cloud Audit Logs (secretmanager, iam) and the review service's own
+# append-only log; the console has no operators before launch, so the MFA gate is
+# not yet exercised.
+identity_gcip = false
+
+# The provider credentials (Gemini, RevenueCat) are written out-of-band and the
+# free-tier shape has no values to seed yet, while the features that use them
+# (generation, the paid tier) are off (flags below). Cloud Run refuses to mount a
+# secret with no version, so the runtime leaves them unmounted and the services
+# read them as optional. The production shape mounts them and seeds the values.
+mount_provider_secrets = false
+
 # The data must survive every lifecycle action (nfr.md "Privacy & Compliance":
 # account and entitlement data lives for the life of the account, financial
 # records for seven years, shared library entries until retired). Two guards:

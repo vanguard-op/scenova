@@ -141,6 +141,13 @@ module "db_migrate" {
   service_account_email = local.migrate_email
   database_url_secret   = module.secrets.secret_ids["database-url"]
   image                 = local.bootstrap_image
+
+  # The job mounts DATABASE_URL from Secret Manager, whose version is written by
+  # the data module once the instance exists. The secret id alone is a static
+  # string, so without this the job could be created before the version it
+  # references and Cloud Run rejects it ("Secret .../database-url/versions/latest
+  # was not found").
+  depends_on = [module.data]
 }
 
 # --- Queue --------------------------------------------------------------------
@@ -233,6 +240,16 @@ locals {
     }
   }
 
+  # The provider credentials (Gemini, RevenueCat) are mounted only where the
+  # provider-backed feature is on (var.mount_provider_secrets). Their values are
+  # written out-of-band and never by Terraform (variables.tf "secret_ids",
+  # NFR-024), so a secret container with no version yet — which Cloud Run refuses
+  # to mount ("Secret .../versions/latest was not found") — would otherwise stop
+  # the runtime from starting. The free-tier shape, where generation and the paid
+  # tier are off, leaves them unmounted and the services read them as optional
+  # (ai/app/config.py, services/entitlement/app/config.py). The generated database
+  # credential is always mounted; Terraform writes its version (modules/data), so
+  # module.run depends on module.data to order the apply.
   service_secret_env = {
     gateway  = { DATABASE_URL = module.secrets.secret_ids["database-url"] }
     lookup   = { DATABASE_URL = module.secrets.secret_ids["database-url"] }
@@ -242,12 +259,14 @@ locals {
     # Push registrations attach the reader's token to a lookup (C-008), which the
     # notification service reads back when that lookup's generation completes.
     notification = { DATABASE_URL = module.secrets.secret_ids["database-url"] }
-    entitlement = {
-      DATABASE_URL            = module.secrets.secret_ids["database-url"]
-      REVENUECAT_API_KEY      = module.secrets.secret_ids["revenuecat-api-key"]
-      REVENUECAT_WEBHOOK_AUTH = module.secrets.secret_ids["revenuecat-webhook-auth"]
-    }
-    model = { GEMINI_API_KEY = module.secrets.secret_ids["gemini-api-key"] }
+    entitlement = merge(
+      { DATABASE_URL = module.secrets.secret_ids["database-url"] },
+      var.mount_provider_secrets ? {
+        REVENUECAT_API_KEY      = module.secrets.secret_ids["revenuecat-api-key"]
+        REVENUECAT_WEBHOOK_AUTH = module.secrets.secret_ids["revenuecat-webhook-auth"]
+      } : {}
+    )
+    model = var.mount_provider_secrets ? { GEMINI_API_KEY = module.secrets.secret_ids["gemini-api-key"] } : {}
   }
 
   # Bootstrap placeholder so the first apply never depends on a pushed image; the
@@ -284,6 +303,12 @@ module "run" {
       max_instances         = 10
     }
   }
+
+  # The services mount DATABASE_URL, whose Secret Manager version the data module
+  # writes once the instance exists; the secret id is a static string, so without
+  # this a service could be created before the version it mounts (Cloud Run:
+  # "Secret .../database-url/versions/latest was not found").
+  depends_on = [module.data]
 }
 
 # --- IAM: least privilege for the runtime -------------------------------------
@@ -386,6 +411,11 @@ module "identity" {
   source = "./modules/identity"
 
   project_id = var.firebase_project_id
+
+  # The MFA gate and auth activity logging need the Identity Platform (GCIP)
+  # upgrade the free-tier pre-revenue shape does not take (D-034); the production
+  # shape turns them on by configuration.
+  gcip = var.identity_gcip
 
   # The console signs in through OAuth redirects, so its Hosting domains and
   # localhost are authorized; the project's own Firebase domains are implied by

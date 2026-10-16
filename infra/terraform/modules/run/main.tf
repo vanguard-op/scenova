@@ -82,6 +82,11 @@ resource "google_cloud_run_v2_service" "this" {
   ingress  = each.value.public ? "INGRESS_TRAFFIC_ALL" : "INGRESS_TRAFFIC_INTERNAL_ONLY"
   labels   = merge(var.labels, { environment = var.environment })
 
+  # The provider default is true, which would stop the lifecycle's `destroy` from
+  # removing the runtime surface (var.enabled = false). The teardown guards belong
+  # on the data stores, not on a stateless, recreatable service.
+  deletion_protection = false
+
   template {
     service_account                  = each.value.service_account_email
     max_instance_request_concurrency = each.value.concurrency
