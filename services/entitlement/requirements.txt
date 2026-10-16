@@ -9,3 +9,11 @@ uvicorn==0.54.0
 pydantic==2.14.1
 httpx2==2.13.1
 pyjwt[crypto]==2.15.1
+# The app parses the ID token's X.509 certificates itself, so cryptography is a
+# direct dependency, pinned like the gateway's.
+cryptography==50.0.2
+# The primary database (architecture.md "Primary Database"): SQLAlchemy over the
+# psycopg driver the `DATABASE_URL` names, held to the same pinned versions in
+# every service that stores to it.
+sqlalchemy==2.0.44
+psycopg[binary]==3.2.10
