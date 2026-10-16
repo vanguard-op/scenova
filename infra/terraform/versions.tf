@@ -1,6 +1,14 @@
 terraform {
   required_version = ">= 1.9"
 
+  # Remote state, one bucket per environment: backend/<env>.hcl supplies `bucket`
+  # and `prefix` through `-backend-config`, so this one root module is
+  # instantiated once per environment with its own state and a plan touches one
+  # environment at a time (release.md "Promotion rule"). The block must exist for
+  # the `-backend-config` to apply; without it Terraform silently falls back to
+  # the local backend and the state stays on one machine's disk.
+  backend "gcs" {}
+
   required_providers {
     google = {
       source  = "hashicorp/google"

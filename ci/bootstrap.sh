@@ -77,7 +77,25 @@ else
   log "Bootstrap · creating remote state bucket gs://${STATE_BUCKET}"
   gcloud storage buckets create "gs://${STATE_BUCKET}" \
     --project "$PROJECT_ID" --location "$REGION" --uniform-bucket-level-access
-  gcloud storage buckets update "gs://${STATE_BUCKET}" --versioning
+fi
+
+# Version the state bucket so a bad write can be rolled back. `gcloud storage
+# buckets update --versioning` exits 0 without enabling versioning on some SDK
+# builds, so the JSON API is used — the same way the Web App id is read above.
+# Ensured on every run, so a bucket created before this fix is corrected too.
+if command -v curl >/dev/null 2>&1; then
+  token="$(gcloud auth print-access-token 2>/dev/null || true)"
+  if [ -n "$token" ]; then
+    curl -s -o /dev/null -X PATCH \
+      "https://storage.googleapis.com/storage/v1/b/${STATE_BUCKET}?project=${PROJECT_ID}" \
+      -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" \
+      -d '{"versioning":{"enabled":true}}'
+    info "versioning enabled on gs://${STATE_BUCKET}"
+  else
+    warn "could not mint a token; enable versioning on gs://${STATE_BUCKET} manually"
+  fi
+else
+  warn "curl not found; enable versioning on gs://${STATE_BUCKET} manually"
 fi
 
 # --- Adopt the resources that already exist -----------------------------------
