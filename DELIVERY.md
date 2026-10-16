@@ -131,7 +131,7 @@ docs/           BPRD (product-shaper)
 | T-137 | FEAT-011, FEAT-013 | frontend-engineer | Done | C-007, C-008 |
 | T-139 | — | backend-engineer | Done | — |
 | T-140 | FEAT-009, FEAT-010, FEAT-011, FEAT-012, FEAT-013 | qa-engineer | In Progress | C-001, C-002, C-003, C-006, C-007, C-008, C-009, C-010, C-011, C-012, C-013, C-014, C-015, C-016, C-017, C-018, C-019, C-020, C-021, C-022 |
-| T-141 | FEAT-013 | backend-engineer | In Progress | — |
+| T-141 | FEAT-013 | backend-engineer | Done | — |
 
 
 ## Decisions Log
