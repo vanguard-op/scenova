@@ -19,7 +19,6 @@ SERVICE_ROOT = Path(__file__).resolve().parents[1]
 # divergences this service uses are mapped here.
 IMPORT_TO_DISTRIBUTION = {
     "jwt": "pyjwt",
-    "pydantic_core": "pydantic-core",
 }
 
 
@@ -41,8 +40,9 @@ def _third_party_imports() -> set[str]:
                 case ast.Import(names=alias_names):
                     roots.update(alias.name.split(".")[0] for alias in alias_names)
                 # An absolute import has level 0 (or None, per the ast
-                # version); a non-empty level is a relative import inside app/.
-                case ast.ImportFrom(module=module_name, level=level) if not level:
+                # version); a non-empty level is a relative import inside app/,
+                # and a module of None is one of those too.
+                case ast.ImportFrom(module=module_name, level=level) if not level and module_name:
                     roots.add(module_name.split(".")[0])
     roots -= {"app"}
     return {name for name in roots if name not in sys.stdlib_module_names}
