@@ -87,53 +87,12 @@ docs/           BPRD (product-shaper)
 | Phase | Closed | Notes |
 |---|---|---|
 | Phase 3: Trust and Continuity | 2026-10-15 | C-012 to C-016 frozen and conformed at the gate; the moderation change (`D-030`) reworked and re-verified. The generation path's release still flagged (`D-023`) |
+| Phase 4: Polish and Account | 2026-10-16 | C-018 to C-022 frozen and conformed; the tier gates and the primary database landed; the generation path's release still flagged (`D-023`) |
 | — | — | The conditional closes of the first two phases are decisions-log entries (`D-020`, `D-023`). |
 
 ### Active Phase: Phase 4: Polish and Account
 | Task | Feature | Owner | Status | Contract |
 |---|---|---|---|---|
-| T-101 | — | infra-engineer | Done | — |
-| T-102 | FEAT-010, FEAT-011, FEAT-015 | backend-engineer | Done | C-003, C-009, C-010, C-011, C-013, C-014, C-015, C-016, C-017 |
-| T-103 | FEAT-015 | frontend-engineer | Done | C-014, C-015, C-016 |
-| T-104 | FEAT-009, FEAT-011 | frontend-engineer | Done | C-008, C-013 |
-| T-105 | — | backend-engineer | Done | — |
-| T-106 | FEAT-008, FEAT-011 | backend-engineer | Done | C-008 |
-| T-107 | FEAT-015 | frontend-engineer | Done | — |
-| T-108 | FEAT-009, FEAT-010, FEAT-011, FEAT-015 | qa-engineer | Done | C-003, C-008, C-009, C-010, C-011, C-013, C-014, C-015, C-016, C-017 |
-| T-109 | FEAT-015 | backend-engineer | Done | C-016 |
-| T-110 | FEAT-013 | backend-engineer | Done | C-018, C-019, C-020 |
-| T-111 | FEAT-013 | backend-engineer | Done | C-001 |
-| T-112 | FEAT-013 | frontend-engineer | Done | C-018 |
-| T-113 | FEAT-013 | frontend-engineer | Done | C-001, C-018 |
-| T-114 | FEAT-012 | frontend-engineer | Done | C-020 |
-| T-115 | FEAT-009, FEAT-013 | frontend-engineer | Done | C-018 |
-| T-116 | FEAT-013 | infra-engineer | Done | — |
-| T-117 | FEAT-013 | frontend-engineer | Done | — |
-| T-118 | FEAT-013 | backend-engineer | Done | C-021 |
-| T-119 | FEAT-013 | frontend-engineer | Done | C-021 |
-| T-120 | FEAT-013 | infra-engineer | Done | — |
-| T-121 | FEAT-013 | backend-engineer | Done | — |
-| T-122 | FEAT-013 | frontend-engineer | Done | — |
-| T-123 | FEAT-013 | backend-engineer | Done | — |
-| T-124 | FEAT-013 | backend-engineer | Done | — |
-| T-125 | FEAT-012 | backend-engineer | Done | C-022 |
-| T-126 | FEAT-012 | frontend-engineer | Done | C-022 |
-| T-128 | FEAT-006 | backend-engineer | Done | C-009, C-010, C-011, C-017 |
-| T-129 | FEAT-010, FEAT-011 | backend-engineer | Done | C-007, C-008, C-012, C-013, C-014, C-015, C-016 |
-| T-130 | FEAT-013 | backend-engineer | Done | C-003, C-006, C-018, C-019, C-020, C-021, C-022 |
-| T-131 | — | infra-engineer | Done | — |
-| T-132 | FEAT-001, FEAT-002 | frontend-engineer | Done | C-001 |
-| T-133 | FEAT-003 | backend-engineer | Done | C-001 |
-| T-134 | — | infra-engineer | Done | — |
-| T-136 | — | infra-engineer | Done | — |
-| T-135 | FEAT-008 | backend-engineer | Done | — |
-| T-138 | — | infra-engineer | Done | — |
-| T-137 | FEAT-011, FEAT-013 | frontend-engineer | Done | C-007, C-008 |
-| T-139 | — | backend-engineer | Done | — |
-| T-140 | FEAT-009, FEAT-010, FEAT-011, FEAT-012, FEAT-013 | qa-engineer | In Progress | C-001, C-002, C-003, C-006, C-007, C-008, C-009, C-010, C-011, C-012, C-013, C-014, C-015, C-016, C-017, C-018, C-019, C-020, C-021, C-022 |
-| T-141 | FEAT-013 | backend-engineer | Done | — |
-| T-142 | FEAT-013 | backend-engineer | Done | — |
-
 
 ## Decisions Log
 | # | Decision | Rationale | By |
