@@ -95,6 +95,7 @@ docs/           BPRD (product-shaper)
 |---|---|---|---|---|
 | T-143 | — | infra-engineer | Done | — |
 | T-144 | — | infra-engineer | Done | — |
+| T-145 | — | infra-engineer | In Progress | — |
 
 ## Decisions Log
 | # | Decision | Rationale | By |
