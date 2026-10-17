@@ -50,13 +50,13 @@ case "$cmd" in
     command -v docker >/dev/null 2>&1 || die "docker is required to run the local PostgreSQL"
     log "Database · docker compose up -d postgres"
     docker compose up -d postgres
-    # Wait until the server accepts connections, so `make db-up && make db-migrate`
-    # does not race the container's first start.
-    for _ in $(seq 1 60); do
-      docker compose exec -T postgres pg_isready \
-        -U "${DB_USER:-scenova}" -d "${DB_NAME:-scenova}" >/dev/null 2>&1 && break
-      sleep 1
-    done
+    # Wait until the server accepts connections over TCP, not the container's
+    # Unix socket (postgres_tcp_ready in lib.sh explains why the socket reports
+    # ready too early), so `make db-up && make db-migrate` does not race the
+    # container's first start.
+    wait_for_postgres_tcp 60 "${DB_USER:-scenova}" "${DB_NAME:-scenova}" \
+      -- docker compose exec -T postgres \
+      || die "the local PostgreSQL did not become ready (docker compose logs postgres)"
     info "PostgreSQL ready on ${DB_HOST:-localhost}:${DB_PORT:-5432} (docker compose)"
     ;;
 

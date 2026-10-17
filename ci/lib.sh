@@ -157,6 +157,36 @@ tool() {
   if [ -x "$VENV_DIR/bin/$name" ]; then echo "$VENV_DIR/bin/$name"; else echo "$name"; fi
 }
 
+# --- Container readiness -----------------------------------------------------
+# The readiness probe for a PostgreSQL container. It is deliberately over TCP
+# (`-h 127.0.0.1`), never the container's Unix socket: the official postgres
+# image runs a temporary server on the socket alone while it executes its init
+# scripts, then shuts it down and starts the server that serves the published
+# port. `pg_isready` with no host hits the socket, so it reports ready against
+# that temporary server and a connection made right after it is closed by the
+# shutdown — the "server closed the connection unexpectedly" flake. Probing the
+# TCP listener waits for the server the caller will actually connect to.
+#
+# Usage: postgres_tcp_ready <user> <db> -- <exec-prefix...>
+postgres_tcp_ready() {
+  local user="$1" db="$2"; shift 2
+  [ "${1:-}" = "--" ] && shift
+  "$@" pg_isready -h 127.0.0.1 -U "$user" -d "$db" >/dev/null 2>&1
+}
+
+# Bounded wait on the probe above: a server that never comes up fails the caller
+# after a fixed bound rather than hanging or being papered over by a hand-tuned
+# sleep. Returns non-zero when the bound elapses.
+wait_for_postgres_tcp() {
+  local bound="$1"; shift
+  local deadline=$(( SECONDS + bound ))
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    postgres_tcp_ready "$@" && return 0
+    sleep 0.5
+  done
+  return 1
+}
+
 # --- Service registry --------------------------------------------------------
 # The services the docs define (architecture.md "System Components"), with the
 # module each exposes and the local port it binds. A service is booted when its

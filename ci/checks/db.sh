@@ -42,11 +42,15 @@ container="$(docker run -d --name "$container" \
   -e POSTGRES_DB=scenova -e POSTGRES_USER=scenova -e POSTGRES_PASSWORD=scenova \
   -p 127.0.0.1::5432 "$image")"
 
+# Wait until the server accepts connections over TCP — the path the migrations
+# use. The probe is TCP, never the container's Unix socket (postgres_tcp_ready
+# in lib.sh explains why the socket reports ready too early). The container is
+# checked each pass so a bad image fails fast instead of waiting out the bound.
 ready=0
-for _ in $(seq 1 60); do
-  if docker exec "$container" pg_isready -U scenova -d scenova >/dev/null 2>&1; then ready=1; break; fi
+for _ in $(seq 1 120); do
+  if postgres_tcp_ready scenova scenova -- docker exec "$container"; then ready=1; break; fi
   docker inspect -f '{{.State.Running}}' "$container" 2>/dev/null | grep -q true || break
-  sleep 1
+  sleep 0.5
 done
 if [ "$ready" -ne 1 ]; then
   printf '\n----- database did not become ready — log follows -----\n' >&2

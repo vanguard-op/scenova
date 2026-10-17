@@ -35,5 +35,21 @@ fi
 # a laptop and in CI.
 export AUTH_MODE=dev
 
+# The store-backed check in the suite (the restart-survival run) needs the
+# primary database. It boots the compose PostgreSQL itself when it finds one
+# absent, but a container that was just started is not yet accepting
+# connections, so that boot races the container's first start — the same flake
+# the database check hit. Bring the database up through the documented path
+# (`ci/db.sh up`, which waits for the TCP listener — postgres_tcp_ready in
+# lib.sh) and hand the suite a serving database. Only a database this station
+# started is torn down again, so a developer's own `make db-up` is left alone.
+db_started_here=0
+if [ -f docker-compose.yml ] && command -v docker >/dev/null 2>&1; then
+  [ -n "$(docker compose ps -q postgres 2>/dev/null)" ] || db_started_here=1
+  bash ci/db.sh up
+fi
+teardown_db() { [ "$db_started_here" -eq 1 ] && docker compose down >/dev/null 2>&1 || true; }
+trap teardown_db EXIT
+
 log "QA · integration and acceptance suites (${paths[*]})"
 "$(tool pytest)" "${paths[@]}" -m "not model"
