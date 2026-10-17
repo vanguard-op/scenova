@@ -68,6 +68,7 @@ docs/           BPRD (product-shaper)
 - Contracts are frozen in `CONTRACTS.md`; a change is a revision that re-dispatches both sides.
 - Dart: `dart format` and `flutter analyze` clean. Python: `ruff` + `black`, typed.
 - Run `make ci` in full before reporting: a scoped lint, type or test check is not the gate, and two typing slips have reached `dev` through checks narrowed to a directory.
+- A push cancels the branch's in-flight CI run (`cancel-in-progress`): read a run's result before pushing again, or the verification you were waiting on is the one you discarded.
 - `.delivery/**` and `.scratch/**` are gitignored.
 
 ## Behavior Rules
