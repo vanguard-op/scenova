@@ -67,13 +67,12 @@ jobs:
 
       # `make setup` resolves the Flutter workspaces and `make deploy` builds the
       # review console as a Flutter Web bundle, so the deploy runner needs the
-      # same pinned Flutter as CI.
+      # same pinned Flutter as CI. The local composite action installs it without
+      # an unpinned nested cache, which `sha_pinning_required` refuses.
       - name: Set up Flutter (review console)
-        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        uses: ./.github/actions/setup-flutter
         with:
-          channel: stable
-          flutter-version: "3.47.2"
-          cache: true
+          version: "3.47.2"
 
       - name: Install toolchain
         run: make setup
