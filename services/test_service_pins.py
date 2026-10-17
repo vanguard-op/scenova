@@ -30,12 +30,12 @@ SERVICES_ROOT = Path(__file__).resolve().parent
 IMPORT_DIVERGENCES: dict[str, dict[str, str]] = {
     "analytics": {"jwt": "pyjwt"},
     "entitlement": {"jwt": "pyjwt"},
-    "feedback": {"jwt": "pyjwt"},
+    "feedback": {"jwt": "pyjwt", "google": "google-auth"},
     "gateway": {"jwt": "pyjwt", "google": "google-auth"},
     "library": {},
-    "lookup": {},
+    "lookup": {"google": "google-auth"},
     "notification": {"jwt": "pyjwt", "google": "google-auth"},
-    "pipeline": {},
+    "pipeline": {"google": "google-auth"},
 }
 
 SERVICE_NAMES: list[str] = sorted(

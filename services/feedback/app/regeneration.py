@@ -22,6 +22,8 @@ from typing import Protocol
 
 import httpx2
 
+from .service_identity import ServiceIdentity
+
 # Clips are capped at four seconds, so a regeneration targets the cap, matching
 # the lookup path's own generation request.
 CLIP_TARGET_SECONDS = 4.0
@@ -102,9 +104,15 @@ class HttpRegenerationTrigger:
         clip_model_pin: str,
         timeout_seconds: float = 5.0,
         transport: httpx2.AsyncBaseTransport | None = None,
+        identity: ServiceIdentity | None = None,
     ) -> None:
         self._internal_audience = internal_audience
         self._clip_model_pin = clip_model_pin
+        # The pipeline is internal only, so Cloud Run checks the caller's
+        # identity at the platform edge (nfr.md NFR-020). The audience is this
+        # client's own base URL: Cloud Run binds the ID token to the service
+        # being called.
+        self._identity = identity or ServiceIdentity(base_url)
         self._client = httpx2.AsyncClient(
             base_url=base_url.rstrip("/"),
             timeout=timeout_seconds,
@@ -162,7 +170,10 @@ class HttpRegenerationTrigger:
         try:
             response = await self._client.post(
                 "/internal/generation-jobs",
-                headers={"x-internal-audience": self._internal_audience},
+                headers={
+                    "x-internal-audience": self._internal_audience,
+                    **self._identity.headers(),
+                },
                 json=payload,
             )
         except httpx2.HTTPError as exc:

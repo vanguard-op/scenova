@@ -29,6 +29,7 @@ from typing import Protocol
 import httpx2
 
 from .models import Kind, PartOfSpeech
+from .service_identity import ServiceIdentity
 
 logger = logging.getLogger(__name__)
 
@@ -139,8 +140,14 @@ class HttpGenerationClient:
         internal_audience: str,
         timeout_seconds: float = 5.0,
         transport: httpx2.AsyncBaseTransport | None = None,
+        identity: ServiceIdentity | None = None,
     ) -> None:
         self._internal_audience = internal_audience
+        # The pipeline is internal only, so Cloud Run checks the caller's
+        # identity at the platform edge (nfr.md NFR-020). The audience is this
+        # client's own base URL: Cloud Run binds the ID token to the service
+        # being called.
+        self._identity = identity or ServiceIdentity(base_url)
         self._client = httpx2.AsyncClient(
             base_url=base_url.rstrip("/"),
             timeout=timeout_seconds,
@@ -151,7 +158,10 @@ class HttpGenerationClient:
         try:
             response = await self._client.post(
                 "/internal/generation-jobs",
-                headers={"x-internal-audience": self._internal_audience},
+                headers={
+                    "x-internal-audience": self._internal_audience,
+                    **self._identity.headers(),
+                },
                 json=job.to_payload(),
             )
         except httpx2.HTTPError as exc:
@@ -168,7 +178,10 @@ class HttpGenerationClient:
         try:
             response = await self._client.get(
                 f"/internal/generation-jobs/{job_id}",
-                headers={"x-internal-audience": self._internal_audience},
+                headers={
+                    "x-internal-audience": self._internal_audience,
+                    **self._identity.headers(),
+                },
             )
         except httpx2.HTTPError as exc:
             raise GenerationUnavailableError("The generation pipeline is unreachable.") from exc

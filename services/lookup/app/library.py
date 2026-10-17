@@ -21,6 +21,7 @@ from typing import Literal, Protocol
 import httpx2
 
 from .models import PartOfSpeech
+from .service_identity import ServiceIdentity
 
 LibraryKey = tuple[str, str, PartOfSpeech]
 
@@ -113,8 +114,14 @@ class HttpLibrary:
         internal_audience: str,
         timeout_seconds: float = 3.0,
         transport: httpx2.AsyncBaseTransport | None = None,
+        identity: ServiceIdentity | None = None,
     ) -> None:
         self._internal_audience = internal_audience
+        # The shared library is internal only, so Cloud Run checks the caller's
+        # identity at the platform edge (nfr.md NFR-020). The audience is this
+        # client's own base URL: Cloud Run binds the ID token to the service
+        # being called.
+        self._identity = identity or ServiceIdentity(base_url)
         self._client = httpx2.AsyncClient(
             base_url=base_url.rstrip("/"),
             timeout=timeout_seconds,
@@ -130,7 +137,10 @@ class HttpLibrary:
         try:
             response = await self._client.get(
                 "/internal/library/entries",
-                headers={"x-internal-audience": self._internal_audience},
+                headers={
+                    "x-internal-audience": self._internal_audience,
+                    **self._identity.headers(),
+                },
                 params={
                     "lemma": lemma,
                     "senseLabel": sense_label,

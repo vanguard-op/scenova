@@ -7,6 +7,14 @@ fastapi==0.143.0
 uvicorn==0.54.0
 pydantic==2.14.1
 httpx2==2.13.1
+# The pipeline calls the model-serving layer, the shared library, and the
+# notification service over their `run.app` URLs, each an internal Cloud Run
+# service that admits only an authenticated service identity. google-auth mints
+# the short-lived ID token presented at that edge (NFR-020), and requests carries
+# the credential refresh it reaches through google.auth.transport.requests
+# (NFR-024).
+google-auth==2.62.0
+requests==2.34.2
 # The generation queue is the relational queue (schema.md "GenerationJob"):
 # SQLAlchemy over the psycopg driver the `DATABASE_URL` names, held to the same
 # pinned versions in every service that stores to the primary database.

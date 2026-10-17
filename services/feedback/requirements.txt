@@ -8,6 +8,13 @@ fastapi==0.143.0
 uvicorn==0.54.0
 pydantic==2.14.1
 httpx2==2.13.1
+# The feedback service calls the lookup service, the shared library, and the
+# pipeline over their `run.app` URLs, each an internal Cloud Run service that
+# admits only an authenticated service identity. google-auth mints the
+# short-lived ID token presented at that edge (NFR-020), and requests carries the
+# credential refresh it reaches through google.auth.transport.requests (NFR-024).
+google-auth==2.62.0
+requests==2.34.2
 pyjwt[crypto]==2.15.1
 # The app parses the ID token's X.509 certificates itself, so cryptography is a
 # direct dependency, pinned like the gateway's and the entitlement service's.
