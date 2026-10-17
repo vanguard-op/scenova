@@ -138,20 +138,25 @@ variable "secret_ids" {
 
 # The provider credentials (Gemini, RevenueCat) are written out-of-band, so their
 # containers may have no version when the runtime first starts; Cloud Run refuses
-# to mount a versionless secret. The mount is therefore split per provider rather
-# than one switch: the Gemini credential can be seeded and mounted on the model
-# service while the RevenueCat credentials have no version yet and stay unmounted
-# on the entitlement service, and the services read an unmounted secret as
-# optional. Both default on for the production shape, where the operator seeds
-# every value before the first apply.
+# to mount a versionless secret. The mount is therefore split per credential
+# rather than one switch: a credential can be seeded and mounted on its service as
+# soon as it is written, while one that has no value yet stays unmounted, and the
+# services read an unmounted secret as optional. Every mount defaults on for the
+# production shape, where the operator seeds every value before the first apply.
 variable "mount_gemini_secret" {
   description = "Mount the Gemini API key on the model service. On once its value is seeded; off leaves the model service reading it as optional."
   type        = bool
   default     = true
 }
 
-variable "mount_revenuecat_secrets" {
-  description = "Mount the RevenueCat API key and webhook authorization on the entitlement service. On once their values are seeded; off leaves the entitlement service reading them as optional."
+variable "mount_revenuecat_api_key" {
+  description = "Mount the RevenueCat API key on the entitlement service. On once its value is seeded; off leaves the entitlement service reading it as optional."
+  type        = bool
+  default     = true
+}
+
+variable "mount_revenuecat_webhook_auth" {
+  description = "Mount the RevenueCat webhook authorization on the entitlement service. On once its value is seeded; off leaves the entitlement service accepting only the internal service audience."
   type        = bool
   default     = true
 }

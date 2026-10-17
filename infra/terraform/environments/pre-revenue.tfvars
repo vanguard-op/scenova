@@ -46,12 +46,15 @@ console_site_id = "scenova-hq"
 identity_gcip = true
 
 # The provider credentials (Gemini, RevenueCat) are written out-of-band. The
-# Gemini key is seeded and mounted on the model service; the RevenueCat key and
-# webhook authorization have no value yet (the paid tier is off), so their mount
-# stays off and the entitlement service reads them as optional. Cloud Run refuses
-# to mount a secret with no version, which is why the two mounts are separate.
-mount_gemini_secret      = true
-mount_revenuecat_secrets = false
+# Gemini key and the RevenueCat API key are seeded and mounted on the model and
+# entitlement services; the RevenueCat webhook authorization has no value yet (the
+# value is chosen and set in the RevenueCat dashboard when the webhook is
+# configured), so its mount stays off and the entitlement service accepts only the
+# internal service audience. Cloud Run refuses to mount a secret with no version,
+# which is why each credential's mount is separate.
+mount_gemini_secret           = true
+mount_revenuecat_api_key      = true
+mount_revenuecat_webhook_auth = false
 
 # The data must survive every lifecycle action (nfr.md "Privacy & Compliance":
 # account and entitlement data lives for the life of the account, financial
