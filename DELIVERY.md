@@ -100,7 +100,7 @@ docs/           BPRD (product-shaper)
 | T-147 | — | backend-engineer | Done | — |
 | T-148 | — | infra-engineer | Done | — |
 | T-149 | — | infra-engineer | In Progress | — |
-| T-150 | — | backend-engineer | In Progress | — |
+| T-150 | — | backend-engineer | Done | — |
 
 ## Decisions Log
 | # | Decision | Rationale | By |
