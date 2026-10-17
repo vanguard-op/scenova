@@ -108,7 +108,9 @@ docs/           BPRD (product-shaper)
 | T-154 | — | infra-engineer | Done | — |
 | T-155 | — | infra-engineer | Done | — |
 | T-156 | — | infra-engineer | In Progress | — |
-| T-157 | FEAT-013 | backend-engineer | In Progress | C-019 |
+| T-157 | FEAT-013 | backend-engineer | Done | C-019 |
+| T-158 | FEAT-013 | backend-engineer | In Progress | — |
+| T-159 | — | infra-engineer | Backlog | — |
 | T-150 | — | backend-engineer | Done | — |
 
 ## Decisions Log
