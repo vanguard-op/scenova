@@ -4,8 +4,10 @@
 # The gateway is the single public entry point; every other service is internal
 # only (INGRESS_TRAFFIC_INTERNAL_ONLY) and reachable only by an authenticated
 # service identity (C-003, C-004, C-005). Terraform owns the service shape,
-# environment, and secret wiring; the deploy pipeline owns the image tag, which is
-# left untouched here so a canary roll-out is not reverted on the next plan.
+# environment, and secret wiring — including each service's `<NAME>_BASE_URL` for
+# the internal services it calls and the egress that lets it reach them — and the
+# deploy pipeline owns the image tag, which is left untouched here so a canary
+# roll-out is not reverted on the next plan.
 
 variable "project_id" { type = string }
 variable "region" { type = string }
@@ -45,17 +47,36 @@ variable "services" {
     image                 = string
     env                   = map(string)
     secret_env            = map(string)
-    cpu                   = optional(string, "1")
-    memory                = optional(string, "512Mi")
-    min_instances         = optional(number, 0)
-    max_instances         = optional(number, 10)
-    concurrency           = optional(number, 80)
+    # The internal services this service calls over their default `run.app` URLs.
+    # Each name becomes `<NAME>_BASE_URL` in this service's environment, valued
+    # from `downstream_uris` (see the resource below), so the platform owns the
+    # internal wiring and a plan cannot revert a value set by hand.
+    downstream    = optional(list(string), [])
+    cpu           = optional(string, "1")
+    memory        = optional(string, "512Mi")
+    min_instances = optional(number, 0)
+    max_instances = optional(number, 10)
+    concurrency   = optional(number, 80)
   }))
 }
 
 variable "internal_invokers" {
   description = "Service account emails allowed to call the internal services."
   type        = list(string)
+}
+
+# The base URIs of the services a service calls, keyed by service name. Terraform
+# refuses a resource that refers to itself, so a service cannot take a callee's
+# URI from the callee's resource when both are created by the same block; and the
+# internal call graph is not a strict order (lookup → pipeline → notification →
+# lookup), so no ordering of blocks can resolve it either. The caller passes the
+# deterministic Cloud Run URL for each service here instead — predictable before
+# the service exists — and the module resolves each name in a service's
+# `downstream` list into `<NAME>_BASE_URL`.
+variable "downstream_uris" {
+  description = "Downstream service base URIs keyed by service name, resolved into <NAME>_BASE_URL for a service that names them in `downstream`."
+  type        = map(string)
+  default     = {}
 }
 
 resource "google_artifact_registry_repository" "images" {
@@ -99,8 +120,19 @@ resource "google_cloud_run_v2_service" "this" {
     # The private VPC (Cloud SQL) is reached either through the Serverless VPC
     # Access connector or, in direct mode, through Direct VPC egress on this
     # service's own network interface — no connector, no always-on resource.
+    #
+    # A service that calls another internal service over its `run.app` URL must
+    # route all egress through the VPC. With `PRIVATE_RANGES_ONLY` the call
+    # leaves for the internet, and Cloud Run's internal ingress refuses it
+    # because the source is not the VPC
+    # (docs.cloud.google.com/run/docs/securing/private-networking); `ALL_TRAFFIC`
+    # keeps the call on the VPC, where the subnet's Private Google Access still
+    # carries the Google APIs a service needs (Firebase signing certs, FCM, the
+    # model provider). A service with no internal downstream keeps
+    # `PRIVATE_RANGES_ONLY`, so a non-Google call — the payment processor's API —
+    # leaves directly instead of needing a Cloud NAT.
     vpc_access {
-      egress = "PRIVATE_RANGES_ONLY"
+      egress = length(each.value.downstream) > 0 ? "ALL_TRAFFIC" : "PRIVATE_RANGES_ONLY"
 
       connector = var.vpc_egress == "connector" ? var.connector_id : null
 
@@ -128,8 +160,17 @@ resource "google_cloud_run_v2_service" "this" {
         }
       }
 
+      # The service's own environment, plus a `<NAME>_BASE_URL` for every
+      # downstream service, valued from the `downstream_uris` map the caller
+      # passes in (the deterministic Cloud Run URL of each service).
       dynamic "env" {
-        for_each = each.value.env
+        for_each = merge(
+          each.value.env,
+          {
+            for dep in each.value.downstream :
+            "${upper(dep)}_BASE_URL" => var.downstream_uris[dep]
+          }
+        )
         content {
           name  = env.key
           value = env.value

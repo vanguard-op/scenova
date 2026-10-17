@@ -280,6 +280,41 @@ locals {
 
 # --- Cloud Run services -------------------------------------------------------
 
+# The Cloud Run deterministic URL (docs.cloud.google.com/run/docs/triggering/
+# https-request, "Deterministic URL"): https://<service>-<project-number>.<region>.run.app.
+# It is predictable before a service exists, which is what lets the internal call
+# graph be wired: the callers and callees are created by one resource block, and
+# Terraform refuses a resource that refers to itself, so a callee's URI cannot be
+# read from its own resource — and the graph is not a strict order either
+# (lookup → pipeline → notification → lookup), so no ordering of blocks resolves
+# it. The deterministic URL sidesteps both.
+data "google_project" "this" {
+  project_id = var.project_id
+}
+
+locals {
+  service_base_urls = {
+    for name in keys(var.services) :
+    name => "https://${name}-${data.google_project.this.number}.${var.region}.run.app"
+  }
+
+  # The internal call graph: each service and the services it calls over their
+  # `run.app` URLs (architecture.md "Component: API Gateway" for the gateway's
+  # set; the services' own downstream clients for the rest). The run module turns
+  # each name into `<NAME>_BASE_URL` from `service_base_urls` and gives a caller
+  # all-traffic egress, so the call stays on the VPC and Cloud Run's internal
+  # ingress admits it (docs.cloud.google.com/run/docs/securing/private-networking).
+  # Declared once for every environment — the wiring is Terraform's, so nothing a
+  # plan could revert is set by hand. A new client is a new entry here.
+  service_downstream = {
+    gateway      = ["lookup", "analytics", "notification", "feedback", "entitlement"]
+    lookup       = ["pipeline", "library", "entitlement"]
+    feedback     = ["lookup", "library", "pipeline"]
+    pipeline     = ["model", "library", "notification"]
+    notification = ["lookup"]
+  }
+}
+
 module "run" {
   source = "./modules/run"
 
@@ -295,6 +330,7 @@ module "run" {
   enabled       = var.runtime_enabled
 
   internal_invokers = concat(local.all_runtime_emails, [local.tasks_email])
+  downstream_uris   = local.service_base_urls
 
   services = {
     for name, cfg in var.services : name => {
@@ -303,6 +339,7 @@ module "run" {
       image                 = local.bootstrap_image
       env                   = merge(local.common_env, var.flags, lookup(local.service_extra_env, name, {}))
       secret_env            = lookup(local.service_secret_env, name, {})
+      downstream            = lookup(local.service_downstream, name, [])
       min_instances         = name == "gateway" ? var.gateway_min_instances : 0
       max_instances         = 10
     }
@@ -313,6 +350,22 @@ module "run" {
   # this a service could be created before the version it mounts (Cloud Run:
   # "Secret .../database-url/versions/latest was not found").
   depends_on = [module.data]
+}
+
+# The gateway was briefly created by a second instantiation, while its base URLs
+# came from the internal services' URIs; the deterministic URLs make one
+# instantiation enough, so its resources move back. Declared so a plan updates the
+# service in place instead of destroying and recreating it — a create would start
+# the bootstrap placeholder image, which the deploy pipeline's tag would then have
+# to replace.
+moved {
+  from = module.run_public.google_cloud_run_v2_service.this["gateway"]
+  to   = module.run.google_cloud_run_v2_service.this["gateway"]
+}
+
+moved {
+  from = module.run_public.google_cloud_run_v2_service_iam_member.public["gateway"]
+  to   = module.run.google_cloud_run_v2_service_iam_member.public["gateway"]
 }
 
 # --- IAM: least privilege for the runtime -------------------------------------

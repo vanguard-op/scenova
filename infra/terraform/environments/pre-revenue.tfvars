@@ -45,16 +45,17 @@ console_site_id = "scenova-hq"
 # exception to "nothing bills while idle" (D-034).
 identity_gcip = true
 
-# The provider credentials (Gemini, RevenueCat) are written out-of-band. The
-# Gemini key and the RevenueCat API key are seeded and mounted on the model and
-# entitlement services; the RevenueCat webhook authorization has no value yet (the
-# value is chosen and set in the RevenueCat dashboard when the webhook is
-# configured), so its mount stays off and the entitlement service accepts only the
-# internal service audience. Cloud Run refuses to mount a secret with no version,
-# which is why each credential's mount is separate.
+# The provider credentials (Gemini, RevenueCat) are written out-of-band. All
+# three are seeded, so all three mount: the Gemini key and the RevenueCat API key
+# on the model and entitlement services, and the RevenueCat webhook
+# authorization on the entitlement service, so the store billing sync (C-019) is
+# authenticated by the processor's signed webhook as well as the internal service
+# audience. Cloud Run refuses to mount a secret with no version, which is why
+# each credential's mount is separate: a credential goes live on its service as
+# soon as it is written, and one that has no value yet stays unmounted.
 mount_gemini_secret           = true
 mount_revenuecat_api_key      = true
-mount_revenuecat_webhook_auth = false
+mount_revenuecat_webhook_auth = true
 
 # The data must survive every lifecycle action (nfr.md "Privacy & Compliance":
 # account and entitlement data lives for the life of the account, financial
