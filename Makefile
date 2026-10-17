@@ -45,12 +45,12 @@ PYTEST    := $(VENV)/bin/pytest
         db-up db-migrate db-rollback db-reset db-status db-check db-migrate-cloud \
         infra-init infra-fmt infra-validate infra-plan infra-apply \
         bootstrap env-start env-pause env-destroy \
-        deploy deploy-console curator promote rollback flag ci clean
+        deploy deploy-console traffic curator promote rollback flag ci clean
 
 help: ## Show the documented commands
 	@printf '\nScenova platform commands (env=%s, venv=%s)\n\n' "$(ENVIRONMENT)" "$(VENV)"
 	@awk 'BEGIN{FS=":.*## "} /^[a-zA-Z0-9_-]+:.*## /{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
-	@printf '\nTargets: make setup · make auth · make ci · make qa · make model-bar · make db-up · make db-migrate · make deploy ENV=staging · make promote ENV=staging SVC=gateway · make rollback ENV=staging SVC=gateway · make flag ENV=prod FLAG=FLAG_ENABLE_GENERATION VALUE=false · make curator OPERATOR=… · make bootstrap · make env-start · make env-pause · make env-destroy\n\n'
+	@printf '\nTargets: make setup · make auth · make ci · make qa · make model-bar · make db-up · make db-migrate · make deploy ENV=staging SVC=gateway · make promote ENV=staging SVC=gateway · make rollback ENV=staging SVC=gateway · make traffic ENV=staging · make flag ENV=prod FLAG=FLAG_ENABLE_GENERATION VALUE=false · make curator OPERATOR=… · make bootstrap · make env-start · make env-pause · make env-destroy\n\n'
 
 # --- Setup -------------------------------------------------------------------
 
@@ -171,8 +171,16 @@ env-destroy: ## Destroy the pre-revenue runtime: stop the database, keep the dat
 
 # --- Release -----------------------------------------------------------------
 
-deploy: ## Deploy container images to an environment (ENV=dev|staging|prod)
-	@bash ci/deploy.sh $(ENV)
+# A service subset is named with SVC=…, as `make promote` and `make rollback`
+# already name it. A bare positional service (`make deploy ENV=… gateway`) is a
+# make goal, not an argument: make would deploy every service and then fail as an
+# unknown target. Reject it before anything ships, and point at SVC.
+deploy: ## Deploy container images to an environment (ENV=dev|staging|prod|pre-revenue; SVC=… for a subset)
+	@if [ -n "$(filter-out deploy,$(MAKECMDGOALS))" ]; then \
+		echo "error: 'make deploy' takes no positional service; name a subset with SVC=…, e.g. 'make deploy ENV=$(ENV) SVC=gateway'" >&2; \
+		exit 1; \
+	fi
+	@bash ci/deploy.sh $(ENV) $(SVC)
 
 deploy-console: ## Deploy the review console to Firebase Hosting (ENV=dev|staging|prod)
 	@bash ci/deploy_console.sh $(ENV)
@@ -185,6 +193,9 @@ promote: ## Promote a canary service to full traffic (ENV=… SVC=…)
 
 rollback: ## Roll a service back to its previous revision (ENV=… SVC=…)
 	@bash ci/rollback.sh $(ENV) $(SVC)
+
+traffic: ## Assert every service serves one revision, with no canary tag left (ENV=…; read-only)
+	@bash ci/checks/traffic.sh $(ENV)
 
 flag: ## Set a release flag on an environment's services (ENV=… FLAG=… VALUE=true|false)
 	@bash ci/flag.sh $(ENV) $(FLAG) $(VALUE)
