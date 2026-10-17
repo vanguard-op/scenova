@@ -9,6 +9,7 @@ from typing import Any, Protocol
 import httpx2
 
 from .errors import UpstreamUnavailableError
+from .service_identity import ServiceIdentity
 
 
 @dataclass(frozen=True)
@@ -47,6 +48,10 @@ class HttpLookupClient:
         timeout_seconds: float = 10.0,
     ) -> None:
         self._internal_audience = internal_audience
+        # The gateway asserts its own service identity at the platform edge; the
+        # lookup service is internal only (architecture.md "Component: API
+        # Gateway").
+        self._identity = ServiceIdentity(base_url)
         self._client = httpx2.AsyncClient(base_url=base_url.rstrip("/"), timeout=timeout_seconds)
 
     async def create_lookup(
@@ -87,6 +92,7 @@ class HttpLookupClient:
         headers = {
             "x-correlation-id": correlation_id,
             "x-internal-audience": self._internal_audience,
+            **self._identity.headers(),
         }
         try:
             response = await self._client.request(

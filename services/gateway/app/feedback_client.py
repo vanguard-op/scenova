@@ -16,6 +16,7 @@ import httpx2
 
 from .errors import UpstreamUnavailableError
 from .lookup_client import UpstreamResponse
+from .service_identity import ServiceIdentity
 
 
 class FeedbackClient(Protocol):
@@ -57,6 +58,10 @@ class HttpFeedbackClient:
         transport: httpx2.AsyncBaseTransport | None = None,
     ) -> None:
         self._internal_audience = internal_audience
+        # The gateway asserts its own service identity at the platform edge; the
+        # feedback service is internal only (architecture.md "Component: API
+        # Gateway").
+        self._identity = ServiceIdentity(base_url)
         self._client = httpx2.AsyncClient(
             base_url=base_url.rstrip("/"),
             timeout=timeout_seconds,
@@ -90,7 +95,7 @@ class HttpFeedbackClient:
         rewrites or records the identity.
         """
 
-        headers = {"x-correlation-id": correlation_id}
+        headers = {"x-correlation-id": correlation_id, **self._identity.headers()}
         if authorization is not None:
             headers["authorization"] = authorization
         if body is not None:
@@ -124,6 +129,7 @@ class HttpFeedbackClient:
         headers = {
             "x-correlation-id": correlation_id,
             "x-internal-audience": self._internal_audience,
+            **self._identity.headers(),
         }
         try:
             response = await self._client.post(
@@ -144,7 +150,7 @@ class HttpFeedbackClient:
         authorization: str | None,
         correlation_id: str,
     ) -> UpstreamResponse:
-        headers = {"x-correlation-id": correlation_id}
+        headers = {"x-correlation-id": correlation_id, **self._identity.headers()}
         if authorization is not None:
             headers["authorization"] = authorization
         try:

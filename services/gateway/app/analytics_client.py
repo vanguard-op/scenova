@@ -22,6 +22,7 @@ import httpx2
 
 from .errors import UpstreamUnavailableError
 from .lookup_client import UpstreamResponse
+from .service_identity import ServiceIdentity
 
 
 class AnalyticsClient(Protocol):
@@ -47,12 +48,16 @@ class HttpAnalyticsClient:
         timeout_seconds: float = 10.0,
     ) -> None:
         self._internal_audience = internal_audience
+        # The gateway asserts its own service identity at the platform edge; the
+        # analytics intake is internal only (architecture.md "Component: API
+        # Gateway").
+        self._identity = ServiceIdentity(base_url)
         self._client = httpx2.AsyncClient(base_url=base_url.rstrip("/"), timeout=timeout_seconds)
 
     async def ingest(
         self, payload: Mapping[str, Any], authorization: str | None, correlation_id: str
     ) -> UpstreamResponse:
-        headers = {"x-correlation-id": correlation_id}
+        headers = {"x-correlation-id": correlation_id, **self._identity.headers()}
         if authorization is not None:
             headers["authorization"] = authorization
         try:
@@ -69,6 +74,7 @@ class HttpAnalyticsClient:
         headers = {
             "x-correlation-id": correlation_id,
             "x-internal-audience": self._internal_audience,
+            **self._identity.headers(),
         }
         try:
             response = await self._client.post(

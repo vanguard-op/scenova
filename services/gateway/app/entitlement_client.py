@@ -25,6 +25,7 @@ import httpx2
 
 from .errors import UpstreamUnavailableError
 from .lookup_client import UpstreamResponse
+from .service_identity import ServiceIdentity
 
 
 class EntitlementClient(Protocol):
@@ -62,7 +63,12 @@ class HttpEntitlementClient:
         base_url: str,
         timeout_seconds: float = 10.0,
         transport: httpx2.AsyncBaseTransport | None = None,
+        identity: ServiceIdentity | None = None,
     ) -> None:
+        # The gateway asserts its own service identity at the platform edge; the
+        # entitlement service is internal only (architecture.md "Component: API
+        # Gateway").
+        self._identity = identity or ServiceIdentity(base_url)
         self._client = httpx2.AsyncClient(
             base_url=base_url.rstrip("/"),
             timeout=timeout_seconds,
@@ -107,7 +113,7 @@ class HttpEntitlementClient:
         authorization: str | None,
         correlation_id: str,
     ) -> UpstreamResponse:
-        headers = {"x-correlation-id": correlation_id}
+        headers = {"x-correlation-id": correlation_id, **self._identity.headers()}
         if authorization is not None:
             headers["authorization"] = authorization
         try:

@@ -3,7 +3,9 @@
 # client Starlette's TestClient uses); pyjwt with cryptography verifies Firebase
 # ID tokens, whose signing keys are published as X.509 certificates. redis reads
 # the rate-limit counters from the Memorystore cache (architecture.md "Data
-# Stores").
+# Stores"); google-auth mints the short-lived ID token the gateway presents to
+# the internal services at the platform edge, and requests carries the credential
+# refresh it reaches through google.auth.transport.requests (NFR-020, NFR-024).
 fastapi==0.143.0
 uvicorn==0.54.0
 # The gateway validates the request shape it routes, so pydantic is imported
@@ -14,3 +16,5 @@ httpx2==2.13.1
 pyjwt[crypto]==2.15.1
 cryptography==50.0.2
 redis==8.0.1
+google-auth==2.62.0
+requests==2.34.2
