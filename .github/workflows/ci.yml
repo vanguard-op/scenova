@@ -30,15 +30,16 @@ jobs:
         with:
           python-version: "3.12"
 
+      # The pinned Flutter SDK comes from the local composite action rather than
+      # subosito/flutter-action: that action nests an unpinned `actions/cache`,
+      # which the repository's `sha_pinning_required` policy refuses at setup.
       - name: Set up Flutter
-        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        uses: ./.github/actions/setup-flutter
         with:
-          channel: stable
-          flutter-version: "3.47.2"
-          cache: true
+          version: "3.47.2"
 
       - name: Set up Java (Android build)
-        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: "17"
