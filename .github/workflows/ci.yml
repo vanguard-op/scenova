@@ -44,8 +44,17 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      # Google retired the `tools` SDK package, which setup-android@v3 still
+      # lists in its default `packages`; asking for it fails with "Failed to find
+      # package 'tools'" and the action dies before it exports ANDROID_HOME.
+      # Request only `platform-tools`: the command-line tools (sdkmanager,
+      # apkanalyzer, lint, …) are installed and put on PATH by the action
+      # regardless, and the runner image already carries the platform and
+      # build-tools the APK build needs.
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3

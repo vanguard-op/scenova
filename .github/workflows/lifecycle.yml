@@ -43,8 +43,17 @@ permissions:
 jobs:
   lifecycle:
     runs-on: ubuntu-latest
-    # A protection rule on this Environment (required reviewers) is the human gate
-    # on destroy; it is not configured in the repository.
+    # The human gate on destroy is a required-reviewer protection rule on this
+    # Environment. It cannot be expressed in the repository, so it is attached to
+    # `pre-revenue` out of band, with admins unable to bypass it, so every
+    # lifecycle run pauses for an approval before the runner starts:
+    #
+    #   gh api --method PUT repos/<owner>/<repo>/environments/pre-revenue \
+    #     -f 'reviewers[][type]=User' -F 'reviewers[][id]=<reviewer-id>' \
+    #     -F 'can_admins_bypass=false' -F 'prevent_self_review=false'
+    #
+    # It stands between a mistake and the environment being torn down; it must be
+    # present before any lifecycle action runs.
     environment: pre-revenue
     timeout-minutes: 30
 
