@@ -2,7 +2,7 @@
 # Build every present workspace so a broken build fails here, not at deploy.
 #   Python  : byte-compile the workspace (catches syntax/import-time breakage)
 #   Images  : container image build, then a boot smoke test that asserts each
-#             image serves GET /healthz (so an image that will not start fails
+#             image serves GET /health (so an image that will not start fails
 #             here and prints its log, not at deploy)
 #   Flutter : debug APK build
 set -euo pipefail
@@ -10,7 +10,7 @@ set -euo pipefail
 
 built_any=0
 
-# Start an image just built and assert it serves GET /healthz, printing the
+# Start an image just built and assert it serves GET /health, printing the
 # container log on failure. One fixed loopback port, used one container at a
 # time, so the same command runs locally and in CI.
 smoke_image() {
@@ -20,14 +20,14 @@ smoke_image() {
   # No --rm: a container that exits is kept so its log can be read on failure.
   cid="$(docker run -d -e PORT="$port" -p "127.0.0.1:${port}:${port}" "$image")"
   for i in $(seq 1 60); do
-    if curl -fsS "http://127.0.0.1:${port}/healthz" >/dev/null 2>&1; then ok=1; break; fi
+    if curl -fsS "http://127.0.0.1:${port}/health" >/dev/null 2>&1; then ok=1; break; fi
     docker inspect -f '{{.State.Running}}' "$cid" 2>/dev/null | grep -q true || break
     sleep 0.5
   done
   docker logs "$cid" >"$log_file" 2>&1 || true
   docker rm -f "$cid" >/dev/null 2>&1 || true
   if [ "$ok" -ne 1 ]; then
-    printf '\n----- image %s did not serve /healthz — log follows -----\n' "$image" >&2
+    printf '\n----- image %s did not serve /health — log follows -----\n' "$image" >&2
     cat "$log_file" >&2 || true
     die "container image '$name' failed the boot smoke test"
   fi

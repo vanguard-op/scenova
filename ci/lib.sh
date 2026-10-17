@@ -160,7 +160,9 @@ tool() {
 # --- Service registry --------------------------------------------------------
 # The services the docs define (architecture.md "System Components"), with the
 # module each exposes and the local port it binds. A service is booted when its
-# package directory exists. Every service MUST expose GET /healthz.
+# package directory exists. Every service MUST expose GET /health — the path the
+# platform probes; Cloud Run's front end answers /healthz itself before the
+# request reaches the container, so a check on that path would mean nothing.
 # Format: name|module|port_var  (module keeps its own colon, e.g. app.main:app)
 SERVICES=(
   "gateway|app.main:app|GATEWAY_PORT"

@@ -108,7 +108,7 @@ bundle: ## Produce deployable artifacts (container images; APK/appbundle; consol
 	@bash ci/checks/build.sh
 	@if [ -f apps/mobile/pubspec.yaml ]; then bash ci/build_app.sh appbundle; else echo "skip: no Flutter app"; fi
 
-boot: ## Boot the stack locally (start the local Postgres, apply its migrations, hand them to the services) and assert each service serves /healthz
+boot: ## Boot the stack locally (start the local Postgres, apply its migrations, hand them to the services) and assert each service serves /health
 	@bash ci/checks/boot.sh
 
 security: ## Dependency scan (pip-audit) and secret scan
