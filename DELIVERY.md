@@ -67,6 +67,7 @@ docs/           BPRD (product-shaper)
 - Engineers own unit tests; QA owns integration and acceptance tests and the model quality-bar evaluation, and runs at the phase gate.
 - Contracts are frozen in `CONTRACTS.md`; a change is a revision that re-dispatches both sides.
 - Dart: `dart format` and `flutter analyze` clean. Python: `ruff` + `black`, typed.
+- Run `make ci` in full before reporting: a scoped lint, type or test check is not the gate, and two typing slips have reached `dev` through checks narrowed to a directory.
 - `.delivery/**` and `.scratch/**` are gitignored.
 
 ## Behavior Rules
@@ -100,7 +101,8 @@ docs/           BPRD (product-shaper)
 | T-147 | — | backend-engineer | Done | — |
 | T-148 | — | infra-engineer | Done | — |
 | T-149 | — | infra-engineer | Done | — |
-| T-151 | — | infra-engineer | In Progress | — |
+| T-151 | — | infra-engineer | Done | — |
+| T-152 | — | backend-engineer | In Progress | — |
 | T-150 | — | backend-engineer | Done | — |
 
 ## Decisions Log
