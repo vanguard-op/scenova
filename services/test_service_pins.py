@@ -31,7 +31,7 @@ IMPORT_DIVERGENCES: dict[str, dict[str, str]] = {
     "analytics": {"jwt": "pyjwt"},
     "entitlement": {"jwt": "pyjwt"},
     "feedback": {"jwt": "pyjwt"},
-    "gateway": {"jwt": "pyjwt"},
+    "gateway": {"jwt": "pyjwt", "google": "google-auth"},
     "library": {},
     "lookup": {},
     "notification": {"jwt": "pyjwt", "google": "google-auth"},
