@@ -55,7 +55,7 @@ variable "console_site_id" {
 }
 
 variable "identity_gcip" {
-  description = "The project is on Identity Platform (GCIP), enabling the MFA gate (NFR-020) and auth activity logging (NFR-029). On for the production shape; off for the pre-revenue Firebase free-tier shape (D-034)."
+  description = "The project is on Identity Platform (GCIP), enabling the MFA gate (NFR-020) and auth activity logging (NFR-029). On for every environment that serves the review console; the upgrade also turns on Cloud Logging auth-activity ingestion, which bills beyond the free allotment."
   type        = bool
   default     = true
 }
@@ -138,12 +138,20 @@ variable "secret_ids" {
 
 # The provider credentials (Gemini, RevenueCat) are written out-of-band, so their
 # containers may have no version when the runtime first starts; Cloud Run refuses
-# to mount a versionless secret. The provider-backed features (generation, the
-# paid tier) are off in the free-tier shape, so it leaves these mounts off and the
-# services read them as optional; the production shape mounts them and its
-# operator seeds the values.
-variable "mount_provider_secrets" {
-  description = "Mount the Gemini and RevenueCat provider credentials on the model and entitlement services. Off in the free-tier shape, where generation and the paid tier are off and their values are not yet seeded."
+# to mount a versionless secret. The mount is therefore split per provider rather
+# than one switch: the Gemini credential can be seeded and mounted on the model
+# service while the RevenueCat credentials have no version yet and stay unmounted
+# on the entitlement service, and the services read an unmounted secret as
+# optional. Both default on for the production shape, where the operator seeds
+# every value before the first apply.
+variable "mount_gemini_secret" {
+  description = "Mount the Gemini API key on the model service. On once its value is seeded; off leaves the model service reading it as optional."
+  type        = bool
+  default     = true
+}
+
+variable "mount_revenuecat_secrets" {
+  description = "Mount the RevenueCat API key and webhook authorization on the entitlement service. On once their values are seeded; off leaves the entitlement service reading them as optional."
   type        = bool
   default     = true
 }

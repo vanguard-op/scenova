@@ -241,12 +241,14 @@ locals {
   }
 
   # The provider credentials (Gemini, RevenueCat) are mounted only where the
-  # provider-backed feature is on (var.mount_provider_secrets). Their values are
-  # written out-of-band and never by Terraform (variables.tf "secret_ids",
-  # NFR-024), so a secret container with no version yet — which Cloud Run refuses
-  # to mount ("Secret .../versions/latest was not found") — would otherwise stop
-  # the runtime from starting. The free-tier shape, where generation and the paid
-  # tier are off, leaves them unmounted and the services read them as optional
+  # provider-backed feature is on (var.mount_gemini_secret,
+  # var.mount_revenuecat_secrets). Their values are written out-of-band and never
+  # by Terraform (variables.tf "secret_ids", NFR-024), so a secret container with
+  # no version yet — which Cloud Run refuses to mount ("Secret .../versions/latest
+  # was not found") — would otherwise stop the runtime from starting. The mounts
+  # are split per provider so the Gemini credential can go live on the model
+  # service as soon as it is seeded, while the RevenueCat credentials stay
+  # unmounted until they are; an unmounted secret is read as optional
   # (ai/app/config.py, services/entitlement/app/config.py). The generated database
   # credential is always mounted; Terraform writes its version (modules/data), so
   # module.run depends on module.data to order the apply.
@@ -261,12 +263,12 @@ locals {
     notification = { DATABASE_URL = module.secrets.secret_ids["database-url"] }
     entitlement = merge(
       { DATABASE_URL = module.secrets.secret_ids["database-url"] },
-      var.mount_provider_secrets ? {
+      var.mount_revenuecat_secrets ? {
         REVENUECAT_API_KEY      = module.secrets.secret_ids["revenuecat-api-key"]
         REVENUECAT_WEBHOOK_AUTH = module.secrets.secret_ids["revenuecat-webhook-auth"]
       } : {}
     )
-    model = var.mount_provider_secrets ? { GEMINI_API_KEY = module.secrets.secret_ids["gemini-api-key"] } : {}
+    model = var.mount_gemini_secret ? { GEMINI_API_KEY = module.secrets.secret_ids["gemini-api-key"] } : {}
   }
 
   # Bootstrap placeholder so the first apply never depends on a pushed image; the

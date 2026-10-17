@@ -67,6 +67,16 @@ jobs:
       - name: Install Firebase CLI
         run: npm install -g firebase-tools@15
 
+      # `make setup` resolves the Flutter workspaces and `make deploy` builds the
+      # review console as a Flutter Web bundle, so the deploy runner needs the
+      # same pinned Flutter as CI.
+      - name: Set up Flutter (review console)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.47.2"
+          cache: true
+
       - name: Install toolchain
         run: make setup
 

@@ -30,7 +30,7 @@ variable "authorized_domains" {
 }
 
 variable "gcip" {
-  description = "The project is on Identity Platform (GCIP), which the GCIP-only MFA gate (NFR-020) and auth activity logging (NFR-029) require. On for the production shape; off for the pre-revenue Firebase free-tier shape (D-034), which does not upgrade the project's identity product."
+  description = "The project is on Identity Platform (GCIP), which the GCIP-only MFA gate (NFR-020) and auth activity logging (NFR-029) require. On wherever the review console is reachable; the pre-revenue shape turns it on too, since the console's curator gate must be live from the first operator."
   type        = bool
   default     = true
 }
@@ -58,11 +58,11 @@ resource "google_identity_platform_config" "this" {
 
   # MFA and activity logging are GCIP-only: on a Firebase-only project the API
   # refuses them ("MFA can only be enabled in GCIP or Firebase Auth upgraded to
-  # aligned product"; "activity logging can only be enabled in GCIP"). The
-  # pre-revenue free-tier shape (D-034) does not upgrade the project's identity
-  # product, so both are off there and the production shape turns them back on by
-  # configuration. Sign-in, the anonymous identity, and the authorized domains
-  # apply on Firebase Auth either way.
+  # aligned product"; "activity logging can only be enabled in GCIP"). Every
+  # environment that serves the review console upgrades the project's identity
+  # product and turns both on by configuration; a shape that has not upgraded
+  # leaves them off, and sign-in, the anonymous identity, and the authorized
+  # domains apply on Firebase Auth either way.
   dynamic "mfa" {
     for_each = var.gcip ? [1] : []
     content {
