@@ -47,6 +47,7 @@ class _FakeEntitlementClient:
         self.last_method: str | None = None
         self.last_path: str | None = None
         self.last_payload: Mapping[str, Any] | None = None
+        self.last_body: bytes | None = None
         self.last_authorization: str | None = None
 
     async def get_entitlement(
@@ -77,6 +78,15 @@ class _FakeEntitlementClient:
     ) -> UpstreamResponse:
         self.last_method = "DELETE"
         self.last_path = "/v1/account"
+        self.last_authorization = authorization
+        return self._respond()
+
+    async def sync_entitlement(
+        self, body: bytes, authorization: str | None, correlation_id: str
+    ) -> UpstreamResponse:
+        self.last_method = "POST"
+        self.last_path = "/internal/entitlements/sync"
+        self.last_body = body
         self.last_authorization = authorization
         return self._respond()
 
@@ -388,3 +398,104 @@ def test_a_store_that_refuses_the_erasure_does_not_fail_the_deletion() -> None:
     assert response.status_code == 202
     assert analytics.anonymized == ["reader-1"]
     assert feedback.anonymized == ["reader-1"]
+
+
+# --- The store billing sync (C-019) ------------------------------------------
+
+
+_WEBHOOK = {"Authorization": "processor-secret"}
+
+
+def test_the_store_billing_sync_is_forwarded_with_the_webhooks_authorization() -> None:
+    # The payment processor is not a reader: the gateway forwards the webhook's
+    # own Authorization header and the body unread, and the entitlement service's
+    # answer reaches the processor as it was produced (C-019).
+    entitlement = _FakeEntitlementClient(status_code=202, body=b'{"applied":true}')
+
+    with _client(entitlement) as client:
+        response = client.post(
+            "/internal/entitlements/sync",
+            headers={**_WEBHOOK, "x-correlation-id": "corr-9"},
+            json={
+                "accountId": "reader-1",
+                "event": "purchase",
+                "store": "app_store",
+                "productId": "com.scenova.pro.monthly",
+                "productKind": "subscription",
+                "amountMinor": 699,
+                "currency": "USD",
+                "occurredAt": "2026-10-15T12:00:00+00:00",
+            },
+        )
+
+    assert response.status_code == 202
+    assert response.json() == {"applied": True}
+    assert response.headers["x-correlation-id"] == "corr-9"
+    assert entitlement.last_method == "POST"
+    assert entitlement.last_path == "/internal/entitlements/sync"
+    assert entitlement.last_authorization == _WEBHOOK["Authorization"]
+    # The body is passed through unread, so the entitlement service stays the
+    # contract's single validator.
+    assert entitlement.last_body is not None
+    assert b'"event":"purchase"' in entitlement.last_body
+
+
+def test_the_store_billing_sync_does_not_require_a_reader_token() -> None:
+    # A processor carries no Firebase token; the gateway must not resolve a
+    # subject here, or the webhook would be 401'd before it was routed.
+    entitlement = _FakeEntitlementClient(status_code=202, body=b'{"applied":true}')
+
+    with _client(entitlement) as client:
+        response = client.post(
+            "/internal/entitlements/sync",
+            headers=_WEBHOOK,
+            json={"accountId": "reader-1"},
+        )
+
+    assert response.status_code == 202
+    assert entitlement.last_path == "/internal/entitlements/sync"
+
+
+def test_an_unauthenticated_billing_sync_is_refused_by_the_service() -> None:
+    # The gateway forwards the call and the entitlement service owns the
+    # refusal, so an unauthenticated delivery is 401 as the service produced it,
+    # never the gateway's own reader-token refusal.
+    entitlement = _FakeEntitlementClient(
+        status_code=401,
+        body=b'{"code":"unauthorized","message":"This endpoint is for the processor only."}',
+    )
+
+    with _client(entitlement) as client:
+        response = client.post("/internal/entitlements/sync", json={"accountId": "reader-1"})
+
+    assert response.status_code == 401
+    assert response.json()["code"] == "unauthorized"
+    assert entitlement.last_path == "/internal/entitlements/sync"
+    assert entitlement.last_authorization is None
+
+
+def test_a_billing_sync_error_passes_through() -> None:
+    # C-019's 400 and 404 reach the processor as the service produced them.
+    entitlement = _FakeEntitlementClient(
+        status_code=404, body=b'{"code":"account_not_found","message":"No such account."}'
+    )
+
+    with _client(entitlement) as client:
+        response = client.post(
+            "/internal/entitlements/sync", headers=_WEBHOOK, json={"accountId": "nobody"}
+        )
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "account_not_found"
+
+
+def test_an_unreachable_entitlement_service_refuses_a_billing_sync() -> None:
+    entitlement = _FakeEntitlementClient(error=UpstreamUnavailableError("down"))
+
+    with _client(entitlement) as client:
+        response = client.post(
+            "/internal/entitlements/sync", headers=_WEBHOOK, json={"accountId": "reader-1"}
+        )
+
+    assert response.status_code == 503
+    assert response.json()["code"] == "upstream_unavailable"

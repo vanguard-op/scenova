@@ -1,7 +1,6 @@
 """Client HTTP API for the gateway.
 
-Contracts: C-001, C-002, C-007, C-008, C-012, C-013, C-018, C-020, C-021,
-C-022.
+Contracts: C-001, C-002, C-007, C-008, C-012, C-013, C-018 to C-022.
 
 The gateway authenticates the caller, rate-limits lookups, events, push
 registrations, ratings, and reports, validates the request body, and passes the
@@ -14,6 +13,12 @@ read, the account settings read, the account update, and the account deletion
 carry no rate limit of their own; the account screen reads the plan and the saved
 choices, writes the consent choice, and deletes the account, none of which is a
 flood surface.
+
+The store billing sync (C-019) is the one public route that carries no reader
+token: the payment processor calls it from the internet and the gateway forwards
+the webhook's own Authorization header to the entitlement service, which decides
+it. The webhook secret never leaves the entitlement service, so the public edge
+holds nothing with which to forge a purchase.
 
 An account deletion is the one place the gateway sequences more than one
 service: once the entitlement service has removed the account, the gateway
@@ -310,6 +315,19 @@ def create_app(
                 subject.id,
                 correlation_id,
             )
+        return _passthrough(upstream, correlation_id, resolved_settings)
+
+    @app.post("/internal/entitlements/sync", status_code=202)
+    async def sync_entitlement(request: Request) -> Response:
+        # The payment processor is not a reader: the store billing sync carries
+        # the webhook's own Authorization header, not a reader token, so the
+        # gateway does not resolve a subject here and forwards the call for the
+        # entitlement service to authenticate (C-019). The body is passed through
+        # unread, so the service remains the contract's single validator.
+        correlation_id = _correlation_id(resolved_settings, request)
+        upstream = await resolved_entitlement.sync_entitlement(
+            await request.body(), request.headers.get("authorization"), correlation_id
+        )
         return _passthrough(upstream, correlation_id, resolved_settings)
 
     @app.get("/internal/review/queue")

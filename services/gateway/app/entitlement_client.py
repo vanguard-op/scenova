@@ -1,4 +1,4 @@
-"""Internal client for the account and entitlement service (C-018, C-020, C-021, C-022).
+"""Internal client for the account and entitlement service (C-018 to C-022).
 
 The gateway routes a reader's entitlement read, their account settings read,
 their account update, and their account deletion to the entitlement service,
@@ -6,6 +6,14 @@ which owns the account and the allowance. The caller's Authorization header is
 forwarded unchanged, so the service resolves the same token subject the gateway
 authenticated and scopes the answer to that reader; the gateway never rewrites or
 records the identity.
+
+The gateway also carries the store billing sync (C-019). The payment processor is
+not a reader, so the call is not a reader token's: the gateway forwards the
+webhook's own Authorization header unchanged and the entitlement service decides
+it — the processor's signed webhook or an internal service identity — and the
+response, including a refusal, reaches the processor as the service produced it.
+The webhook secret stays on the entitlement service alone, so the public surface
+never holds the value it would need to forge a purchase.
 """
 
 from __future__ import annotations
@@ -36,6 +44,10 @@ class EntitlementClient(Protocol):
 
     async def delete_account(
         self, authorization: str | None, correlation_id: str
+    ) -> UpstreamResponse: ...
+
+    async def sync_entitlement(
+        self, body: bytes, authorization: str | None, correlation_id: str
     ) -> UpstreamResponse: ...
 
     async def aclose(self) -> None: ...
@@ -77,6 +89,13 @@ class HttpEntitlementClient:
     ) -> UpstreamResponse:
         return await self._request("DELETE", "/v1/account", None, authorization, correlation_id)
 
+    async def sync_entitlement(
+        self, body: bytes, authorization: str | None, correlation_id: str
+    ) -> UpstreamResponse:
+        return await self._request(
+            "POST", "/internal/entitlements/sync", body, authorization, correlation_id
+        )
+
     async def aclose(self) -> None:
         await self._client.aclose()
 
@@ -84,7 +103,7 @@ class HttpEntitlementClient:
         self,
         method: str,
         path: str,
-        payload: dict[str, Any] | None,
+        payload: dict[str, Any] | bytes | None,
         authorization: str | None,
         correlation_id: str,
     ) -> UpstreamResponse:
@@ -92,7 +111,13 @@ class HttpEntitlementClient:
         if authorization is not None:
             headers["authorization"] = authorization
         try:
-            response = await self._client.request(method, path, headers=headers, json=payload)
+            if isinstance(payload, bytes):
+                headers["content-type"] = "application/json"
+                response = await self._client.request(
+                    method, path, headers=headers, content=payload
+                )
+            else:
+                response = await self._client.request(method, path, headers=headers, json=payload)
         except httpx2.HTTPError as exc:
             raise UpstreamUnavailableError("The entitlement service is unavailable.") from exc
         return UpstreamResponse(
