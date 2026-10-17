@@ -104,7 +104,9 @@ docs/           BPRD (product-shaper)
 | T-151 | — | infra-engineer | Done | — |
 | T-152 | — | backend-engineer | Done | — |
 | T-153 | — | infra-engineer | Done | — |
-| T-154 | — | infra-engineer | In Progress | — |
+| T-154 | — | infra-engineer | Done | — |
+| T-155 | — | infra-engineer | In Progress | — |
+| T-156 | — | infra-engineer | Backlog | — |
 | T-150 | — | backend-engineer | Done | — |
 
 ## Decisions Log
@@ -145,6 +147,7 @@ docs/           BPRD (product-shaper)
 | D-033 | The selection-action label ships in English only; the choice is stored and every other language reads that it is shown in English | No translated label set exists to ship, so the platform per-app-locale wiring waits for real translations rather than shipping a choice that does nothing | user |
 | D-034 | Pre-revenue the product runs on the free tiers with no always-on infrastructure: scale-to-zero services, the cheapest reachable Postgres, no Redis, no CDN, and Firebase's free tier — with the paid resources started, paused and destroyed on demand rather than left running | There are no readers yet, so the availability the production shape exists to meet buys nothing; every choice reverses by configuration because the stores sit behind ports, and the lifecycle action means the paid parts exist only during testing windows | user |
 | D-035 | The product is billed through Vanguard Billing, freeing its project slot by unlinking `waypoint-510216` | Vanguard is at its project quota and cannot take another project without a support request; Waypoint keeps its project and its data but loses its billing link, so any billable service there stops until it is re-linked | user |
+| D-036 | The product repository is public and the documentation submodule stays private | The public repository is what lets the Actions run and the environment protection rules attach; the specification is not published with the code, so a public cloner gets a build it cannot reproduce without the docs | user |
 
 ## Definition of Done
 - **Task:** the acceptance criteria in the cited feature doc are met; the frozen contract is conformed; unit tests pass; format, lint, analyze, and build are clean; work is committed to the dev branch and confined to `Own`.

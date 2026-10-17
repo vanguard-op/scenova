@@ -40,7 +40,7 @@ jobs:
     timeout-minutes: 45
 
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
@@ -53,7 +53,7 @@ jobs:
           service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
 
       - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker "${{ vars.GCP_REGION }}-docker.pkg.dev" --quiet
 
@@ -67,13 +67,12 @@ jobs:
 
       # `make setup` resolves the Flutter workspaces and `make deploy` builds the
       # review console as a Flutter Web bundle, so the deploy runner needs the
-      # same pinned Flutter as CI.
+      # same pinned Flutter as CI. The local composite action installs it without
+      # an unpinned nested cache, which `sha_pinning_required` refuses.
       - name: Set up Flutter (review console)
-        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        uses: ./.github/actions/setup-flutter
         with:
-          channel: stable
-          flutter-version: "3.47.2"
-          cache: true
+          version: "3.47.2"
 
       - name: Install toolchain
         run: make setup
