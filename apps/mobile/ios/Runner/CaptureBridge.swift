@@ -101,10 +101,12 @@ final class CaptureBridge {
 /// to plugins, on both the cold-start and warm paths.
 final class CaptureSceneDelegate: NSObject, FlutterSceneLifeCycleDelegate {
 
+  // `UIScene.ConnectionOptions`, not the top-level `UISceneConnectionOptions`:
+  // the latter was renamed in the newer iOS SDK and the compiler rejects it.
   @objc func scene(
     _ scene: UIScene,
     willConnectTo session: UISceneSession,
-    options connectionOptions: UISceneConnectionOptions?
+    options connectionOptions: UIScene.ConnectionOptions?
   ) -> Bool {
     guard let urlContexts = connectionOptions?.urlContexts else { return false }
     return handle(urlContexts)
