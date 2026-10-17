@@ -46,13 +46,20 @@ class HttpAnalyticsClient:
         base_url: str,
         internal_audience: str,
         timeout_seconds: float = 10.0,
+        transport: httpx2.AsyncBaseTransport | None = None,
+        identity: ServiceIdentity | None = None,
     ) -> None:
         self._internal_audience = internal_audience
         # The gateway asserts its own service identity at the platform edge; the
         # analytics intake is internal only (architecture.md "Component: API
-        # Gateway").
-        self._identity = ServiceIdentity(base_url)
-        self._client = httpx2.AsyncClient(base_url=base_url.rstrip("/"), timeout=timeout_seconds)
+        # Gateway"). The audience is this client's own base URL: Cloud Run binds
+        # the ID token to the service being called.
+        self._identity = identity or ServiceIdentity(base_url)
+        self._client = httpx2.AsyncClient(
+            base_url=base_url.rstrip("/"),
+            timeout=timeout_seconds,
+            transport=transport,
+        )
 
     async def ingest(
         self, payload: Mapping[str, Any], authorization: str | None, correlation_id: str
