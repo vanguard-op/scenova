@@ -8,8 +8,10 @@ reader-facing behavior under a suppressed schema is covered by its own suite.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 import pytest
+from fastapi import FastAPI
 
 SERVICES_ROOT = Path(__file__).resolve().parent
 
@@ -24,10 +26,12 @@ def test_the_scan_covers_the_services() -> None:
     assert SERVICE_NAMES, "no service scanned — the schema scan is checking nothing"
 
 
-def _app(service: str, *, docs_enabled: bool) -> object:
+def _app(service: str, *, docs_enabled: bool) -> FastAPI:
     api = __import__(f"{service}.app.api", fromlist=["create_app"])
     config = __import__(f"{service}.app.config", fromlist=["Settings"])
-    return api.create_app(settings=config.Settings(docs_enabled=docs_enabled))
+    # The dynamic import is untyped; every service's `create_app` builds a
+    # FastAPI app, which is the type the schema assertions read.
+    return cast(FastAPI, api.create_app(settings=config.Settings(docs_enabled=docs_enabled)))
 
 
 @pytest.mark.parametrize("service", SERVICE_NAMES)
