@@ -11,6 +11,8 @@
 #   - the clip-store variables the AI layer resolves are declared;
 #   - the primary-database keys are declared and stay wired to the Terraform
 #     that provides the store;
+#   - the deploy injects no service environment variable, because the platform
+#     owns the service environment and the next apply would strip what it set;
 #   - no schema key is declared twice.
 #
 # It runs before the build in `make ci`, so a drifted schema fails fast.
@@ -191,6 +193,23 @@ done
 info "app build store configuration ok: ${#MOBILE_DEFINE_KEYS[@]} keys, no secret, no flag"
 
 info "schema ok: ${#FLAG_DEFAULTS[@]} flags, ${#CLIP_STORE_KEYS[@]} clip-store keys"
+
+# --- Deploy path: the platform owns the service environment ------------------
+# The deploy pipeline owns the image tag; the platform (Terraform) owns the
+# service environment and secrets. A variable the deploy injects but Terraform
+# does not declare is drift: the next `terraform apply`, or a lifecycle `start`,
+# reconciles the service to Terraform's environment set and strips it, so the
+# running revision silently loses the value. Keep the boundary single-owner — the
+# deploy writes no service environment variable at all. The running revision's
+# commit is its image tag (`...:<sha>`), which the run module leaves untouched
+# (ignore_changes), so provenance survives every apply.
+DEPLOY="ci/deploy.sh"
+if [ -f "$DEPLOY" ]; then
+  if grep -vE '^[[:space:]]*#' "$DEPLOY" | grep -qE -- '--(update|set)-env-vars|--env-vars-file'; then
+    die "$DEPLOY injects service environment variables; the platform (Terraform) owns them — declare the variable in infra/terraform instead"
+  fi
+  info "deploy owns only the image tag: the service environment stays Terraform's"
+fi
 
 shopt -s nullglob
 tfvars=(infra/terraform/environments/*.tfvars)

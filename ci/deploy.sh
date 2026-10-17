@@ -102,17 +102,22 @@ for svc in "${services[@]}"; do
   docker push "$image"
 
   log "Deploy · Cloud Run '$svc' (no traffic) + 5% canary"
-  # --update-env-vars merges, so the Terraform-managed configuration on the
-  # service (data stores, clip store, model pins, flags) survives the deploy;
-  # --set-env-vars would remove every existing variable first and ship a service
-  # with no configuration. Secrets are untouched (they are mounted separately).
+  # The deploy pipeline owns the image tag; the platform (Terraform) owns the
+  # service environment and secrets. `gcloud run deploy` with only --image keeps
+  # the environment Terraform set — gcloud retains variables it is not asked to
+  # change — and the running revision's commit is its image tag (`...:<sha>`),
+  # which the run module leaves untouched (ignore_changes), so provenance
+  # survives every apply. A variable injected here but not declared in
+  # infra/terraform is drift: the next apply, or a lifecycle `start`, reconciles
+  # the service to Terraform's environment set and strips it, and the running
+  # revision silently loses it. Declare a new variable in Terraform instead; the
+  # env schema check rejects a deploy that injects one.
   gcloud run deploy "$svc" \
     --project "$PROJECT_ID" \
     --region "$REGION" \
     --image "$image" \
     --no-traffic \
     --tag candidate \
-    --update-env-vars "ENVIRONMENT=$ENV,GIT_SHA=$GIT_SHA" \
     --quiet
 
   gcloud run services update-traffic "$svc" \
