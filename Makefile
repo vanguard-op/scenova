@@ -44,13 +44,13 @@ PYTEST    := $(VENV)/bin/pytest
 .PHONY: help setup auth fmt lint env typecheck test qa qa-model model-bar build bundle boot security \
         db-up db-migrate db-rollback db-reset db-status db-check db-migrate-cloud \
         infra-init infra-fmt infra-validate infra-plan infra-apply \
-        bootstrap env-start env-pause env-destroy \
+        bootstrap repo-controls env-start env-pause env-destroy \
         deploy deploy-console traffic curator promote rollback flag ci clean
 
 help: ## Show the documented commands
 	@printf '\nScenova platform commands (env=%s, venv=%s)\n\n' "$(ENVIRONMENT)" "$(VENV)"
 	@awk 'BEGIN{FS=":.*## "} /^[a-zA-Z0-9_-]+:.*## /{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
-	@printf '\nTargets: make setup · make auth · make ci · make qa · make model-bar · make db-up · make db-migrate · make deploy ENV=staging SVC=gateway · make promote ENV=staging SVC=gateway · make rollback ENV=staging SVC=gateway · make traffic ENV=staging · make flag ENV=prod FLAG=FLAG_ENABLE_GENERATION VALUE=false · make curator OPERATOR=… · make bootstrap · make env-start · make env-pause · make env-destroy\n\n'
+	@printf '\nTargets: make setup · make auth · make ci · make qa · make model-bar · make db-up · make db-migrate · make deploy ENV=staging SVC=gateway · make promote ENV=staging SVC=gateway · make rollback ENV=staging SVC=gateway · make traffic ENV=staging · make flag ENV=prod FLAG=FLAG_ENABLE_GENERATION VALUE=false · make curator OPERATOR=… · make bootstrap · make repo-controls · make env-start · make env-pause · make env-destroy\n\n'
 
 # --- Setup -------------------------------------------------------------------
 
@@ -154,6 +154,11 @@ infra-plan: ## Plan infrastructure for an environment (ENV=dev|staging|prod)
 
 infra-apply: ## Apply infrastructure for an environment (ENV=dev|staging|prod|pre-revenue)
 	$(TERRAFORM) -chdir=$(TF_DIR) apply -var-file=environments/$(ENV).tfvars
+
+# --- Repository controls -----------------------------------------------------
+
+repo-controls: ## Apply the free controls a public repo gets: secret scanning, Dependabot alerts, SHA-pinned actions, and the dev/main ruleset
+	@bash ci/repo_controls.sh
 
 # --- Pre-revenue lifecycle (D-034) -------------------------------------------
 

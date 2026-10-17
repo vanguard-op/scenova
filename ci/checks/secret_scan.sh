@@ -13,6 +13,21 @@
 # stay tracked. The exemption is scoped to the client-key field on exactly those
 # two paths: every other pattern still scans them, and the Google-API-key pattern
 # still fires on a genuine key on any other line or in any other file.
+#
+# What is settled for the project's three client keys, read from the command line
+# (`gcloud services api-keys list --project scenova-hq`, then `get-key-string` to
+# match each key to its value): each carries the default Firebase API-target list
+# — 27 services — and no application restriction: no Android package name or
+# SHA-1 signing-certificate fingerprint, no iOS bundle ID, no browser referrer.
+# What is not settled from the command line, and needs the console or the reader's
+# signing certificate: adding those application restrictions. The signing
+# certificate is deferred with store release signing, so the Android key's SHA-1
+# binding waits with it; until then the API-target list, App Check, and Security
+# Rules carry the exposure.
+#
+# GitHub's own secret scanning raises a `google_api_key` alert per key; the two
+# paths are excluded from it by rule in .github/secret_scanning.yml, the same
+# exemption this scanner applies.
 set -euo pipefail
 . "$(dirname "$0")/../lib.sh"
 

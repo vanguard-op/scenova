@@ -1,0 +1,19 @@
+# Dependabot keeps the CI actions current (NFR-028: pinned versions). Every
+# action in .github/workflows is pinned to a full-length commit SHA with its
+# release tag in a trailing comment; the Actions repository setting
+# `sha_pinning_required` enforces that. Dependabot raises a PR when a pinned SHA
+# moves, updating the SHA and the comment together, so a pin stays current without
+# ever running an unreviewed tag.
+#
+# Scoped to the Actions ecosystem on purpose: it is the only place this repo
+# carries third-party pinned dependencies in the pipeline. The service and app
+# dependencies are pinned in their own manifests and audited by `make security`.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(ci)"

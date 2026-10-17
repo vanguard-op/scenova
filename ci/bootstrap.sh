@@ -108,15 +108,28 @@ fi
 # billing check and the state bucket, and not something Terraform can create for
 # itself. Idempotent: each step is skipped when it already exists.
 #
-# The provider's attribute condition pins the repository, so a token minted for
-# any other repository is refused; the impersonation binding names that same
-# repository, so only this repo's workflows can act as the deploy account. The
-# workflows read the provider resource name and the account from repository
-# variables (GCP_WORKLOAD_IDENTITY_PROVIDER, GCP_DEPLOY_SERVICE_ACCOUNT).
+# The provider's attribute condition pins the repository and the event, so a
+# token minted for any other repository is refused, and so is one minted for a
+# pull request: a `pull_request`-event token carries the *base* repository's
+# `assertion.repository`, so the repository check alone would not refuse a fork's
+# PR. GitHub does not issue OIDC tokens to fork PR workflows at all today, which
+# is what actually refuses them; the event-name clause makes the pin refuse it
+# itself, so the control does not rest on that provider behaviour. Only `push` and
+# `workflow_dispatch` mint tokens here — the deploy and lifecycle workflows — so
+# nothing legitimate is excluded (the CI workflow runs on `pull_request` but never
+# requests `id-token`). The impersonation binding names the same repository, so
+# only this repo's workflows can act as the deploy account. The workflows read the
+# provider resource name and the account from repository variables
+# (GCP_WORKLOAD_IDENTITY_PROVIDER, GCP_DEPLOY_SERVICE_ACCOUNT).
 GITHUB_REPO="${GITHUB_REPO:-vanguard-op/scenova}"
 WIF_POOL="${WIF_POOL:-github-actions}"
 WIF_PROVIDER="${WIF_PROVIDER:-github}"
 DEPLOY_ACCOUNT_ID="scenova-deploy"
+
+# The provider's desired state, applied on every run so a provider created before
+# a condition was tightened is brought in line rather than left as it was.
+WIF_ATTRIBUTE_MAPPING="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_owner=assertion.repository_owner,attribute.ref=assertion.ref"
+WIF_ATTRIBUTE_CONDITION="assertion.repository == '${GITHUB_REPO}' && (assertion.event_name == 'push' || assertion.event_name == 'workflow_dispatch')"
 
 if [ -n "$GITHUB_REPO" ]; then
   log "Bootstrap · Workload Identity Federation for $GITHUB_REPO"
@@ -140,10 +153,20 @@ if [ -n "$GITHUB_REPO" ]; then
       --project "$PROJECT_ID" --location global --workload-identity-pool "$WIF_POOL" \
       --display-name "GitHub OIDC" \
       --issuer-uri "https://token.actions.githubusercontent.com" \
-      --attribute-mapping "google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_owner=assertion.repository_owner,attribute.ref=assertion.ref" \
-      --attribute-condition "assertion.repository == '${GITHUB_REPO}'" --quiet
+      --attribute-mapping "$WIF_ATTRIBUTE_MAPPING" \
+      --attribute-condition "$WIF_ATTRIBUTE_CONDITION" --quiet
     info "created workload identity provider $WIF_PROVIDER"
   fi
+
+  # Converge the provider onto the desired mapping and condition on every run, so
+  # a repository bootstrapped before the event-name clause was added is refused
+  # the same way a fresh one is. Idempotent: a provider already at the desired
+  # state is rewritten with the same values.
+  gcloud iam workload-identity-pools providers update-oidc "$WIF_PROVIDER" \
+    --project "$PROJECT_ID" --location global --workload-identity-pool "$WIF_POOL" \
+    --attribute-mapping "$WIF_ATTRIBUTE_MAPPING" \
+    --attribute-condition "$WIF_ATTRIBUTE_CONDITION" --quiet >/dev/null
+  info "provider $WIF_PROVIDER pinned to repository + push/workflow_dispatch"
 
   PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
   DEPLOY_SA="${DEPLOY_ACCOUNT_ID}@${PROJECT_ID}.iam.gserviceaccount.com"
