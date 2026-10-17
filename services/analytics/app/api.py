@@ -44,7 +44,15 @@ def create_app(
         window_seconds=resolved_settings.rate_limit_window_seconds,
     )
 
-    app = FastAPI(title="Scenova Analytics", version="1.0.0")
+    # The interactive schema is a development aid; a deployed service does not
+    # publish it (nfr.md "Security").
+    app = FastAPI(
+        title="Scenova Analytics",
+        version="1.0.0",
+        docs_url="/docs" if resolved_settings.docs_enabled else None,
+        redoc_url="/redoc" if resolved_settings.docs_enabled else None,
+        openapi_url="/openapi.json" if resolved_settings.docs_enabled else None,
+    )
 
     @app.exception_handler(AnalyticsError)
     async def _handle_analytics_error(_request: Request, exc: AnalyticsError) -> JSONResponse:

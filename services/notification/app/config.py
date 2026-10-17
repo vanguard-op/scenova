@@ -52,6 +52,10 @@ class Settings:
     internal_audience: str = DEFAULT_INTERNAL_AUDIENCE
     correlation_id_header: str = DEFAULT_CORRELATION_ID_HEADER
     require_internal_auth: bool = True
+    # The interactive schema (Swagger UI, ReDoc, OpenAPI) is a development aid,
+    # never a published surface (nfr.md "Security"); `from_env` serves it only
+    # for local development, and `DOCS_ENABLED` overrides that.
+    docs_enabled: bool = False
     lookup_base_url: str = f"http://127.0.0.1:{DEFAULT_LOOKUP_PORT}"
     lookup_timeout_seconds: float = DEFAULT_LOOKUP_TIMEOUT_SECONDS
     # The push provider's base URL for the generic HTTP seam. Empty (with the
@@ -92,6 +96,7 @@ class Settings:
                 source, "CORRELATION_ID_HEADER", DEFAULT_CORRELATION_ID_HEADER
             ),
             require_internal_auth=_env_bool(source, "NOTIFICATION_REQUIRE_INTERNAL_AUTH", True),
+            docs_enabled=_env_bool(source, "DOCS_ENABLED", environment == "dev"),
             lookup_base_url=lookup_base_url,
             lookup_timeout_seconds=_env_float(
                 source, "NOTIFICATION_LOOKUP_TIMEOUT_SECONDS", DEFAULT_LOOKUP_TIMEOUT_SECONDS

@@ -160,7 +160,17 @@ def create_app(
             if redis_client is not None:
                 await redis_client.aclose()
 
-    app = FastAPI(title="Scenova API Gateway", version="1.0.0", lifespan=lifespan)
+    # The interactive schema is a development aid; a deployed gateway does not
+    # publish it, because it advertises the operator routes beside the reader
+    # routes (nfr.md "Security"; architecture.md "Component: API Gateway").
+    app = FastAPI(
+        title="Scenova API Gateway",
+        version="1.0.0",
+        lifespan=lifespan,
+        docs_url="/docs" if resolved_settings.docs_enabled else None,
+        redoc_url="/redoc" if resolved_settings.docs_enabled else None,
+        openapi_url="/openapi.json" if resolved_settings.docs_enabled else None,
+    )
 
     @app.exception_handler(GatewayError)
     async def _handle_gateway_error(_request: Request, exc: GatewayError) -> JSONResponse:

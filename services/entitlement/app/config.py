@@ -62,6 +62,10 @@ class Settings:
     # and only the internal service audience is accepted.
     webhook_auth: str | None = None
     require_internal_auth: bool = True
+    # The interactive schema (Swagger UI, ReDoc, OpenAPI) is a development aid,
+    # never a published surface (nfr.md "Security"); `from_env` serves it only
+    # for local development, and `DOCS_ENABLED` overrides that.
+    docs_enabled: bool = False
     free_lookups: int = DEFAULT_FREE_LOOKUPS
     pro_lookups: int = DEFAULT_PRO_LOOKUPS
     topup_lookups: int = DEFAULT_TOPUP_LOOKUPS
@@ -88,6 +92,7 @@ class Settings:
             ),
             webhook_auth=_env_opt(source, "REVENUECAT_WEBHOOK_AUTH"),
             require_internal_auth=_env_bool(source, "ENTITLEMENT_REQUIRE_INTERNAL_AUTH", True),
+            docs_enabled=_env_bool(source, "DOCS_ENABLED", environment == "dev"),
             free_lookups=_env_int(source, "ENTITLEMENT_FREE_LOOKUPS", DEFAULT_FREE_LOOKUPS),
             pro_lookups=_env_int(source, "ENTITLEMENT_PRO_LOOKUPS", DEFAULT_PRO_LOOKUPS),
             topup_lookups=_env_int(source, "ENTITLEMENT_TOPUP_LOOKUPS", DEFAULT_TOPUP_LOOKUPS),

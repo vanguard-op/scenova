@@ -74,6 +74,10 @@ class Settings:
     internal_audience: str = DEFAULT_INTERNAL_AUDIENCE
     correlation_id_header: str = DEFAULT_CORRELATION_ID_HEADER
     require_internal_auth: bool = True
+    # The interactive schema (Swagger UI, ReDoc, OpenAPI) is a development aid,
+    # never a published surface (nfr.md "Security"); `from_env` serves it only
+    # for local development, and `DOCS_ENABLED` overrides that.
+    docs_enabled: bool = False
     model_base_url: str = f"http://127.0.0.1:{DEFAULT_MODEL_PORT}"
     model_timeout_seconds: float = DEFAULT_MODEL_TIMEOUT_SECONDS
     phrase_timeout_seconds: float = DEFAULT_PHRASE_TIMEOUT_SECONDS
@@ -104,6 +108,7 @@ class Settings:
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Settings:
         source = os.environ if env is None else env
+        environment = _env_str(source, "ENVIRONMENT", "dev")
         model_base_url = _env_str(
             source,
             "MODEL_BASE_URL",
@@ -125,6 +130,7 @@ class Settings:
                 source, "CORRELATION_ID_HEADER", DEFAULT_CORRELATION_ID_HEADER
             ),
             require_internal_auth=_env_bool(source, "PIPELINE_REQUIRE_INTERNAL_AUTH", True),
+            docs_enabled=_env_bool(source, "DOCS_ENABLED", environment == "dev"),
             model_base_url=model_base_url,
             model_timeout_seconds=_env_float(
                 source, "PIPELINE_MODEL_TIMEOUT_SECONDS", DEFAULT_MODEL_TIMEOUT_SECONDS

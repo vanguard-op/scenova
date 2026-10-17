@@ -25,6 +25,10 @@ class Settings:
     internal_audience: str = DEFAULT_INTERNAL_AUDIENCE
     correlation_id_header: str = DEFAULT_CORRELATION_ID_HEADER
     require_internal_auth: bool = True
+    # The interactive schema (Swagger UI, ReDoc, OpenAPI) is a development aid,
+    # never a published surface (nfr.md "Security"); `from_env` serves it only
+    # for local development, and `DOCS_ENABLED` overrides that.
+    docs_enabled: bool = False
     # The primary database the library entries live in (architecture.md "Primary
     # Database"). Empty resolves to the in-memory store, which the unit tests and
     # a bare local run use; every deployed environment supplies it.
@@ -33,12 +37,14 @@ class Settings:
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Settings:
         source = os.environ if env is None else env
+        environment = _env_str(source, "ENVIRONMENT", "dev")
         return cls(
             internal_audience=_env_str(source, "INTERNAL_AUDIENCE", DEFAULT_INTERNAL_AUDIENCE),
             correlation_id_header=_env_str(
                 source, "CORRELATION_ID_HEADER", DEFAULT_CORRELATION_ID_HEADER
             ),
             require_internal_auth=_env_bool(source, "LIBRARY_REQUIRE_INTERNAL_AUTH", True),
+            docs_enabled=_env_bool(source, "DOCS_ENABLED", environment == "dev"),
             database_url=_env_optional(source, "DATABASE_URL"),
         )
 

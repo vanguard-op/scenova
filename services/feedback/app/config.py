@@ -56,6 +56,10 @@ class Settings:
     # (nfr.md "Privacy & Compliance").
     require_internal_auth: bool = True
     correlation_id_header: str = DEFAULT_CORRELATION_ID_HEADER
+    # The interactive schema (Swagger UI, ReDoc, OpenAPI) is a development aid,
+    # never a published surface (nfr.md "Security"); `from_env` serves it only
+    # for local development, and `DOCS_ENABLED` overrides that.
+    docs_enabled: bool = False
     lookup_base_url: str = f"http://127.0.0.1:{DEFAULT_LOOKUP_PORT}"
     lookup_timeout_seconds: float = DEFAULT_LOOKUP_TIMEOUT_SECONDS
     library_base_url: str = f"http://127.0.0.1:{DEFAULT_LIBRARY_PORT}"
@@ -97,6 +101,7 @@ class Settings:
             firebase_project_id=_env_opt(source, "FIREBASE_PROJECT_ID"),
             internal_audience=_env_str(source, "INTERNAL_AUDIENCE", DEFAULT_INTERNAL_AUDIENCE),
             require_internal_auth=_env_bool(source, "FEEDBACK_REQUIRE_INTERNAL_AUTH", True),
+            docs_enabled=_env_bool(source, "DOCS_ENABLED", environment == "dev"),
             correlation_id_header=_env_str(
                 source, "CORRELATION_ID_HEADER", DEFAULT_CORRELATION_ID_HEADER
             ),

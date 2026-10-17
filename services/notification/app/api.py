@@ -70,10 +70,15 @@ def create_app(
                     await drain_task
             await resolved_service.aclose()
 
+    # The interactive schema is a development aid; a deployed service does not
+    # publish it (nfr.md "Security").
     app = FastAPI(
         title="Scenova Notification Service",
         version="1.0.0",
         lifespan=lifespan,
+        docs_url="/docs" if resolved_settings.docs_enabled else None,
+        redoc_url="/redoc" if resolved_settings.docs_enabled else None,
+        openapi_url="/openapi.json" if resolved_settings.docs_enabled else None,
     )
 
     @app.exception_handler(NotificationError)

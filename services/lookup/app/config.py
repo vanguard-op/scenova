@@ -50,6 +50,10 @@ class Settings:
     internal_audience: str = DEFAULT_INTERNAL_AUDIENCE
     correlation_id_header: str = DEFAULT_CORRELATION_ID_HEADER
     require_internal_auth: bool = True
+    # The interactive schema (Swagger UI, ReDoc, OpenAPI) is a development aid,
+    # never a published surface (nfr.md "Security"); `from_env` serves it only
+    # for local development, and `DOCS_ENABLED` overrides that.
+    docs_enabled: bool = False
     pipeline_base_url: str = f"http://127.0.0.1:{DEFAULT_PIPELINE_PORT}"
     pipeline_timeout_seconds: float = DEFAULT_PIPELINE_TIMEOUT_SECONDS
     library_base_url: str = f"http://127.0.0.1:{DEFAULT_LIBRARY_PORT}"
@@ -68,6 +72,7 @@ class Settings:
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Settings:
         source = os.environ if env is None else env
+        environment = _env_str(source, "ENVIRONMENT", "dev")
         pipeline_base_url = _env_str(
             source,
             "PIPELINE_BASE_URL",
@@ -89,6 +94,7 @@ class Settings:
                 source, "CORRELATION_ID_HEADER", DEFAULT_CORRELATION_ID_HEADER
             ),
             require_internal_auth=_env_bool(source, "LOOKUP_REQUIRE_INTERNAL_AUTH", True),
+            docs_enabled=_env_bool(source, "DOCS_ENABLED", environment == "dev"),
             pipeline_base_url=pipeline_base_url,
             pipeline_timeout_seconds=_env_float(
                 source, "LOOKUP_PIPELINE_TIMEOUT_SECONDS", DEFAULT_PIPELINE_TIMEOUT_SECONDS

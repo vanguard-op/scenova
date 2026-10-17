@@ -45,6 +45,13 @@ class Settings:
     rate_limit_window_seconds: int = DEFAULT_RATE_LIMIT_WINDOW_SECONDS
     upstream_timeout_seconds: float = DEFAULT_UPSTREAM_TIMEOUT_SECONDS
     correlation_id_header: str = DEFAULT_CORRELATION_ID_HEADER
+    # The interactive schema (Swagger UI, ReDoc, OpenAPI) is a development aid,
+    # never a published surface. The gateway's schema advertises the operator
+    # routes beside the reader routes, so publishing it hands an attacker a map
+    # of the internal surface (nfr.md "Security"; architecture.md "Component: API
+    # Gateway"). Off by default; `from_env` turns it on only for local
+    # development, and `DOCS_ENABLED` overrides that.
+    docs_enabled: bool = False
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Settings:
@@ -114,6 +121,9 @@ class Settings:
             correlation_id_header=_env_str(
                 source, "CORRELATION_ID_HEADER", DEFAULT_CORRELATION_ID_HEADER
             ),
+            # The schema is served only where the team develops (ENVIRONMENT=dev,
+            # the local default); every deployed environment suppresses it.
+            docs_enabled=_env_bool(source, "DOCS_ENABLED", environment == "dev"),
         )
 
 
@@ -145,3 +155,10 @@ def _env_float(env: Mapping[str, str], name: str, default: float) -> float:
         return float(raw)
     except ValueError:
         return default
+
+
+def _env_bool(env: Mapping[str, str], name: str, default: bool) -> bool:
+    value = env.get(name)
+    if value in (None, ""):
+        return default
+    return value.strip().lower() not in {"0", "false", "no", "off"}

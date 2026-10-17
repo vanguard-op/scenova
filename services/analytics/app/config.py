@@ -39,6 +39,10 @@ class Settings:
     event_store: str = ""
     internal_audience: str = DEFAULT_INTERNAL_AUDIENCE
     require_internal_auth: bool = True
+    # The interactive schema (Swagger UI, ReDoc, OpenAPI) is a development aid,
+    # never a published surface (nfr.md "Security"); `from_env` serves it only
+    # for local development, and `DOCS_ENABLED` overrides that.
+    docs_enabled: bool = False
     consent_gated_events: frozenset[EventName] = DEFAULT_GATED_EVENTS
     sample_rate: float = DEFAULT_SAMPLE_RATE
     rate_limit_per_minute: int = DEFAULT_RATE_LIMIT_PER_MINUTE
@@ -57,6 +61,7 @@ class Settings:
             event_store=_env_str(source, "ANALYTICS_EVENT_STORE", ""),
             internal_audience=_env_str(source, "INTERNAL_AUDIENCE", DEFAULT_INTERNAL_AUDIENCE),
             require_internal_auth=_env_bool(source, "ANALYTICS_REQUIRE_INTERNAL_AUTH", True),
+            docs_enabled=_env_bool(source, "DOCS_ENABLED", environment == "dev"),
             consent_gated_events=_gated_events(source.get("ANALYTICS_CONSENT_GATED_EVENTS")),
             sample_rate=_env_rate(source, "ANALYTICS_SAMPLE_RATE", DEFAULT_SAMPLE_RATE),
             rate_limit_per_minute=_env_int(
