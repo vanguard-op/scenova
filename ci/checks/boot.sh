@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# Boot check: start every present service and assert it serves GET /healthz.
+# Boot check: start every present service and assert it serves GET /health.
+# /health is the path the platform probes: Cloud Run's front end answers /healthz
+# itself (a branded 404) before the request reaches the container, so a check on
+# /healthz would pass locally and mean nothing on the deployed service.
 # A service that will not start fails the build here and prints its log, so the
 # failure is reproducible from the same command locally (`make boot`).
 set -euo pipefail
@@ -30,7 +33,7 @@ boot_one() {
 
   local i ok=0
   for i in $(seq 1 40); do
-    if curl -fsS "http://127.0.0.1:$port/healthz" >/dev/null 2>&1; then ok=1; break; fi
+    if curl -fsS "http://127.0.0.1:$port/health" >/dev/null 2>&1; then ok=1; break; fi
     kill -0 "$pid" 2>/dev/null || break
     sleep 0.5
   done
@@ -78,7 +81,7 @@ fi
 # Docker missing is not an error — the services degrade and the boot check still
 # proves they start — but a database that is here and will not start or will not
 # take the migrations is: it would fail every store call underneath healthy
-# /healthz endpoints. Failing here fails fast and prints ci/db.sh's output.
+# /health endpoints. Failing here fails fast and prints ci/db.sh's output.
 if [ -f docker-compose.yml ]; then
   if command -v docker >/dev/null 2>&1; then
     bash ci/db.sh up

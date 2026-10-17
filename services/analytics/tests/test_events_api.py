@@ -39,11 +39,15 @@ _TAXONOMY: dict[str, dict[str, object]] = {
 }
 
 
-def test_healthz() -> None:
+def test_health() -> None:
+    # /health is the path the platform probes; /healthz stays as the local
+    # image-smoke alias (ci/checks/build.sh).
     with make_client() as client:
-        response = client.get("/healthz")
-    assert response.status_code == 200
-    assert response.json()["service"] == "analytics"
+        canonical = client.get("/health")
+        alias = client.get("/healthz")
+    assert canonical.status_code == 200
+    assert canonical.json()["service"] == "analytics"
+    assert alias.status_code == 200
 
 
 def test_every_taxonomy_event_is_accepted() -> None:

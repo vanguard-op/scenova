@@ -55,6 +55,6 @@ def test_the_service_runs_the_drain_while_it_is_up() -> None:
     # The drain is wired into the service lifecycle, so it starts with the
     # service and stops cleanly with it.
     with make_client(run_drain_loop=True) as client:
-        response = client.get("/healthz")
+        response = client.get("/health")
 
     assert response.status_code == 200

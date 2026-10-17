@@ -36,7 +36,10 @@ resource "google_monitoring_uptime_check_config" "gateway" {
   period       = "60s"
 
   http_check {
-    path         = "/healthz"
+    # /health, not /healthz: Cloud Run's front end answers /healthz itself with a
+    # branded 404 before the request reaches the container, so a check on it would
+    # read as failing on a service that is fine. /health is not intercepted.
+    path         = "/health"
     port         = 443
     use_ssl      = true
     validate_ssl = true

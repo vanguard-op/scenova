@@ -80,12 +80,16 @@ def _client(
     return TestClient(app)
 
 
-def test_healthz() -> None:
+def test_health() -> None:
+    # /health is the path the platform probes; /healthz stays as the local
+    # image-smoke alias (ci/checks/build.sh).
     with _client(_FakeLookupClient()) as client:
-        response = client.get("/healthz")
+        canonical = client.get("/health")
+        alias = client.get("/healthz")
 
-    assert response.status_code == 200
-    assert response.json() == {"status": "ok", "service": "gateway"}
+    assert canonical.status_code == 200
+    assert canonical.json() == {"status": "ok", "service": "gateway"}
+    assert alias.status_code == 200
 
 
 def test_a_missing_token_is_unauthorized() -> None:

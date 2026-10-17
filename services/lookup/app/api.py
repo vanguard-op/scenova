@@ -57,8 +57,12 @@ def create_app(
             content={"code": exc.code, "message": exc.message},
         )
 
+    # The platform probes /health: Cloud Run's front end answers /healthz with its
+    # own 404 before the request reaches the container. /healthz is kept as an
+    # alias for the local image smoke test (ci/checks/build.sh).
+    @app.get("/health")
     @app.get("/healthz")
-    async def healthz() -> dict[str, str]:
+    async def health() -> dict[str, str]:
         return {"status": "ok", "service": "lookup"}
 
     @app.post("/internal/lookups")

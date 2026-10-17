@@ -48,12 +48,16 @@ def _payload(
     }
 
 
-def test_healthz() -> None:
+def test_health() -> None:
+    # /health is the path the platform probes; /healthz stays as the local
+    # image-smoke alias (ci/checks/build.sh).
     with _client() as client:
-        response = client.get("/healthz")
+        canonical = client.get("/health")
+        alias = client.get("/healthz")
 
-    assert response.status_code == 200
-    assert response.json() == {"status": "ok", "service": "lookup"}
+    assert canonical.status_code == 200
+    assert canonical.json() == {"status": "ok", "service": "lookup"}
+    assert alias.status_code == 200
 
 
 def test_internal_routes_reject_a_missing_audience() -> None:

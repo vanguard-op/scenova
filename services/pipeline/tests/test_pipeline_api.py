@@ -38,12 +38,16 @@ def _payload(**overrides: object) -> dict[str, object]:
     return body
 
 
-def test_healthz() -> None:
+def test_health() -> None:
+    # /health is the path the platform probes; /healthz stays as the local
+    # image-smoke alias (ci/checks/build.sh).
     with _client(rig().service) as client:
-        response = client.get("/healthz")
+        canonical = client.get("/health")
+        alias = client.get("/healthz")
 
-    assert response.status_code == 200
-    assert response.json() == {"status": "ok", "service": "pipeline"}
+    assert canonical.status_code == 200
+    assert canonical.json() == {"status": "ok", "service": "pipeline"}
+    assert alias.status_code == 200
 
 
 def test_the_endpoint_rejects_a_missing_audience() -> None:

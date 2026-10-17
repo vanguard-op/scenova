@@ -98,11 +98,15 @@ async def test_unknown_field_is_rejected() -> None:
 
 
 @pytest.mark.asyncio
-async def test_healthz_is_served() -> None:
+async def test_health_is_served() -> None:
+    # /health is the path the platform probes; /healthz stays as the local
+    # image-smoke alias (ci/checks/build.sh).
     app = make_app(FakePhraseModel([]))
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://model") as client:
-        response = await client.get("/healthz")
+        canonical = await client.get("/health")
+        alias = await client.get("/healthz")
 
-    assert response.status_code == 200
-    assert response.json() == {"status": "ok", "service": "model"}
+    assert canonical.status_code == 200
+    assert canonical.json() == {"status": "ok", "service": "model"}
+    assert alias.status_code == 200
