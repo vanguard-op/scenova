@@ -67,3 +67,30 @@ jobs:
 
       - name: Run CI
         run: make ci
+
+  # The iOS app and its share extension build only on macOS with Xcode 15 or
+  # newer: that is where Swift Package Manager resolves the engine and the
+  # plugins, and where `xcodebuild` produces the app. The build is unsigned
+  # (`--no-codesign`) because store release signing is deferred — the point here
+  # is that both targets compile at all, which no Linux runner can tell us. It
+  # runs on the same triggers as the rest of CI and is dispatchable by hand, and
+  # `make ios` is the same command a developer runs on a Mac.
+  ios:
+    runs-on: macos-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The same pinned Flutter the Linux job uses, installed from the official
+      # macOS archive by the local composite action.
+      - name: Set up Flutter
+        uses: ./.github/actions/setup-flutter
+        with:
+          version: "3.47.2"
+
+      # `make ios` resolves the app's Dart dependencies and builds the app and
+      # its share extension unsigned, asserting the built `.appex` is present; it
+      # skips on a non-macOS host, so the target is safe to run anywhere.
+      - name: Build iOS app and share extension (no codesign)
+        run: make ios

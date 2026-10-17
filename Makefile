@@ -41,7 +41,7 @@ RUFF      := $(VENV)/bin/ruff
 MYPY      := $(VENV)/bin/mypy
 PYTEST    := $(VENV)/bin/pytest
 
-.PHONY: help setup auth fmt lint env typecheck test qa qa-model model-bar build bundle boot security \
+.PHONY: help setup auth fmt lint env typecheck test qa qa-model model-bar build bundle ios boot security \
         db-up db-migrate db-rollback db-reset db-status db-check db-migrate-cloud \
         infra-init infra-fmt infra-validate infra-plan infra-apply \
         bootstrap repo-controls env-start env-pause env-destroy \
@@ -50,7 +50,7 @@ PYTEST    := $(VENV)/bin/pytest
 help: ## Show the documented commands
 	@printf '\nScenova platform commands (env=%s, venv=%s)\n\n' "$(ENVIRONMENT)" "$(VENV)"
 	@awk 'BEGIN{FS=":.*## "} /^[a-zA-Z0-9_-]+:.*## /{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
-	@printf '\nTargets: make setup · make auth · make ci · make qa · make model-bar · make db-up · make db-migrate · make deploy ENV=staging SVC=gateway · make promote ENV=staging SVC=gateway · make rollback ENV=staging SVC=gateway · make traffic ENV=staging · make flag ENV=prod FLAG=FLAG_ENABLE_GENERATION VALUE=false · make curator OPERATOR=… · make bootstrap · make repo-controls · make env-start · make env-pause · make env-destroy\n\n'
+	@printf '\nTargets: make setup · make auth · make ci · make qa · make model-bar · make ios · make db-up · make db-migrate · make deploy ENV=staging SVC=gateway · make promote ENV=staging SVC=gateway · make rollback ENV=staging SVC=gateway · make traffic ENV=staging · make flag ENV=prod FLAG=FLAG_ENABLE_GENERATION VALUE=false · make curator OPERATOR=… · make bootstrap · make repo-controls · make env-start · make env-pause · make env-destroy\n\n'
 
 # --- Setup -------------------------------------------------------------------
 
@@ -107,6 +107,9 @@ build: ## Build every present workspace (compile, container images + boot smoke,
 bundle: ## Produce deployable artifacts (container images; APK/appbundle; console web bundle)
 	@bash ci/checks/build.sh
 	@if [ -f apps/mobile/pubspec.yaml ]; then bash ci/build_app.sh appbundle; else echo "skip: no Flutter app"; fi
+
+ios: ## Build the iOS app and its share extension without codesign (macOS only)
+	@bash ci/build_ios.sh
 
 boot: ## Boot the stack locally (start the local Postgres, apply its migrations, hand them to the services) and assert each service serves /health
 	@bash ci/checks/boot.sh

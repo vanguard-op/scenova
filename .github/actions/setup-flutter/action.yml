@@ -5,15 +5,20 @@
 # repository with `sha_pinning_required` cannot run it at all (the run fails at
 # setup with "The action actions/cache@v5 is not allowed … must be pinned to a
 # full-length commit SHA"). Upstream leaves the nested reference unpinned, so this
-# local action installs the official SDK tarball for the pinned version and caches
+# local action installs the official SDK archive for the pinned version and caches
 # it with an explicitly pinned `actions/cache`, keeping every action in the run on
 # a full-length SHA.
 #
-# Local actions (`uses: ./…`) are part of the repository and need no pin. The SDK
+# It serves both the Linux jobs (services, Android, console) and the macOS job
+# that builds the iOS app and its share extension: the official release ships an
+# xz tarball for Linux and a zip for macOS, arch-suffixed on Apple silicon, so the
+# archive and the extraction are chosen from `runner.os`/`runner.arch`. The SDK
 # version stays a workflow input, so the pinned version lives in one place per
 # workflow, exactly as before.
+#
+# Local actions (`uses: ./…`) are part of the repository and need no pin.
 name: Set up Flutter
-description: Install a pinned Flutter SDK, with the cache action pinned to a SHA
+description: Install a pinned Flutter SDK (Linux or macOS), with the cache action pinned to a SHA
 
 inputs:
   version:
@@ -27,7 +32,7 @@ runs:
       id: flutter-sdk
       uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       with:
-        path: ${{ runner.tool_cache }}/flutter/stable-${{ inputs.version }}-x64
+        path: ${{ runner.tool_cache }}/flutter/stable-${{ inputs.version }}-${{ runner.os }}-${{ runner.arch }}
         key: flutter-sdk-${{ runner.os }}-${{ runner.arch }}-${{ inputs.version }}
 
     - name: Install Flutter SDK
@@ -35,21 +40,37 @@ runs:
       shell: bash
       env:
         FLUTTER_VERSION: ${{ inputs.version }}
+        RUNNER_OS: ${{ runner.os }}
+        RUNNER_ARCH: ${{ runner.arch }}
       run: |
         set -euo pipefail
-        root="$RUNNER_TOOL_CACHE/flutter/stable-${FLUTTER_VERSION}-x64"
+        # The official SDK archive for this host: an xz tarball on Linux, a zip
+        # on macOS (`_arm64` on Apple silicon, the plain archive on Intel).
+        os="$(printf '%s' "$RUNNER_OS" | tr '[:upper:]' '[:lower:]')"
+        case "$RUNNER_OS-$RUNNER_ARCH" in
+          Linux-X64)   archive="flutter_linux_${FLUTTER_VERSION}-stable.tar.xz" ;;
+          macOS-X64)   archive="flutter_macos_${FLUTTER_VERSION}-stable.zip" ;;
+          macOS-ARM64) archive="flutter_macos_arm64_${FLUTTER_VERSION}-stable.zip" ;;
+          *) echo "::error::unsupported runner ${RUNNER_OS}/${RUNNER_ARCH}"; exit 1 ;;
+        esac
+        root="$RUNNER_TOOL_CACHE/flutter/stable-${FLUTTER_VERSION}-${RUNNER_OS}-${RUNNER_ARCH}"
         mkdir -p "$root"
-        curl --connect-timeout 15 --retry 5 -fsSL -o "$RUNNER_TEMP/flutter.tar.xz" \
-          "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz"
-        tar xf "$RUNNER_TEMP/flutter.tar.xz" -C "$root"
-        rm -f "$RUNNER_TEMP/flutter.tar.xz"
+        curl --connect-timeout 15 --retry 5 -fsSL -o "$RUNNER_TEMP/flutter.archive" \
+          "https://storage.googleapis.com/flutter_infra_release/releases/stable/${os}/${archive}"
+        case "$archive" in
+          *.zip) unzip -q -o "$RUNNER_TEMP/flutter.archive" -d "$root" ;;
+          *)     tar xf "$RUNNER_TEMP/flutter.archive" -C "$root" ;;
+        esac
+        rm -f "$RUNNER_TEMP/flutter.archive"
 
     - name: Add Flutter to PATH
       shell: bash
       env:
         FLUTTER_VERSION: ${{ inputs.version }}
+        RUNNER_OS: ${{ runner.os }}
+        RUNNER_ARCH: ${{ runner.arch }}
       run: |
-        root="$RUNNER_TOOL_CACHE/flutter/stable-${FLUTTER_VERSION}-x64/flutter"
+        root="$RUNNER_TOOL_CACHE/flutter/stable-${FLUTTER_VERSION}-${RUNNER_OS}-${RUNNER_ARCH}/flutter"
         echo "FLUTTER_ROOT=$root" >> "$GITHUB_ENV"
         echo "$root/bin" >> "$GITHUB_PATH"
         echo "$root/bin/cache/dart-sdk/bin" >> "$GITHUB_PATH"

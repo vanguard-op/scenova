@@ -17,6 +17,7 @@
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
 		5CE0A2000000000000000001 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CE0A1000000000000000001 /* ShareViewController.swift */; };
+		5CE0A9000000000000000002 /* FlutterGeneratedPluginSwiftPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 5CE0A9000000000000000003 /* FlutterGeneratedPluginSwiftPackage */; };
 		5CE0A2000000000000000002 /* ShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 5CE0A1000000000000000004 /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		5CE0A2000000000000000003 /* CaptureBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CE0A1000000000000000006 /* CaptureBridge.swift */; };
 /* End PBXBuildFile section */
@@ -94,6 +95,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				78A318202AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5CE0A9000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5CE0A9000000000000000002 /* FlutterGeneratedPluginSwiftPackage in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -194,6 +203,7 @@
 			buildConfigurationList = 5CE0A8000000000000000001 /* Build configuration list for PBXNativeTarget "ShareExtension" */;
 			buildPhases = (
 				5CE0A5000000000000000001 /* Sources */,
+				5CE0A9000000000000000001 /* Frameworks */,
 				5CE0A5000000000000000002 /* Resources */,
 			);
 			buildRules = (
@@ -201,6 +211,9 @@
 			dependencies = (
 			);
 			name = ShareExtension;
+			packageProductDependencies = (
+				5CE0A9000000000000000003 /* FlutterGeneratedPluginSwiftPackage */,
+			);
 			productName = ShareExtension;
 			productReference = 5CE0A1000000000000000004 /* ShareExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
@@ -814,6 +827,10 @@
 
 /* Begin XCSwiftPackageProductDependency section */
 		78A3181F2AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = FlutterGeneratedPluginSwiftPackage;
+		};
+		5CE0A9000000000000000003 /* FlutterGeneratedPluginSwiftPackage */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = FlutterGeneratedPluginSwiftPackage;
 		};
