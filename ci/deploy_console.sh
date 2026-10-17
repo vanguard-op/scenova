@@ -58,7 +58,10 @@ export CONSOLE_FIREBASE_APP_ID="${CONSOLE_DEPLOY_FIREBASE_APP_ID:-}"
 export CONSOLE_FIREBASE_MESSAGING_SENDER_ID="${CONSOLE_DEPLOY_FIREBASE_MESSAGING_SENDER_ID:-}"
 
 log "Deploy console · flutter build web"
-mapfile -t defines < <(console_dart_defines)
+defines=()
+while IFS= read -r define; do
+  defines+=("$define")
+done < <(console_dart_defines)
 (cd apps/console && flutter build web "${defines[@]}")
 
 # Firebase Hosting config, generated per deploy so the site id lives in exactly

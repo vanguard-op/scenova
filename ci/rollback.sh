@@ -17,7 +17,10 @@ PROJECT_ID="${DEPLOY_PROJECT_ID:-$(tfvar project_id)}"
 REGION="${GCP_REGION:-$(tfvar region)}"
 
 log "Rollback · listing revisions of $SVC in $ENV"
-mapfile -t revisions < <(gcloud run revisions list \
+revisions=()
+while IFS= read -r revision; do
+  revisions+=("$revision")
+done < <(gcloud run revisions list \
   --service "$SVC" --project "$PROJECT_ID" --region "$REGION" \
   --sort-by '~metadata.creationTimestamp' --format 'value(metadata.name)')
 

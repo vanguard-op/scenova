@@ -28,6 +28,11 @@ esac
 
 has_flutter || die "no reader app to build (apps/mobile/pubspec.yaml is missing)"
 
-mapfile -t defines < <(mobile_dart_defines)
+# Read loop rather than `mapfile` (a bash 4 builtin): macOS ships bash 3.2, and
+# the same script runs on a Mac developer's machine.
+defines=()
+while IFS= read -r define; do
+  defines+=("$define")
+done < <(mobile_dart_defines)
 log "Build app · flutter build $target (store client config: ${#defines[@]} defines)"
 (cd apps/mobile && flutter build "$target" --debug "${defines[@]}")

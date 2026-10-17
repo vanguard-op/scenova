@@ -33,10 +33,15 @@ set -euo pipefail
 
 self="ci/checks/secret_scan.sh"
 
+files=()
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  mapfile -t files < <(git ls-files | grep -v "^$self$" | grep -v '^\.env\.example$')
+  while IFS= read -r file; do
+    files+=("$file")
+  done < <(git ls-files | grep -v "^$self$" | grep -v '^\.env\.example$')
 else
-  mapfile -t files < <(find . -type f \
+  while IFS= read -r file; do
+    files+=("$file")
+  done < <(find . -type f \
     -not -path './.git/*' -not -path './.venv/*' -not -path './docs/*' \
     -not -path "./$self" -not -name '.env.example')
 fi

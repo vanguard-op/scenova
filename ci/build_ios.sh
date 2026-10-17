@@ -32,7 +32,15 @@ command -v xcodebuild >/dev/null 2>&1 \
 # catalog as `--dart-define` values. Identifiers, never secrets; a pipeline that
 # has not seeded them passes them empty, which the SDK tolerates, so the build
 # still exercises the paid-tier surface.
-mapfile -t defines < <(mobile_dart_defines)
+#
+# Filled with a read loop rather than `mapfile`: that builtin arrived in bash 4,
+# and macOS ships bash 3.2, so the runner would die before reaching the compiler.
+# The loop and process substitution both work on bash 3.2, so the same script
+# runs on the Linux and the macOS runner unchanged.
+defines=()
+while IFS= read -r define; do
+  defines+=("$define")
+done < <(mobile_dart_defines)
 
 log "Build · iOS app + share extension · flutter build ios --no-codesign (${#defines[@]} defines)"
 (cd apps/mobile && flutter build ios --no-codesign "${defines[@]}")
