@@ -94,12 +94,33 @@ db_activation_policy = "ALWAYS"
 # (NFR-010, 50 rps sustained) is not bought before there is traffic.
 enable_redis = false
 
-# Scale to zero: no min instances on any service, so an idle service bills
-# nothing (an idle *minimum* instance is billed at Cloud Run's idle rate even
-# with no traffic; cloud.google.com/run/pricing). The cost is a cold start on the
-# first request after an idle period — the availability NFR-010 asks for is not
-# bought before there are readers.
-gateway_min_instances = 0
+# The reader chain is held warm while the generation path is exercised end to
+# end: one minimum instance on each service a lookup traverses (gateway, lookup,
+# pipeline, library, entitlement, model, notification), so the first request
+# after an idle period is served instead of failing. The gateway's call to the
+# lookup service does not outlive the lookup's cold start, so a scale-to-zero
+# chain 503s the reader's first lookup (observed: a gateway 503 on
+# POST /v1/lookups at the same instant the lookup logged "Starting new
+# instance", ~8s before it was ready).
+#
+# This is the shape's one deliberate departure from D-034's scale-to-zero, and
+# it is a real, ongoing charge while it stands: an idle minimum instance is
+# billed (cloud.google.com/run/pricing). At seven services × 1 vCPU / 512 MiB on
+# this project's instance-based billing that is ~$0.48/hour. The other services
+# (feedback, analytics) stay scale-to-zero — neither gates a lookup.
+#
+# Revert to the free-tier shape by setting this back to `{}` and applying:
+# `make infra-apply ENV=pre-revenue`. It is declared here, never flipped on the
+# live services, so an apply reconciles to it.
+min_instances = {
+  gateway      = 1
+  lookup       = 1
+  pipeline     = 1
+  library      = 1
+  entitlement  = 1
+  model        = 1
+  notification = 1
+}
 
 # Direct VPC egress instead of a Serverless VPC Access connector: the connector
 # bills at least two Compute Engine instances 24/7, and the free-tier shape has
@@ -138,15 +159,22 @@ services = {
   notification = { public = false }
 }
 
-# The release defaults from release.md "Rollout Phases & Feature Flags", exactly
-# as `.env.example` declares them: pre-revenue changes no flag. Generation and
-# the paid tier stay off, so nothing spends on the model provider before the
-# judged quality bars (NFR-050 to NFR-053) are met, and `serve_seeded_library`
-# stays on as at launch. The entitlement tier figures live in infra/terraform
-# and are likewise unchanged.
+# The generation path is on while pre-revenue is exercised end to end:
+# `enable_generation` (FEAT-005) and `enable_clip_view` (FEAT-008) are raised
+# from their release default (release.md "Rollout Phases & Feature Flags") so a
+# lookup can actually produce a clip and show it in context. The other flags
+# stay at their defaults and are handled separately: `enable_phrase_clip`
+# (FEAT-007), `enable_offline_history` (FEAT-009), and `enable_paid_tier`
+# (FEAT-013) remain off. `serve_seeded_library` stays on as at launch.
+#
+# Raising a flag here is a deliberate spend: with generation on, a lookup calls
+# the pinned model provider and spends provider credit, which the judged quality
+# bars (NFR-050 to NFR-053) do not yet gate in this environment. It is the
+# environment's declared state, not an out-of-band flip, so an apply reconciles
+# to it. The entitlement tier figures live in infra/terraform and are unchanged.
 flags = {
-  FLAG_ENABLE_CLIP_VIEW       = "false"
-  FLAG_ENABLE_GENERATION      = "false"
+  FLAG_ENABLE_CLIP_VIEW       = "true"
+  FLAG_ENABLE_GENERATION      = "true"
   FLAG_ENABLE_PHRASE_CLIP     = "false"
   FLAG_ENABLE_OFFLINE_HISTORY = "false"
   FLAG_ENABLE_PAID_TIER       = "false"

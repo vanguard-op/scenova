@@ -24,20 +24,22 @@ log "Infra · terraform validate"
 "$TF" -chdir=infra/terraform validate -no-color
 
 # --- Pre-revenue shape (D-034) -----------------------------------------------
-# The pre-revenue environment is the free-tier shape with no always-on
-# infrastructure. Every invariant below is a silent monthly bill if it regresses
-# (Memorystore ~$35, a Serverless VPC Access connector's two always-on VMs, an
-# idle minimum Cloud Run instance, a load balancer), so the shape is asserted
-# here and not merely documented. The lifecycle action starts, pauses, and
-# destroys this environment; the teardown guards are asserted too, because a
-# teardown may not lose the data (nfr.md "Privacy & Compliance").
+# The pre-revenue environment is the free-tier shape. Every invariant below is a
+# silent monthly bill if it regresses (Memorystore ~$35, a Serverless VPC Access
+# connector's two always-on VMs, a load balancer), so the shape is asserted here
+# and not merely documented. The reader chain's warmth is the one deliberate
+# departure from scale-to-zero: it is declared in the tfvars (min_instances) and
+# asserted to be declared, so it is never left as a live flip the next apply
+# reverts. The lifecycle action starts, pauses, and destroys this environment;
+# the teardown guards are asserted too, because a teardown may not lose the data
+# (nfr.md "Privacy & Compliance").
 PREREV="infra/terraform/environments/pre-revenue.tfvars"
 if [ -f "$PREREV" ]; then
   prerev_has() { grep -qE "^[[:space:]]*$1[[:space:]]*=[[:space:]]*$2([[:space:]]|$)" "$PREREV"; }
   prerev_has enable_redis false \
     || die "$PREREV must set enable_redis = false (Memorystore has no free tier, D-034)"
-  prerev_has gateway_min_instances 0 \
-    || die "$PREREV must set gateway_min_instances = 0 (an idle minimum instance is billed, D-034)"
+  grep -qE '^[[:space:]]*min_instances[[:space:]]*=' "$PREREV" \
+    || die "$PREREV must declare min_instances (the environment's warmth is declared in the tfvars, not flipped on the live services)"
   prerev_has vpc_egress '"direct"' \
     || die "$PREREV must set vpc_egress = \"direct\" (a connector's two VMs bill 24/7, D-034)"
   prerev_has db_tier '"db-f1-micro"' \
@@ -49,7 +51,7 @@ if [ -f "$PREREV" ]; then
   if grep -qE '^[[:space:]]*cdn_domain' "$PREREV"; then
     die "$PREREV must not set cdn_domain (no CDN: a load balancer bills hourly, D-034)"
   fi
-  info "pre-revenue shape ok: no Redis, no CDN, no connector, no min instances; data guarded"
+  info "pre-revenue shape ok: no Redis, no CDN, no connector; reader chain warmth declared; data guarded"
 fi
 
 # --- Adopted Firebase resources carry the teardown guard ----------------------

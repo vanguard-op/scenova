@@ -91,16 +91,29 @@ variable "runtime_enabled" {
   default     = true
 }
 
-# The production shape keeps one warm gateway instance so the first reader after
-# an idle period is not cold-started. The free-tier shape runs no min instances
-# at all: an idle min instance is billed at Cloud Run's idle rate even with no
-# traffic (cloud.google.com/run/pricing), so it sets this to 0 and accepts a cold
-# start — the availability NFR-010 asks for is not bought before there are
-# readers (D-034).
-variable "gateway_min_instances" {
-  description = "Minimum Cloud Run instances for the gateway. 0 is scale-to-zero."
-  type        = number
-  default     = 1
+# Per-service minimum Cloud Run instances. A service absent from the map runs
+# scale-to-zero. This is the single place an environment's warmth is declared:
+# the production shape keeps one warm gateway instance so the first reader after
+# an idle period is not cold-started; the free-tier shape (D-034) declares no
+# warmth and accepts the cold start — the availability NFR-010 asks for is not
+# bought before there are readers.
+#
+# Warming more of the chain is this map and nothing else: a lookup traverses the
+# gateway, lookup, pipeline, library, entitlement, model, and notification
+# services, and the gateway's call to the lookup does not outlive the lookup's
+# cold start, so a first request after idle fails rather than waits. Because an
+# idle minimum instance is billed (cloud.google.com/run/pricing), the map is the
+# one declared source of truth for that cost — a live flip on a service is drift
+# the next apply reverts.
+variable "min_instances" {
+  description = "Minimum Cloud Run instances per service. Services absent from the map run scale-to-zero."
+  type        = map(number)
+  default     = { gateway = 1 }
+
+  validation {
+    condition     = alltrue([for n in values(var.min_instances) : n >= 0])
+    error_message = "min_instances values must be zero or more."
+  }
 }
 
 # How Cloud Run reaches the private VPC (Cloud SQL). "connector" uses a

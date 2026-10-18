@@ -340,7 +340,7 @@ module "run" {
       env                   = merge(local.common_env, var.flags, lookup(local.service_extra_env, name, {}))
       secret_env            = lookup(local.service_secret_env, name, {})
       downstream            = lookup(local.service_downstream, name, [])
-      min_instances         = name == "gateway" ? var.gateway_min_instances : 0
+      min_instances         = lookup(var.min_instances, name, 0)
       max_instances         = 10
     }
   }

@@ -4,8 +4,12 @@
 # `.env.example` is the single documented source of truth for configuration.
 # This check keeps it from drifting from the platform it describes (release.md
 # "Rollout Phases & Feature Flags"; architecture.md "Data Architecture"):
-#   - every release flag is declared with the doc's default, and set per
-#     environment in environments/<env>.tfvars with a boolean value;
+#   - every release flag is declared with the doc's default in `.env.example`,
+#     and set per environment in environments/<env>.tfvars with a boolean value;
+#     an environment may raise a flag above its default (pre-revenue raises the
+#     generation path while it is exercised), but the raise is declared in its
+#     tfvars rather than flipped on the live services, so an apply reconciles to
+#     it;
 #   - a tfvars carries no FLAG_* key the doc does not define (a typo would
 #     silently disable a kill switch);
 #   - the clip-store variables the AI layer resolves are declared;
@@ -225,21 +229,13 @@ for f in "${tfvars[@]}"; do
     grep -qE "^[[:space:]]*${key}[[:space:]]*=[[:space:]]*\"(true|false)\"" "$f" \
       || die "$f is missing a boolean $key"
   done
-  # The free-tier shape changes no flag (D-034): its flags equal the release
-  # defaults, so generation and the paid tier stay off and nothing spends on the
-  # model provider before the judged quality bars are met. The entitlement tier
-  # figures are likewise unchanged — they live in infra/terraform/main.tf, which
-  # this check already holds in step with .env.example above.
-  case "$f" in
-    */pre-revenue.tfvars)
-      for pair in "${FLAG_DEFAULTS[@]}"; do
-        key="${pair%%=*}"
-        value="${pair#*=}"
-        grep -qE "^[[:space:]]*${key}[[:space:]]*=[[:space:]]*\"${value}\"" "$f" \
-          || die "$f must keep the release default '$pair' (D-034: no flag changes)"
-      done
-      ;;
-  esac
+  # The free-tier shape used to change no flag (D-034), so this check forced
+  # every pre-revenue flag to equal the release default. That is no longer the
+  # shape: pre-revenue declares the generation path on while it is exercised, so
+  # forcing the default would fight the deployment and the flags could not be
+  # switched on at all. The per-environment set is now allowed to deviate; the
+  # guards that remain are the ones that catch a mistake — every flag declared
+  # as a boolean, and no flag outside the release set (both below).
   while read -r key; do
     [ -n "$key" ] || continue
     known=0
