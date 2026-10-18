@@ -43,6 +43,16 @@ variable "clip_retention_days" {
   type        = number
   default     = 30
 }
+# Where the environment serves clips straight from the bucket (no CDN), the
+# objects must be publicly readable: the reader's device opens the URL the model
+# service hands back (ai/app/clip/store.py `clip_url` — the bucket's public
+# object URL when no CDN base URL is configured) with no credentials. Where a
+# CDN is configured the bucket stays private and delivery stays with the CDN.
+variable "public_clip_read" {
+  description = "Serve clips straight from the bucket: grant public object read on the clip bucket (environments with no CDN)."
+  type        = bool
+  default     = false
+}
 variable "runtime_service_accounts" {
   description = "Runtime service accounts granted object access to the clip bucket."
   type        = list(string)
@@ -237,4 +247,28 @@ resource "google_storage_bucket_iam_member" "runtime_object_admin" {
   bucket   = google_storage_bucket.clips.name
   role     = "roles/storage.objectAdmin"
   member   = "serviceAccount:${each.value}"
+}
+
+# Public read of clip objects, for the environments that serve them straight from
+# the bucket (no CDN; architecture.md "Data Architecture": Object Storage + CDN,
+# write-once read-many). A clip carries no reader data and carries the provider's
+# watermark (nfr.md "Privacy & Compliance": the shared library holds words, clips,
+# and phrases and no personal data), so its object is public content: without this
+# grant the URL the model service hands the reader's device
+# (https://storage.googleapis.com/<bucket>/clips/<id>.mp4) answers an anonymous
+# caller 403 AccessDenied, and the reader can never open the clip (FEAT-005,
+# FEAT-006).
+#
+# The role is objectReader, not objectViewer: it grants `storage.objects.get` and
+# NOT `storage.objects.list`, so a caller holding a clip's URL can read that clip
+# but cannot enumerate the bucket. The object name is an unguessable id
+# (ai/app/clip/service.py), so read-without-list is the least privilege that
+# serves the clip. Where a CDN is configured (var.public_clip_read false) the
+# bucket stays private and clips are served through the CDN.
+resource "google_storage_bucket_iam_member" "public_object_reader" {
+  count = var.public_clip_read ? 1 : 0
+
+  bucket = google_storage_bucket.clips.name
+  role   = "roles/storage.legacyObjectReader"
+  member = "allUsers"
 }

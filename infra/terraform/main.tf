@@ -113,6 +113,16 @@ module "data" {
 
   clip_bucket = var.clip_bucket
 
+  # An environment with no CDN (cdn_domain unset) serves clips straight from the
+  # bucket: the model service hands the reader's device the bucket's public object
+  # URL (local.cdn_base_url is empty below, so ai/app/clip/store.py builds
+  # `https://storage.googleapis.com/<bucket>/<key>`), and this grants the public
+  # object read that URL needs (FEAT-005, FEAT-006). Where a CDN is configured the
+  # bucket stays private and clips are served through it. This is the same switch
+  # that instantiates the CDN module and sets CLIP_CDN_BASE_URL below, so the
+  # delivery shape is declared in one place: cdn_domain.
+  public_clip_read = var.cdn_domain == ""
+
   runtime_service_accounts = [
     local.runtime_emails["pipeline"],
     local.runtime_emails["library"],
