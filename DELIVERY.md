@@ -123,7 +123,7 @@ docs/           BPRD (product-shaper)
 | T-150 | — | backend-engineer | Done | — |
 | T-168 | FEAT-005 | backend-engineer | Done | C-003 |
 | T-169 | FEAT-005 | infra-engineer | Done | — |
-| T-172 | FEAT-005, FEAT-006 | infra-engineer | In Progress | — |
+| T-172 | FEAT-005, FEAT-006 | infra-engineer | Done | — |
 | T-170 | FEAT-011, FEAT-015 | infra-engineer | In Progress | C-003 |
 | T-171 | FEAT-011, FEAT-015 | backend-engineer | Backlog | C-003, C-006 |
 
