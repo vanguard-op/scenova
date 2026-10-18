@@ -54,6 +54,15 @@ resource "google_identity_platform_config" "this" {
       enabled           = true
       password_required = true
     }
+
+    # Phone auth is off. The API returns this block with `enabled = false` as its
+    # default, so leaving it out of the config made every plan try to remove a
+    # block the API re-adds on the next refresh — a perpetual diff that would mask
+    # a real change. Declared explicitly to match, so the plan is clean. The
+    # operator's second factor is TOTP, never SMS (see `mfa` below).
+    phone_number {
+      enabled = false
+    }
   }
 
   # MFA and activity logging are GCIP-only: on a Firebase-only project the API
