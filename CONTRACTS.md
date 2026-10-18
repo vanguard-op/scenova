@@ -20,11 +20,12 @@ Errors: 401 (missing or invalid token), 404 (unknown lookup, or not owned by the
 Body: error responses are `{"code": string, "message": string}`. `notice` carries a clip-availability advisory; `senseLabel` is a plain human label and is not a signal.
 
 ### C-003: POST /internal/generation-jobs
-Status: Frozen (revision 1)
+Status: Frozen (revision 2)
 Auth: internal service identity (service account); never reachable from the client
-Request: jobId: string, lookupId: string, kind: word|phrase, lemma: string|null, phrase: string|null (the selection for a phrase job; null for a word job, where the pipeline generates the phrase via C-004, unless a curator supplied a replacement phrase through C-016, in which case the pipeline generates the clip from that phrase), senseLabel: string, partOfSpeech: string, targetDurationSeconds: number (at most 4), modelPin: string ("gemini-omni-1.1-flash"), attempt: integer
+Request: jobId: string, lookupId: string|null (the reader lookup that started the job), entryId: string|null (the library entry a report- or curator-started job regenerates), noticeLookupId: string|null (the lookup a finished clip's notice goes to, or null when no reader is waiting), kind: word|phrase, lemma: string|null, phrase: string|null (the selection for a phrase job; null for a word job, where the pipeline generates the phrase via C-004, unless a curator supplied a replacement phrase through C-016, in which case the pipeline generates the clip from that phrase), senseLabel: string, partOfSpeech: string, targetDurationSeconds: number (at most 4), modelPin: string ("gemini-omni-1.1-flash"), attempt: integer
 Response 202: jobId: string, status: queued|running
-Errors: 400 (a phrase job without a phrase, or target duration over four seconds), 401 (not an internal caller), 409 (jobId already enqueued), 503 (queue unavailable)
+Errors: 400 (both or neither of lookupId and entryId, a phrase job without a phrase, or target duration over four seconds), 401 (not an internal caller), 409 (jobId already enqueued), 503 (queue unavailable)
+Body: A job carries exactly one origin, and the origin decides how its clip is stored: a job with `lookupId` is one a reader's lookup started and its clip is written to the shared library as a new entry; a job with `entryId` regenerates that entry, written as the entry's candidate when `noticeLookupId` names the reporting reader's lookup (C-013) and as the entry's replacement when it is null (C-016). An origin field that is not set is omitted or null.
 
 ### C-004: POST /internal/model/phrase
 Status: Frozen
@@ -41,10 +42,10 @@ Response 201: clipId: string, storageKey: string, url: string, durationSeconds: 
 Errors: 400 (target duration over four seconds), 401 (not an internal caller), 422 (provider declined the phrase; no clip produced), 504 (provider timeout), 503 (provider unavailable). The caller maps 422, 504, and 503 to the reader's fallback.
 
 ### C-006: GET /internal/generation-jobs/{jobId}
-Status: Frozen
+Status: Frozen (revision 1)
 Auth: internal service identity (called by the lookup service only)
 Request: jobId: string (path)
-Response 200: jobId: string, lookupId: string, status: queued|running|succeeded|failed|declined
+Response 200: jobId: string, lookupId: string|null (the reader lookup that started the job), entryId: string|null (the library entry the job regenerates), status: queued|running|succeeded|failed|declined
 Errors: 401 (not an internal caller), 404 (unknown job). The lookup service consults this on a C-002 poll so a generation that fails or is declined after enqueue resolves to the reader's fallback.
 
 ### C-007: POST /v1/events

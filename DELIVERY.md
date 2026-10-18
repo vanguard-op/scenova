@@ -1,7 +1,7 @@
 # DELIVERY — Scenova
 
 ## Source of Truth
-`docs/Scenova/` (BPRD), a git submodule of `vanguard-op/scenova-docs`, pinned at `e07755a5f9dec2a555a4ea14025e606d8532f5d2` (`e07755a5f9de`). Read-only for the squad; `product-shaper` is the only writer. The roadmap owns the build order. The lead is the only agent who runs git against the submodule: commit and push `product-shaper`'s changes to the docs repo, then stage the pointer bump in the same commit as the code built against it, and never leave the parent pointing at an unpushed docs commit.
+`docs/Scenova/` (BPRD), a git submodule of `vanguard-op/scenova-docs`, pinned at `2f182d5069cd72a91f54f0eaa6091c13534c35d5` (`2f182d5`). Read-only for the squad; `product-shaper` is the only writer. The roadmap owns the build order. The lead is the only agent who runs git against the submodule: commit and push `product-shaper`'s changes to the docs repo, then stage the pointer bump in the same commit as the code built against it, and never leave the parent pointing at an unpushed docs commit.
 
 ## Team & File Ownership
 | Owner | Owns |
@@ -121,6 +121,10 @@ docs/           BPRD (product-shaper)
 | T-158 | FEAT-013 | backend-engineer | Done | — |
 | T-159 | — | infra-engineer | Backlog | — |
 | T-150 | — | backend-engineer | Done | — |
+| T-168 | FEAT-005 | backend-engineer | Done | C-003 |
+| T-169 | FEAT-005 | infra-engineer | In Progress | — |
+| T-170 | FEAT-011, FEAT-015 | infra-engineer | Ready | C-003 |
+| T-171 | FEAT-011, FEAT-015 | backend-engineer | Backlog | C-003, C-006 |
 
 ## Decisions Log
 | # | Decision | Rationale | By |
@@ -161,6 +165,7 @@ docs/           BPRD (product-shaper)
 | D-034 | Pre-revenue the product runs on the free tiers with no always-on infrastructure: scale-to-zero services, the cheapest reachable Postgres, no Redis, no CDN, and Firebase's free tier — with the paid resources started, paused and destroyed on demand rather than left running | There are no readers yet, so the availability the production shape exists to meet buys nothing; every choice reverses by configuration because the stores sit behind ports, and the lifecycle action means the paid parts exist only during testing windows | user |
 | D-035 | The product is billed through Vanguard Billing, freeing its project slot by unlinking `waypoint-510216` | Vanguard is at its project quota and cannot take another project without a support request; Waypoint keeps its project and its data but loses its billing link, so any billable service there stops until it is re-linked | user |
 | D-036 | The product repository is public and the documentation submodule stays private | The public repository is what lets the Actions run and the environment protection rules attach; the specification is not published with the code, so a public cloner gets a build it cannot reproduce without the docs | user |
+| D-037 | A generation job carries exactly one origin — the reader lookup that started it, or the library entry a report or a curator regenerates — and the store records that origin | Report- and curator-started generation has no reader lookup behind it, so the store refused every such job and both paths wrote nothing on a store-backed deployment; settled in the schema via `product-shaper` at the user's direction, with C-003 and C-006 revised to match | user |
 
 ## Definition of Done
 - **Task:** the acceptance criteria in the cited feature doc are met; the frozen contract is conformed; unit tests pass; format, lint, analyze, and build are clean; work is committed to the dev branch and confined to `Own`.
