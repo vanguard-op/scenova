@@ -6,28 +6,47 @@ import 'package:flutter/foundation.dart';
 abstract final class AppConfig {
   /// The gateway URL a build was configured with, or empty when it set none.
   ///
-  /// A real environment supplies this with
+  /// A build that has to reach a particular stack — the local one, or a
+  /// per-environment deploy — supplies it with
   /// `--dart-define=SCENOVA_API_BASE_URL=https://…`, and [apiBaseUrl] then uses
   /// it unchanged.
   static const String configuredApiBaseUrl = String.fromEnvironment(
     'SCENOVA_API_BASE_URL',
   );
 
-  /// The base URL the client sends reader input to.
+  /// The gateway the shipped build reaches when it was configured with none.
   ///
-  /// A configured [configuredApiBaseUrl] wins. Otherwise the default addresses
-  /// the local stack the `Makefile` boots, on the host that reaches the
-  /// reader's own machine: `localhost` from a desktop or the iOS simulator, and
-  /// the Android emulator's alias for the host's loopback (`10.0.2.2`), because
-  /// inside the emulator `localhost` names the emulator itself. That stack is
-  /// plaintext; [isSecureGateway] confines plaintext to hosts of this kind, so
-  /// a build pointed at a remote gateway still carries the reader's selection
-  /// over TLS (`NFR-022`).
-  static String get apiBaseUrl => configuredApiBaseUrl.isNotEmpty
-      ? configuredApiBaseUrl
-      : defaultTargetPlatform == TargetPlatform.android
+  /// A build installed on a device has to reach a running stack with nothing
+  /// passed by hand, and the only stack a device can reach is the deployed one:
+  /// the emulator's alias for the host's loopback (`10.0.2.2`) names a stack on
+  /// the developer's own machine, which a build on a device or an emulator does
+  /// not have. So the default is the deployed gateway, over `https`
+  /// (`NFR-022`), and a local run opts into the local stack with
+  /// `--dart-define=SCENOVA_API_BASE_URL` ([localStackBaseUrl]).
+  static const String deployedGatewayUrl =
+      'https://gateway-tv3mjmnqda-uc.a.run.app';
+
+  /// The base URL the local stack the `Makefile` boots is served on, on the host
+  /// that reaches the developer's own machine: `localhost` from a desktop or the
+  /// iOS simulator, and the Android emulator's alias for the host's loopback
+  /// (`10.0.2.2`), because inside the emulator `localhost` names the emulator
+  /// itself. That stack is plaintext; [isSecureGateway] confines plaintext to
+  /// hosts of this kind, so a build pointed at a remote gateway still carries
+  /// the reader's selection over TLS.
+  static String get localStackBaseUrl =>
+      defaultTargetPlatform == TargetPlatform.android
       ? 'http://10.0.2.2:8080'
       : 'http://localhost:8080';
+
+  /// The base URL the client sends reader input to.
+  ///
+  /// A configured [configuredApiBaseUrl] wins. Otherwise the default is the
+  /// deployed gateway ([deployedGatewayUrl]), so a build reaches a running stack
+  /// with nothing passed by hand; a local run points at the local stack
+  /// ([localStackBaseUrl]).
+  static String get apiBaseUrl => configuredApiBaseUrl.isNotEmpty
+      ? configuredApiBaseUrl
+      : deployedGatewayUrl;
 
   /// The lookup service (`C-001`/`C-002`).
   ///

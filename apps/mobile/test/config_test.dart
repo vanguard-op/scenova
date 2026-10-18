@@ -26,26 +26,41 @@ void main() {
       expect(services.lookupApi, isA<HttpLookupApi>());
       expect(services.analytics.api, isA<HttpAnalyticsApi>());
       expect(services.pushRegistrar.api, isA<HttpPushRegistrationApi>());
-      // The default base URL is the local stack the Makefile boots.
+      // Every live intake is pointed at the base URL the app resolves, so the
+      // one place the gateway is decided is the one the client uses.
       expect(
         (services.lookupApi as HttpLookupApi).baseUrl,
         AppConfig.apiBaseUrl,
       );
     });
 
-    test('the local default reaches the host from the device it runs on', () {
-      // The emulator cannot see the host as `localhost` — there that name is
-      // the device itself — so the Android default is the emulator's alias for
-      // the host loopback. Elsewhere the host's own `localhost` is right.
-      debugDefaultTargetPlatformOverride = TargetPlatform.android;
-      expect(AppConfig.apiBaseUrl, 'http://10.0.2.2:8080');
-
-      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-      expect(AppConfig.apiBaseUrl, 'http://localhost:8080');
-
-      debugDefaultTargetPlatformOverride = null;
-      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    test('the default reaches the deployed gateway, not a loopback address', () {
+      // A build installed on a device has no stack on the developer's own
+      // machine to reach, so the default is the deployed gateway, and it is
+      // carried over https (NFR-022). A loopback default would leave the reader
+      // with nothing the moment the app left the developer's laptop.
+      expect(AppConfig.apiBaseUrl, AppConfig.deployedGatewayUrl);
+      expect(AppConfig.apiBaseUrl.startsWith('https://'), isTrue);
+      expect(AppConfig.isSecureGateway(AppConfig.apiBaseUrl), isTrue);
     });
+
+    test(
+      'the local stack default reaches the host from the device it runs on',
+      () {
+        // The emulator cannot see the host as `localhost` — there that name is
+        // the device itself — so the local-stack URL an explicit run passes is
+        // the emulator's alias for the host loopback. Elsewhere the host's own
+        // `localhost` is right.
+        debugDefaultTargetPlatformOverride = TargetPlatform.android;
+        expect(AppConfig.localStackBaseUrl, 'http://10.0.2.2:8080');
+
+        debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+        expect(AppConfig.localStackBaseUrl, 'http://localhost:8080');
+
+        debugDefaultTargetPlatformOverride = null;
+        addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      },
+    );
   });
 
   group('transport encryption (NFR-022)', () {
