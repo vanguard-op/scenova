@@ -24,6 +24,17 @@ if [ -f .env ]; then
   set -a; . ./.env; set +a
 fi
 
+# The committed schema's value for a key (`$1`), or empty. A build path uses it
+# as the last resort so a client build finds the non-secret values the schema
+# declares even when a developer's `.env` predates them — a stale `.env` would
+# otherwise bake empty `--dart-define` values and ship a build that cannot reach
+# a stack or sell a plan. It is a build-path fallback only: the services and the
+# deploy scripts keep reading `.env`/the environment, so no runtime or deploy
+# value is silently taken from the schema.
+schema_value() {
+  sed -n "s/^$1=//p" "$REPO_ROOT/.env.example" | head -n1
+}
+
 # One project identifier (see `.env.example`): the Firebase project — the token
 # audience the services verify and the FCM target the notification service sends
 # to — and the Cloud Tasks project are the same Google project as
@@ -118,23 +129,42 @@ console_dart_defines() {
   done
 }
 
-# The reader app's build-time store configuration (FEAT-013). RevenueCat wraps the
-# stores (D-008), so the client buys through its SDK and no card data reaches the
-# product (NFR-027). These are RevenueCat's *public* client SDK keys — one per
-# store — and the store product catalog from monetization.md "Pricing Tiers": the
-# Pro subscription (monthly and annual) and the one-time lookup top-up. They are
-# identifiers, not credentials, so they ship inside the app bundle the way the
-# Firebase client config does; the RevenueCat server API key and webhook
-# authorization are Secret Manager containers mounted on the entitlement service
-# alone and are never a build input. The values come from `.env` locally and from
-# the environment in CI, so the same build command describes the same app
-# everywhere. Prices are store-managed and localized (monetization.md "Payment &
-# Billing"), so none is baked in — only identifiers.
+# The reader app's build-time environment (FEAT-008, FEAT-013): the gateway the
+# build reaches and the store client configuration it carries. Both are carried
+# into the build as `--dart-define` values, so the same build command describes
+# the same app everywhere.
+#
+# `SCENOVA_API_BASE_URL` is the gateway a per-environment client build bakes. It
+# must be in the define set or the build path cannot point a build at its own
+# stack: without it a build falls back to the deployed gateway compiled into the
+# app, so an emulator reaches the live stack but a dev/staging/prod build cannot
+# name its environment's gateway.
+#
+# The store client configuration: RevenueCat wraps the stores (D-008), so the
+# client buys through its SDK and no card data reaches the product (NFR-027).
+# These are RevenueCat's *public* client SDK keys — one per store — and the store
+# product catalog from monetization.md "Pricing Tiers": the Pro subscription
+# (monthly and annual) and the one-time lookup top-up. They are identifiers, not
+# credentials, so they ship inside the app bundle the way the Firebase client
+# config does; the RevenueCat server API key and webhook authorization are Secret
+# Manager containers mounted on the entitlement service alone and are never a
+# build input. The values come from `.env` locally and from the environment in
+# CI, so the same build command describes the same app everywhere. Prices are
+# store-managed and localized (monetization.md "Payment & Billing"), so none is
+# baked in — only identifiers.
+#
+# The two SDK keys have no value in the schema: only the user can supply them
+# from the RevenueCat dashboard. The entitlement, offering, and product
+# identifiers do have values there — they are the product's own catalog, not the
+# user's — so a build finds them without the user filling anything in, and a
+# build that is missing only an SDK key for its store fails at the store client
+# rather than shipping a store it cannot buy from.
 #
 # The define names are the schema names: one name, one meaning, everywhere
 # (`.env.example`). `make env` holds this list to the schema and refuses a secret
 # or a release flag in it.
 MOBILE_DEFINE_KEYS=(
+  SCENOVA_API_BASE_URL
   REVENUECAT_PUBLIC_SDK_KEY_APP_STORE
   REVENUECAT_PUBLIC_SDK_KEY_PLAY_STORE
   REVENUECAT_ENTITLEMENT_ID
@@ -145,9 +175,11 @@ MOBILE_DEFINE_KEYS=(
 )
 
 mobile_dart_defines() {
-  local key
+  local key value
   for key in "${MOBILE_DEFINE_KEYS[@]}"; do
-    printf -- '--dart-define=%s=%s\n' "$key" "${!key:-}"
+    value="${!key:-}"
+    [ -n "$value" ] || value="$(schema_value "$key")"
+    printf -- '--dart-define=%s=%s\n' "$key" "$value"
   done
 }
 
