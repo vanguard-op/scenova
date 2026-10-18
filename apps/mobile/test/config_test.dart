@@ -19,6 +19,16 @@ void main() {
       expect(AppConfig.useMockPurchases, isFalse);
     });
 
+    test(
+      'a debug run starts on the reader\'s own history, not sample data',
+      () {
+        // The sample lookups are a development convenience, so a run that asks
+        // for nothing opens on the reader's own history rather than filling it
+        // with words they never looked up (FEAT-009).
+        expect(AppConfig.seedHistory, isFalse);
+      },
+    );
+
     test('the development wiring builds the live HTTP intakes', () {
       final services = ScenovaServices.development();
       addTearDown(services.dispose);

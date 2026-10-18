@@ -289,11 +289,17 @@ abstract final class AppConfig {
   /// is visible in development.
   static const Duration mockLatency = Duration(milliseconds: 350);
 
-  /// Whether the development build seeds a few lookups so Home's loaded state
-  /// is visible. Turn it off to view the empty state.
+  /// Whether a development run seeds a few sample lookups so the loaded state
+  /// is visible.
+  ///
+  /// Off by default: a fresh debug run opens on the reader's own history, which
+  /// starts empty, and the sample data is opted into with
+  /// `--dart-define=SCENOVA_SEED_HISTORY=true`. The samples are held in memory
+  /// for the run and never written to the store the reader's own history lives
+  /// in (`FEAT-009`).
   static const bool seedHistory = bool.fromEnvironment(
     'SCENOVA_SEED_HISTORY',
-    defaultValue: true,
+    defaultValue: false,
   );
 
   /// Whether the app opens on Onboarding.

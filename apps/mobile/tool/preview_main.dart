@@ -10,6 +10,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:scenova/app_router.dart';
+import 'package:scenova/dev/development_history.dart';
 import 'package:scenova/models/clip_notice.dart';
 import 'package:scenova/models/entitlement.dart';
 import 'package:scenova/models/feedback.dart';
@@ -188,13 +189,13 @@ List<(String, Widget)> _frames() {
         SettingsController(actionEnabled: true, onboardingComplete: false),
       ),
     ),
-    ('Home — loaded', _home(history: _seed(), online: true)),
+    ('Home — loaded', _home(history: sampleHistory(), online: true)),
     ('Home — empty', _home(history: const <HistoryEntry>[], online: true)),
-    ('Home — offline', _home(history: _seed(), online: false)),
+    ('Home — offline', _home(history: sampleHistory(), online: false)),
     (
       'Home — action off (how to enable it)',
       _home(
-        history: _seed(),
+        history: sampleHistory(),
         online: true,
         settings: SettingsController()..actionEnabled = false,
       ),
@@ -1513,28 +1514,6 @@ ScenovaServices _services({
     clips: resolvedClips,
     locale: 'en-GB',
   );
-}
-
-List<HistoryEntry> _seed() {
-  final now = DateTime.now();
-  return <HistoryEntry>[
-    HistoryEntry(
-      id: 'a',
-      word: 'come',
-      phrase: 'to move towards someone or something',
-      kind: LookupKind.word,
-      savedAt: now.subtract(const Duration(minutes: 6)),
-      clipUrl: 'mock://clip/library-hit',
-    ),
-    HistoryEntry(
-      id: 'b',
-      word: 'bank',
-      phrase: 'a place that keeps money safe',
-      kind: LookupKind.word,
-      savedAt: now.subtract(const Duration(hours: 2)),
-      clipUrl: 'mock://clip/bank-money',
-    ),
-  ];
 }
 
 class _PreviewClip extends StatefulWidget {

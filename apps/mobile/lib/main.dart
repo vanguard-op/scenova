@@ -5,12 +5,10 @@ import 'package:flutter/material.dart';
 
 import 'app.dart';
 import 'config.dart';
+import 'dev/development_history.dart';
 import 'extension/clip_extension_app.dart';
-import 'models/history_entry.dart';
-import 'models/lookup.dart';
 import 'services/app_services.dart';
 import 'services/extension_channel.dart';
-import 'services/history_store.dart';
 import 'services/settings_store.dart';
 
 Future<void> main() async {
@@ -18,18 +16,13 @@ Future<void> main() async {
   final locale = WidgetsBinding.instance.platformDispatcher.locale
       .toLanguageTag();
   // The reader's lookups live on the device and outlive the launch
-  // (`FEAT-009`).
-  final historyStore = SharedPreferencesHistoryStore();
-  // A development run seeds a few lookups so the loaded state is visible; the
-  // seeds are written into the device's own store and never in a release build.
-  if (kDebugMode && AppConfig.seedHistory) {
-    final existing = await historyStore.all();
-    if (existing.isEmpty) {
-      for (final entry in _seedHistory()) {
-        await historyStore.save(entry);
-      }
-    }
-  }
+  // (`FEAT-009`). A development run can opt into a few sample lookups so the
+  // loaded state is visible; the samples are held in memory for that run, so
+  // they never reach the store the reader's own history lives in and never
+  // persist. A release build carries none.
+  final historyStore = launchHistoryStore(
+    seed: kDebugMode && AppConfig.seedHistory,
+  );
   final services = ScenovaServices.development(
     locale: locale,
     historyStore: historyStore,
@@ -85,29 +78,4 @@ void clipExtensionMain() {
       extensionChannel: ExtensionChannel(),
     ),
   );
-}
-
-/// A couple of lookups so Home's loaded state is visible in development.
-/// `--dart-define=SCENOVA_SEED_HISTORY=false` shows the empty state instead.
-List<HistoryEntry> _seedHistory() {
-  if (!AppConfig.seedHistory) return const <HistoryEntry>[];
-  final now = DateTime.now();
-  return <HistoryEntry>[
-    HistoryEntry(
-      id: 'seed-come',
-      word: 'come',
-      phrase: 'to move towards someone or something',
-      kind: LookupKind.word,
-      savedAt: now.subtract(const Duration(minutes: 6)),
-      clipUrl: 'mock://clip/library-hit',
-    ),
-    HistoryEntry(
-      id: 'seed-bank',
-      word: 'bank',
-      phrase: 'a place that keeps money safe',
-      kind: LookupKind.word,
-      savedAt: now.subtract(const Duration(hours: 2)),
-      clipUrl: 'mock://clip/bank-money',
-    ),
-  ];
 }
