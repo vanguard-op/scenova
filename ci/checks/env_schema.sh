@@ -6,10 +6,10 @@
 # "Rollout Phases & Feature Flags"; architecture.md "Data Architecture"):
 #   - every release flag is declared with the doc's default in `.env.example`,
 #     and set per environment in environments/<env>.tfvars with a boolean value;
-#     an environment may raise a flag above its default (pre-revenue raises the
-#     generation path while it is exercised), but the raise is declared in its
-#     tfvars rather than flipped on the live services, so an apply reconciles to
-#     it;
+#     an environment may raise a flag above its default (pre-revenue runs the
+#     whole product out of the box, so every flag is on there), but the raise is
+#     declared in its tfvars rather than flipped on the live services, so an
+#     apply reconciles to it;
 #   - a tfvars carries no FLAG_* key the doc does not define (a typo would
 #     silently disable a kill switch);
 #   - the clip-store variables the AI layer resolves are declared;
@@ -231,11 +231,12 @@ for f in "${tfvars[@]}"; do
   done
   # The free-tier shape used to change no flag (D-034), so this check forced
   # every pre-revenue flag to equal the release default. That is no longer the
-  # shape: pre-revenue declares the generation path on while it is exercised, so
-  # forcing the default would fight the deployment and the flags could not be
-  # switched on at all. The per-environment set is now allowed to deviate; the
-  # guards that remain are the ones that catch a mistake — every flag declared
-  # as a boolean, and no flag outside the release set (both below).
+  # shape: pre-revenue runs the whole product out of the box, so its flags differ
+  # from the dark-launch default, and forcing the default would fight the
+  # deployment and the flags could not be switched on at all. The per-environment
+  # set is now allowed to deviate; the guards that remain are the ones that catch
+  # a mistake — every flag declared as a boolean, and no flag outside the release
+  # set (both below).
   while read -r key; do
     [ -n "$key" ] || continue
     known=0

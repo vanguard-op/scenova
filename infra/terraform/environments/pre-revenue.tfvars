@@ -159,24 +159,31 @@ services = {
   notification = { public = false }
 }
 
-# The generation path is on while pre-revenue is exercised end to end:
-# `enable_generation` (FEAT-005) and `enable_clip_view` (FEAT-008) are raised
-# from their release default (release.md "Rollout Phases & Feature Flags") so a
-# lookup can actually produce a clip and show it in context. The other flags
-# stay at their defaults and are handled separately: `enable_phrase_clip`
-# (FEAT-007), `enable_offline_history` (FEAT-009), and `enable_paid_tier`
-# (FEAT-013) remain off. `serve_seeded_library` stays on as at launch.
+# The environment runs the whole product out of the box: every release flag is
+# on, so an install that reaches it can capture, generate a clip, view it in
+# context, take a phrase clip, replay offline, and reach the paid tier, with
+# nothing left off for the user to switch on first. `serve_seeded_library` stays
+# on as at launch. Every flag is declared here and reconciled by an apply, never
+# flipped on the live services: `ci/flag.sh` is the incident-time kill switch
+# (release.md "Rollback & Roll-forward"), and its tfvars line is restored after
+# the incident so the next plan agrees.
 #
-# Raising a flag here is a deliberate spend: with generation on, a lookup calls
-# the pinned model provider and spends provider credit, which the judged quality
-# bars (NFR-050 to NFR-053) do not yet gate in this environment. It is the
-# environment's declared state, not an out-of-band flip, so an apply reconciles
-# to it. The entitlement tier figures live in infra/terraform and are unchanged.
+# Raising a flag is a deliberate spend:
+#   - `enable_generation` (FEAT-005) and `enable_phrase_clip` (FEAT-007) call the
+#     pinned model provider on a miss and spend provider credit, which the judged
+#     quality bars (NFR-050 to NFR-053) do not yet gate in this environment.
+#   - `enable_paid_tier` (FEAT-013) meters every lookup against the reader's
+#     monthly allowance; when the allowance is exhausted the lookup resolves to
+#     `fallback` (word and phrase, no clip) and the client shows the Paywall
+#     instead of a clip (monetization.md "Pricing Tiers"). That is the product
+#     working as specified, not a fault.
+#
+# The entitlement tier figures live in infra/terraform and are unchanged.
 flags = {
   FLAG_ENABLE_CLIP_VIEW       = "true"
   FLAG_ENABLE_GENERATION      = "true"
-  FLAG_ENABLE_PHRASE_CLIP     = "false"
-  FLAG_ENABLE_OFFLINE_HISTORY = "false"
-  FLAG_ENABLE_PAID_TIER       = "false"
+  FLAG_ENABLE_PHRASE_CLIP     = "true"
+  FLAG_ENABLE_OFFLINE_HISTORY = "true"
+  FLAG_ENABLE_PAID_TIER       = "true"
   FLAG_SERVE_SEEDED_LIBRARY   = "true"
 }
