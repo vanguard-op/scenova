@@ -2,6 +2,15 @@
 # logs. Terraform creates the containers and grants least-privilege access; the
 # values for provider keys are written out-of-band by an operator or the deploy
 # pipeline, and the generated database credential is written by the data module.
+#
+# Rotation: a value is replaced by adding a new version, its value piped so it is
+# never printed (`gcloud secrets versions add <id> --project <p> --data-file=-`).
+# A service mounts `latest` and resolves an environment-variable secret at
+# instance start, so a new version reaches the running service on the next cold
+# start or `make env-start` (a fresh revision). The RevenueCat webhook
+# authorization is a shared password chosen in the RevenueCat dashboard: the
+# seeded value must equal the dashboard's webhook Authorization header verbatim,
+# or every delivery is refused (C-019).
 
 variable "project_id" { type = string }
 variable "environment" { type = string }

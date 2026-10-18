@@ -65,6 +65,7 @@ patterns=(
   'xox[baprs]-[0-9A-Za-z-]{10,}'                # Slack token
   'gh[pousr]_[0-9A-Za-z]{36,}'                  # GitHub token
   'sk-[A-Za-z0-9]{32,}'                         # generic API key
+  'sk_[A-Za-z0-9]{20,}'                         # RevenueCat server key (sk_, not sk-)
 )
 
 failed=0
