@@ -16,14 +16,21 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any
 
 import pytest
-from sqlalchemy import UniqueConstraint, create_engine
+from sqlalchemy import UniqueConstraint, create_engine, event, text
 from sqlalchemy.engine import Engine
 
 from lookup.app.config import Settings
 from lookup.app.db import Base, LookupJobRow, LookupRow, LookupSenseRow
 from lookup.app.errors import LookupUnavailableError
+from lookup.app.generation import (
+    GenerationClient,
+    GenerationJob,
+    GenerationJobStatus,
+    GenerationUnavailableError,
+)
 from lookup.app.inventory import build_default_inventory
 from lookup.app.library import InMemoryLibrary
 from lookup.app.models import (
@@ -35,7 +42,7 @@ from lookup.app.models import (
     PartOfSpeech,
     Sense,
 )
-from lookup.app.service import LookupService
+from lookup.app.service import GENERATION_UNAVAILABLE_NOTICE, LookupService
 from lookup.app.store import ANONYMIZED_SUBJECT, PostgresLookupStore, StoredLookup
 from lookup.tests.fakes import RecordingEntitlementClient, RecordingGenerationClient
 
@@ -47,6 +54,49 @@ def _engine(tmp_path: Path, name: str = "lookups.db") -> Engine:
     engine = create_engine(f"sqlite:///{tmp_path / name}")
     Base.metadata.create_all(engine)
     return engine
+
+
+def _engine_referenced_by_the_pipeline(tmp_path: Path) -> Engine:
+    """An engine that holds the pipeline's foreign key to a lookup.
+
+    A generation job's row references the lookup it belongs to (schema
+    "Relationships": GenerationJob -> Lookup), and the real table is the
+    platform's migration history; the tests build the referencing table here so a
+    lookup write is exercised against the constraint the pipeline depends on.
+    SQLite only enforces it once asked to.
+    """
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'referenced.db'}")
+
+    @event.listens_for(engine, "connect")
+    def _enforce_foreign_keys(dbapi_connection: Any, _record: Any) -> None:
+        dbapi_connection.execute("PRAGMA foreign_keys=ON")
+
+    Base.metadata.create_all(engine)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "CREATE TABLE generation_jobs ("
+                "id TEXT PRIMARY KEY, "
+                "lookup_id TEXT NOT NULL REFERENCES lookups (id) ON DELETE CASCADE"
+                ")"
+            )
+        )
+    return engine
+
+
+def _recorded_jobs(engine: Engine) -> list[str]:
+    with engine.connect() as connection:
+        rows = connection.execute(text("SELECT id FROM generation_jobs")).all()
+        return [row[0] for row in rows]
+
+
+def _reference_job(engine: Engine, job_id: str, lookup_id: str) -> None:
+    with engine.begin() as connection:
+        connection.execute(
+            text("INSERT INTO generation_jobs (id, lookup_id) VALUES (:id, :lookup_id)"),
+            {"id": job_id, "lookup_id": lookup_id},
+        )
 
 
 @asynccontextmanager
@@ -279,6 +329,126 @@ async def test_a_lookup_made_through_the_service_is_durable(tmp_path: Path) -> N
     assert polled.lookupId == created.lookupId
     assert polled.rawSelection == "coming"
     assert polled.normalisedLemma == "come"
+
+
+def _service_over(store: PostgresLookupStore, generation: GenerationClient) -> LookupService:
+    return LookupService(
+        inventory=build_default_inventory(),
+        store=store,
+        library=InMemoryLibrary(),
+        generation=generation,
+        entitlement=RecordingEntitlementClient(),
+    )
+
+
+def _request(selection: str = "coming") -> CreateLookupRequest:
+    return CreateLookupRequest(
+        selection=selection,
+        clientLookupId="client-1",
+        platform="android",
+        locale="en",
+        consentModelProcessing=True,
+        subject="reader-1",
+    )
+
+
+class _StoreObservingGeneration:
+    """A generation client that reads the lookup back as the job arrives.
+
+    The pipeline's job row holds a foreign key to the lookup it names, so a job
+    can only be accepted once that lookup is recorded; this observes the record at
+    the moment of the hand-off, which is where an ordering slip shows.
+    """
+
+    def __init__(self, store: PostgresLookupStore) -> None:
+        self._store = store
+        self.jobs: list[GenerationJob] = []
+        self.recorded: list[bool] = []
+
+    async def enqueue(self, job: GenerationJob) -> None:
+        self.recorded.append(await self._store.get(job.lookup_id) is not None)
+        self.jobs.append(job)
+
+    async def status(self, job_id: str) -> GenerationJobStatus:
+        return GenerationJobStatus.QUEUED
+
+    async def aclose(self) -> None:
+        return None
+
+
+@pytest.mark.asyncio
+async def test_a_lookup_is_recorded_before_its_generation_job_is_handed_over(
+    tmp_path: Path,
+) -> None:
+    # A generation job names the lookup it belongs to, and the pipeline's row
+    # holds a foreign key to it (schema "Relationships": GenerationJob -> Lookup);
+    # a job handed over before its lookup is durable names a lookup the database
+    # does not hold, and the pipeline refuses it.
+    store = PostgresLookupStore(_engine(tmp_path, "before-enqueue.db"))
+    generation = _StoreObservingGeneration(store)
+    service = _service_over(store, generation)
+    try:
+        created = await service.create_lookup(_request(), "corr")
+    finally:
+        await service.aclose()
+
+    assert created.status is LookupStatus.GENERATING
+    assert [job.lookup_id for job in generation.jobs] == [created.lookupId]
+    assert generation.recorded == [True]
+
+
+@pytest.mark.asyncio
+async def test_a_lookup_whose_job_was_refused_is_recorded_as_the_fallback(
+    tmp_path: Path,
+) -> None:
+    # The pipeline would not accept the job, so the durable record must not claim
+    # a generation: a poll of it would otherwise wait for a clip that no job will
+    # produce (C-003, FEAT-005).
+    store = PostgresLookupStore(_engine(tmp_path, "refused.db"))
+    service = _service_over(
+        store, RecordingGenerationClient(error=GenerationUnavailableError("unreachable"))
+    )
+    try:
+        created = await service.create_lookup(_request(), "corr")
+        stored = await store.get(created.lookupId)
+    finally:
+        await service.aclose()
+
+    assert created.status is LookupStatus.FALLBACK
+    assert created.notice == GENERATION_UNAVAILABLE_NOTICE
+    assert stored is not None
+    assert stored.status is LookupStatus.FALLBACK
+    assert stored.generation_job_ids == ()
+    assert stored.senses[0].clip is None
+
+
+@pytest.mark.asyncio
+async def test_replacing_a_lookup_keeps_the_generation_job_that_names_it(
+    tmp_path: Path,
+) -> None:
+    # A poll replaces the record when the clip arrives. Rows that reference the
+    # lookup — the pipeline's generation jobs, the reader's feedback, reports,
+    # push registration, and saved history (schema "Relationships") — are not the
+    # record's to take with it, so the write updates the record rather than
+    # deleting and re-inserting it.
+    engine = _engine_referenced_by_the_pipeline(tmp_path)
+    store = PostgresLookupStore(engine)
+    try:
+        await store.add(_lookup())
+        _reference_job(engine, "job_1", "lk_1")
+
+        await store.add(
+            _lookup(status=LookupStatus.SERVED, senses=_senses()[:1], generation_job_ids=())
+        )
+        jobs = _recorded_jobs(engine)
+        stored = await store.get("lk_1")
+    finally:
+        await store.aclose()
+
+    assert jobs == ["job_1"], "the generation that names the lookup survives the replace"
+    assert stored is not None
+    assert stored.status is LookupStatus.SERVED
+    assert [sense.senseLabel for sense in stored.senses] == ["arrive"]
 
 
 @pytest.mark.asyncio

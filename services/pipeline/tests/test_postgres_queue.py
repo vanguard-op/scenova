@@ -18,13 +18,23 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import (
+    Column,
+    ForeignKeyConstraint,
+    MetaData,
+    String,
+    Table,
+    create_engine,
+    event,
+    text,
+)
 from sqlalchemy.engine import Engine
 
 from pipeline.app.config import Settings
-from pipeline.app.db import Base
+from pipeline.app.db import Base, GenerationJobRow
 from pipeline.app.errors import JobAlreadyEnqueuedError, QueueUnavailableError
 from pipeline.app.jobs import GenerationJob
 from pipeline.app.models import JobStatus, Kind, PartOfSpeech
@@ -53,10 +63,10 @@ async def _queue(engine: Engine) -> AsyncIterator[PostgresJobQueue]:
         await queue.aclose()
 
 
-def _job(job_id: str = "job-1") -> GenerationJob:
+def _job(job_id: str = "job-1", *, lookup_id: str = "lk_1") -> GenerationJob:
     return GenerationJob(
         id=job_id,
-        lookup_id="lk_1",
+        lookup_id=lookup_id,
         kind=Kind.WORD,
         lemma="key",
         phrase=None,
@@ -72,6 +82,42 @@ def _job(job_id: str = "job-1") -> GenerationJob:
         created_at=_T1,
         completed_at=None,
     )
+
+
+def _referencing_engine(tmp_path: Path) -> Engine:
+    """An engine holding the foreign key the migration declares on a job's lookup.
+
+    `generation_jobs.lookup_id` references `lookups` (schema "Relationships":
+    GenerationJob -> Lookup), so a job whose lookup the database does not hold is
+    refused by the database itself. The table is built from the queue's own
+    mapping with that one constraint added, and SQLite is asked to enforce it.
+    """
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'referencing.db'}")
+
+    @event.listens_for(engine, "connect")
+    def _enforce_foreign_keys(dbapi_connection: Any, _record: Any) -> None:
+        dbapi_connection.execute("PRAGMA foreign_keys=ON")
+
+    metadata = MetaData()
+    Table("lookups", metadata, Column("id", String(64), primary_key=True))
+    job_row = GenerationJobRow.__table__
+    Table(
+        "generation_jobs",
+        metadata,
+        *(
+            Column(column.name, column.type, primary_key=column.primary_key)
+            for column in job_row.columns
+        ),
+        ForeignKeyConstraint(["lookup_id"], ["lookups.id"], ondelete="CASCADE"),
+    )
+    metadata.create_all(engine)
+    return engine
+
+
+def _add_lookup(engine: Engine, lookup_id: str) -> None:
+    with engine.begin() as connection:
+        connection.execute(text("INSERT INTO lookups (id) VALUES (:id)"), {"id": lookup_id})
 
 
 @pytest.mark.asyncio
@@ -195,6 +241,41 @@ async def test_an_unreachable_database_is_reported_as_unavailable() -> None:
             await queue.enqueue(_job())
     finally:
         await queue.aclose()
+
+
+@pytest.mark.asyncio
+async def test_a_job_whose_lookup_is_not_there_is_a_queue_failure(tmp_path: Path) -> None:
+    # C-003: only a repeated jobId is a 409. A row the database refuses because the
+    # lookup it names is not there is a queue that could not accept the job, so the
+    # lookup service resolves the reader to the fallback rather than reporting a
+    # generation that is not running.
+    engine = _referencing_engine(tmp_path)
+    _add_lookup(engine, "lk_1")
+    queue = PostgresJobQueue(engine)
+    try:
+        with pytest.raises(QueueUnavailableError):
+            await queue.enqueue(_job("job-1", lookup_id="lk_missing"))
+        assert _scalar_count(engine, "generation_jobs") == 0
+    finally:
+        await queue.aclose()
+
+
+@pytest.mark.asyncio
+async def test_a_repeated_job_id_is_still_a_duplicate(tmp_path: Path) -> None:
+    # The lookup's own foreign key is in place and its lookup recorded, so the only
+    # refusal left is the repeated id: two lookups for the same missing word share
+    # one generation (C-003 409; FEAT-005 edge).
+    engine = _referencing_engine(tmp_path)
+    _add_lookup(engine, "lk_1")
+    queue = PostgresJobQueue(engine)
+    try:
+        await queue.enqueue(_job())
+        with pytest.raises(JobAlreadyEnqueuedError):
+            await queue.enqueue(_job())
+    finally:
+        await queue.aclose()
+
+    assert _scalar_count(engine, "generation_jobs") == 1
 
 
 def test_the_default_queue_is_relational_when_a_database_is_configured(tmp_path: Path) -> None:

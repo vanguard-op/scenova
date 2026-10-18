@@ -199,13 +199,24 @@ class PostgresLookupStore:
         try:
             with self._sessions() as session, session.begin():
                 # A poll can replace a lookup whose clip arrived after it was
-                # first made, so the record is written afresh rather than
-                # merged; its senses and jobs go with the row it replaces.
-                previous = session.get(LookupRow, lookup.id)
-                if previous is not None:
-                    session.delete(previous)
-                    session.flush()
-                session.add(_row(lookup))
+                # first made, so its senses and jobs are written afresh rather
+                # than accumulated. The record's own row is updated in place: a
+                # delete would cascade to every row that references the lookup —
+                # the pipeline's generation jobs, the reader's feedback and
+                # reports, their push registration and saved history (schema
+                # "Relationships") — and take a generation that is still running
+                # with it.
+                row = session.get(LookupRow, lookup.id)
+                if row is None:
+                    session.add(_row(lookup))
+                    return
+                row.senses.clear()
+                row.generation_jobs.clear()
+                # The old child rows go before the new ones arrive: they share
+                # the (lookup_id, position) key, so the two must not meet in one
+                # flush.
+                session.flush()
+                _apply(row, lookup)
         except SQLAlchemyError as exc:
             raise _unavailable() from exc
 
@@ -246,30 +257,33 @@ class PostgresLookupStore:
 
 
 def _row(lookup: StoredLookup) -> LookupRow:
+    row = LookupRow(id=lookup.id)
+    _apply(row, lookup)
+    return row
+
+
+def _apply(row: LookupRow, lookup: StoredLookup) -> None:
     allowance = lookup.allowance
-    return LookupRow(
-        id=lookup.id,
-        subject=lookup.subject,
-        client_lookup_id=lookup.client_lookup_id or None,
-        account_id=lookup.account_id,
-        raw_selection=lookup.raw_selection,
-        kind=lookup.kind.value,
-        normalised_lemma=lookup.normalised_lemma,
-        # The entry a library hit was served from, so the lookup joins back to
-        # the entry it used (schema "Lookup": `servedEntryId`).
-        served_entry_id=_served_entry_id(lookup.senses),
-        status=lookup.status.value,
-        notice=lookup.notice,
-        created_at=lookup.created_at,
-        allowance_used=None if allowance is None else allowance.used,
-        allowance_limit=None if allowance is None else allowance.limit,
-        allowance_period_end=None if allowance is None else allowance.periodEnd,
-        senses=[_sense_row(position, sense) for position, sense in enumerate(lookup.senses)],
-        generation_jobs=[
-            LookupJobRow(position=position, job_id=job_id)
-            for position, job_id in enumerate(lookup.generation_job_ids)
-        ],
-    )
+    row.subject = lookup.subject
+    row.client_lookup_id = lookup.client_lookup_id or None
+    row.account_id = lookup.account_id
+    row.raw_selection = lookup.raw_selection
+    row.kind = lookup.kind.value
+    row.normalised_lemma = lookup.normalised_lemma
+    # The entry a library hit was served from, so the lookup joins back to
+    # the entry it used (schema "Lookup": `servedEntryId`).
+    row.served_entry_id = _served_entry_id(lookup.senses)
+    row.status = lookup.status.value
+    row.notice = lookup.notice
+    row.created_at = lookup.created_at
+    row.allowance_used = None if allowance is None else allowance.used
+    row.allowance_limit = None if allowance is None else allowance.limit
+    row.allowance_period_end = None if allowance is None else allowance.periodEnd
+    row.senses = [_sense_row(position, sense) for position, sense in enumerate(lookup.senses)]
+    row.generation_jobs = [
+        LookupJobRow(position=position, job_id=job_id)
+        for position, job_id in enumerate(lookup.generation_job_ids)
+    ]
 
 
 def _served_entry_id(senses: tuple[Sense, ...]) -> str | None:

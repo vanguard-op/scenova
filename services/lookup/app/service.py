@@ -9,8 +9,12 @@ clip availability only.
 
 FEAT-005 is wired here: a sense the library cannot serve is handed to the
 generation pipeline (C-003), so a later poll of the lookup (C-002) serves the
-clip the pipeline wrote to the shared library. When the pipeline cannot accept
-the job the reader still gets the word and phrase, marked as the fallback.
+clip the pipeline wrote to the shared library. The lookup is recorded before its
+job is handed over, because the job names this lookup and the pipeline's row
+holds a foreign key to it (schema "GenerationJob": `lookupId`); a job handed over
+first would name a lookup the database does not hold yet and be refused. When the
+pipeline cannot accept the job the reader still gets the word and phrase, marked
+as the fallback.
 
 FEAT-006 is wired here too. The shared library is read on the fast path: an
 active entry is served without a generation, a retired one is a miss whose id
@@ -35,6 +39,7 @@ a block (NFR-011).
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from uuid import uuid4
@@ -136,6 +141,20 @@ class _MeterReading:
     allowance: Allowance | None
 
 
+@dataclass(frozen=True)
+class _Resolution:
+    """A lookup as it resolved, and the generation jobs it is waiting on.
+
+    The jobs are held beside the record rather than enqueued as the lookup
+    resolves: each job names this lookup and the pipeline's row holds a foreign
+    key to it (schema "GenerationJob": `lookupId`), so the record must be durable
+    before the hand-off (C-003).
+    """
+
+    stored: StoredLookup
+    jobs: tuple[GenerationJob, ...] = ()
+
+
 class LookupService:
     """Normalises selections and records lookups against the shared library."""
 
@@ -175,8 +194,19 @@ class LookupService:
                         "This clientLookupId was already used with a different selection."
                     )
                 return existing.to_create_response(correlation_id)
-            stored = await self._create(request, raw_selection)
+            resolution = await self._resolve_lookup(request, raw_selection)
+            # The lookup is recorded before its generation job is handed to the
+            # pipeline: the job names this lookup, and the pipeline's row holds a
+            # foreign key to it (schema "GenerationJob": `lookupId`), so an
+            # enqueue that arrived first would name a lookup that is not there.
+            stored = resolution.stored
             await self._store.add(stored)
+            if resolution.jobs and not await self._enqueue(resolution.jobs):
+                # The job was never accepted, so the record must not claim a
+                # generation: a poll of it would otherwise wait on a clip that
+                # no job will produce. The word and phrase still show.
+                stored = _generation_unavailable(stored)
+                await self._store.add(stored)
         return stored.to_create_response(correlation_id)
 
     async def get_lookup(self, lookup_id: str, subject: str, correlation_id: str) -> LookupResponse:
@@ -211,7 +241,9 @@ class LookupService:
         await self._generation.aclose()
         await self._entitlement.aclose()
 
-    async def _create(self, request: CreateLookupRequest, raw_selection: str) -> StoredLookup:
+    async def _resolve_lookup(
+        self, request: CreateLookupRequest, raw_selection: str
+    ) -> _Resolution:
         """Validate a selection, spend its allowance, and resolve it.
 
         Validation runs before the spend, so a malformed selection costs the
@@ -239,10 +271,17 @@ class LookupService:
         account_id = _account_id(request, reading)
         if not reading.allowed:
             exhausted = self._exhausted_lookup(request, raw_selection, tokens, reading.allowance)
-            return replace(exhausted, account_id=account_id)
+            return replace(exhausted, stored=replace(exhausted.stored, account_id=account_id))
 
-        stored = await self._resolve(request, raw_selection, tokens)
-        return replace(stored, allowance=reading.allowance, account_id=account_id)
+        resolved = await self._resolve(request, raw_selection, tokens)
+        return replace(
+            resolved,
+            stored=replace(
+                resolved.stored,
+                allowance=reading.allowance,
+                account_id=account_id,
+            ),
+        )
 
     async def _meter(self, request: CreateLookupRequest) -> _MeterReading:
         """Spend one unit of a signed-in reader's allowance, or read the grace path.
@@ -270,7 +309,7 @@ class LookupService:
 
     async def _resolve(
         self, request: CreateLookupRequest, raw_selection: str, tokens: list[str]
-    ) -> StoredLookup:
+    ) -> _Resolution:
         if len(tokens) == 1:
             return await self._word_lookup(request, raw_selection, tokens[0])
         phrase = " ".join(tokens)
@@ -299,51 +338,59 @@ class LookupService:
 
     async def _word_lookup(
         self, request: CreateLookupRequest, raw_selection: str, token: str
-    ) -> StoredLookup:
-        notice: str | None = None
+    ) -> _Resolution:
         lemma, records = self._inventory_key(token)
         resolved_senses = [await self._sense(lemma, record) for record in records]
         senses = tuple(resolution.sense for resolution in resolved_senses)
         status = _word_status(request.consentModelProcessing, senses)
         lookup_id = _new_id()
-        job_ids: tuple[str, ...] = ()
+        jobs: tuple[GenerationJob, ...] = ()
         if status is LookupStatus.GENERATING:
             missing = [
                 (record, resolution.regeneration_seed)
                 for record, resolution in zip(records, resolved_senses, strict=True)
                 if resolution.sense.clip is None
             ]
-            jobs = _word_jobs(
-                lookup_id,
-                lemma,
-                missing,
-                model_pin=self._clip_model_pin,
-                target_duration=self._target_duration,
+            jobs = tuple(
+                _word_jobs(
+                    lookup_id,
+                    lemma,
+                    missing,
+                    model_pin=self._clip_model_pin,
+                    target_duration=self._target_duration,
+                )
             )
-            if not await self._enqueue(jobs):
-                status = LookupStatus.FALLBACK
-                notice = GENERATION_UNAVAILABLE_NOTICE
-            else:
-                job_ids = tuple(job.job_id for job in jobs)
-        return _stored(
-            lookup_id,
-            request,
-            raw_selection,
-            Kind.WORD,
-            lemma,
-            status,
-            senses,
-            notice,
-            generation_job_ids=job_ids,
+        return _Resolution(
+            stored=_stored(
+                lookup_id,
+                request,
+                raw_selection,
+                Kind.WORD,
+                lemma,
+                status,
+                senses,
+                None,
+                generation_job_ids=tuple(job.job_id for job in jobs),
+            ),
+            jobs=jobs,
         )
 
     async def _phrase_lookup(
         self, request: CreateLookupRequest, raw_selection: str, phrase: str
-    ) -> StoredLookup:
+    ) -> _Resolution:
         lookup_id = _new_id()
         if not request.consentModelProcessing:
-            return _stored(
-                lookup_id, request, raw_selection, Kind.PHRASE, None, LookupStatus.DENIED, (), None
+            return _Resolution(
+                stored=_stored(
+                    lookup_id,
+                    request,
+                    raw_selection,
+                    Kind.PHRASE,
+                    None,
+                    LookupStatus.DENIED,
+                    (),
+                    None,
+                )
             )
         job = GenerationJob(
             job_id=phrase_job_id(lookup_id),
@@ -356,8 +403,8 @@ class LookupService:
             target_duration_seconds=self._target_duration,
             model_pin=self._clip_model_pin,
         )
-        if await self._enqueue([job]):
-            return _stored(
+        return _Resolution(
+            stored=_stored(
                 lookup_id,
                 request,
                 raw_selection,
@@ -367,16 +414,8 @@ class LookupService:
                 (),
                 None,
                 generation_job_ids=(job.job_id,),
-            )
-        return _stored(
-            lookup_id,
-            request,
-            raw_selection,
-            Kind.PHRASE,
-            None,
-            LookupStatus.FALLBACK,
-            (),
-            GENERATION_UNAVAILABLE_NOTICE,
+            ),
+            jobs=(job,),
         )
 
     def _exhausted_lookup(
@@ -385,7 +424,7 @@ class LookupService:
         raw_selection: str,
         tokens: list[str],
         allowance: Allowance | None,
-    ) -> StoredLookup:
+    ) -> _Resolution:
         """The lookup a reader gets when their allowance is spent (FEAT-013).
 
         The word and phrase still show; no clip is served or generated, so a
@@ -396,29 +435,33 @@ class LookupService:
         """
 
         if len(tokens) > 1 and self._enable_phrase_clip:
-            return _stored(
-                _new_id(),
-                request,
-                raw_selection,
-                Kind.PHRASE,
-                None,
-                LookupStatus.FALLBACK,
-                (),
-                None,
-                allowance=allowance,
+            return _Resolution(
+                stored=_stored(
+                    _new_id(),
+                    request,
+                    raw_selection,
+                    Kind.PHRASE,
+                    None,
+                    LookupStatus.FALLBACK,
+                    (),
+                    None,
+                    allowance=allowance,
+                )
             )
         key = tokens[0] if len(tokens) == 1 else " ".join(tokens)
         lemma, records = self._inventory_key(key)
-        return _stored(
-            _new_id(),
-            request,
-            raw_selection,
-            Kind.WORD,
-            lemma,
-            LookupStatus.FALLBACK,
-            tuple(_miss_sense(record) for record in records),
-            None,
-            allowance=allowance,
+        return _Resolution(
+            stored=_stored(
+                _new_id(),
+                request,
+                raw_selection,
+                Kind.WORD,
+                lemma,
+                LookupStatus.FALLBACK,
+                tuple(_miss_sense(record) for record in records),
+                None,
+                allowance=allowance,
+            )
         )
 
     async def _sense(self, lemma: str, record: SenseRecord) -> _SenseResolution:
@@ -443,7 +486,7 @@ class LookupService:
             None,
         )
 
-    async def _enqueue(self, jobs: list[GenerationJob]) -> bool:
+    async def _enqueue(self, jobs: Sequence[GenerationJob]) -> bool:
         """Hand jobs to the pipeline; False when one cannot be accepted."""
 
         for job in jobs:
@@ -535,16 +578,18 @@ class LookupService:
             return sense
         return _served_sense(sense.senseLabel, sense.partOfSpeech, entry)
 
-    def _empty_lookup(self, request: CreateLookupRequest, raw_selection: str) -> StoredLookup:
-        return _stored(
-            _new_id(),
-            request,
-            raw_selection,
-            Kind.WORD,
-            None,
-            LookupStatus.EMPTY,
-            (),
-            EMPTY_NOTICE,
+    def _empty_lookup(self, request: CreateLookupRequest, raw_selection: str) -> _Resolution:
+        return _Resolution(
+            stored=_stored(
+                _new_id(),
+                request,
+                raw_selection,
+                Kind.WORD,
+                None,
+                LookupStatus.EMPTY,
+                (),
+                EMPTY_NOTICE,
+            )
         )
 
 
@@ -681,6 +726,23 @@ def _clip(entry: LibraryEntry) -> Clip:
         durationSeconds=entry.clip.duration_seconds,
         resolution=entry.clip.resolution,
         hasAudio=entry.clip.has_audio,
+    )
+
+
+def _generation_unavailable(stored: StoredLookup) -> StoredLookup:
+    """The lookup a reader gets when the pipeline will not accept its job.
+
+    The word and phrase still show; only the clip is unavailable, and the lookup
+    carries no job ids because no job was started. The unavailable notice is used
+    rather than the failed-generation one: the generation never began, so the
+    reader is invited to try again (C-003, FEAT-005).
+    """
+
+    return replace(
+        stored,
+        status=LookupStatus.FALLBACK,
+        notice=GENERATION_UNAVAILABLE_NOTICE,
+        generation_job_ids=(),
     )
 
 

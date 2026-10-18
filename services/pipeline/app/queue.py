@@ -8,7 +8,10 @@ them apart.
 
 An enqueue that cannot reach the database is reported as the queue being
 unavailable, so the API answers 503 and the lookup resolves the reader to the
-fallback (C-003); a jobId that is already enqueued is a 409 (C-003).
+fallback (C-003); a jobId that is already enqueued is a 409 (C-003). A row the
+database refuses for any other reason — a job whose lookup the database does not
+hold, say — is a queue that could not accept the job, not a duplicate, so it is
+answered as unavailable rather than as a job that is already running.
 """
 
 from __future__ import annotations
@@ -101,6 +104,13 @@ class PostgresJobQueue:
             with self._sessions() as session, session.begin():
                 session.add(_row(job))
         except IntegrityError as exc:
+            # Only a repeated jobId is a 409 (C-003). The database can refuse the
+            # row for another reason — the lookup it names is not there, which is
+            # what the foreign key guards — and reporting that as an already
+            # enqueued job would tell the caller a generation is running when none
+            # is, so the queue is reported as unable to accept the job instead.
+            if not _is_repeated_job_id(exc):
+                raise _unavailable() from exc
             raise JobAlreadyEnqueuedError(f"Job {job.id} is already enqueued.") from exc
         except SQLAlchemyError as exc:
             raise _unavailable() from exc
@@ -199,3 +209,24 @@ def _job(row: GenerationJobRow) -> GenerationJob:
 
 def _unavailable() -> QueueUnavailableError:
     return QueueUnavailableError("The generation queue is unavailable. Please try again.")
+
+
+# The SQLSTATE for a unique-constraint violation, which is what a repeated jobId
+# raises on PostgreSQL.
+_UNIQUE_VIOLATION = "23505"
+
+
+def _is_repeated_job_id(exc: IntegrityError) -> bool:
+    """Whether the database refused the row because the job id is already there.
+
+    The driver reports the reason in its own way: a SQLSTATE where one exists
+    (psycopg's unique violation), and a message naming the constraint where it
+    does not (SQLite's "UNIQUE constraint failed"). A foreign key the row does
+    not satisfy is anything else.
+    """
+
+    cause = getattr(exc, "orig", None)
+    sqlstate = getattr(cause, "sqlstate", None) or getattr(cause, "pgcode", None)
+    if sqlstate is not None:
+        return str(sqlstate) == _UNIQUE_VIOLATION
+    return "unique" in str(cause).lower()
