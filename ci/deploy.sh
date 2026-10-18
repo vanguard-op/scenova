@@ -6,9 +6,20 @@
 # Promotion to 100% is a separate, deliberate step: `make promote ENV=... SVC=...`.
 #
 # Usage: ci/deploy.sh <env> [service ...]
-#   env      dev | staging | prod
+#   env      dev | staging | prod | pre-revenue
 #   service  optional subset; default is every container image in the shared
 #            registry (ci/lib.sh) — each service plus the model-serving image.
+#
+# DEPLOY_IMAGE_ONLY=1 releases the named services' images and nothing else: the
+# environment-wide steps — the migration job and the review console — are
+# skipped, so the deploy's image tag is the only thing that changes. It is the
+# release for a change whose schema is already at head and whose console build is
+# unchanged. It also holds a release off a tree that carries a migration the
+# environment must not receive yet: the migration image is built from the working
+# tree (`infra/db/Dockerfile` copies `migrations/`), so the default path would
+# apply an uncommitted revision. A service subset is required with it, because
+# shipping every image without the migration step is never what was meant. Unset,
+# the default path is unchanged.
 #
 # Non-secret configuration comes from infra/terraform/environments/<env>.tfvars —
 # the single per-environment source of truth. Secrets are never read here; Cloud
@@ -21,6 +32,15 @@ shift || true
 case "$ENV" in
   dev|staging|prod|pre-revenue) ;;
   *) die "unknown environment '$ENV' (expected dev, staging, prod, or pre-revenue)" ;;
+esac
+
+# Image-only release (see the header). Opt-in and named, so it cannot be reached
+# by accident; the default path is untouched.
+IMAGE_ONLY=0
+case "${DEPLOY_IMAGE_ONLY:-0}" in
+  1|true) IMAGE_ONLY=1 ;;
+  0|false|"") IMAGE_ONLY=0 ;;
+  *) die "DEPLOY_IMAGE_ONLY must be 1 or 0 (got '$DEPLOY_IMAGE_ONLY')" ;;
 esac
 
 TFVARS="infra/terraform/environments/${ENV}.tfvars"
@@ -67,6 +87,12 @@ else
   services=("${image_names[@]}")
 fi
 
+if [ "$IMAGE_ONLY" -eq 1 ]; then
+  [ "$#" -gt 0 ] \
+    || die "DEPLOY_IMAGE_ONLY=1 requires an explicit service subset (e.g. SVC=\"lookup pipeline\")"
+  info "image-only release: the migration job and the review console are skipped"
+fi
+
 log "Deploy · env=$ENV project=$PROJECT_ID region=$REGION tag=$GIT_SHA"
 info "services: ${services[*]}"
 
@@ -74,7 +100,7 @@ info "services: ${services[*]}"
 # schema change lands before the code that expects it (release.md "Data
 # migrations"). The job is Terraform-owned (modules/db_migrate); this replaces its
 # image and runs it to completion — a failed migration stops the deploy.
-if has_db_migrations && [ -f infra/db/Dockerfile ]; then
+if [ "$IMAGE_ONLY" -eq 0 ] && has_db_migrations && [ -f infra/db/Dockerfile ]; then
   migrate_image="${REGISTRY}/db-migrate:${GIT_SHA}"
   log "Deploy · build and push $migrate_image"
   docker build -f infra/db/Dockerfile -t "$migrate_image" infra/db
@@ -130,10 +156,11 @@ done
 log "Deploy complete — canary at 5%. Promote with: make promote ENV=$ENV SVC=<service>"
 
 # The review console is a static Flutter Web app on Firebase Hosting, not a Cloud
-# Run service, so it deploys through its own path (FEAT-015). It is skipped, with
-# a warning, when the console or the Firebase CLI is not present, so a service
-# deploy never fails on the console's account.
-if has_console; then
+# Run service, so it deploys through its own path (FEAT-015). It is skipped
+# on an image-only release, and otherwise skipped, with a warning, when the
+# console or the Firebase CLI is not present, so a service deploy never fails on
+# the console's account.
+if [ "$IMAGE_ONLY" -eq 0 ] && has_console; then
   if command -v firebase >/dev/null 2>&1; then
     log "Deploy · review console (Firebase Hosting)"
     bash "$(dirname "$0")/deploy_console.sh" "$ENV"

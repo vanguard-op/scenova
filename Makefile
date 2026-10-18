@@ -183,7 +183,13 @@ env-destroy: ## Destroy the pre-revenue runtime: stop the database, keep the dat
 # already name it. A bare positional service (`make deploy ENV=… gateway`) is a
 # make goal, not an argument: make would deploy every service and then fail as an
 # unknown target. Reject it before anything ships, and point at SVC.
-deploy: ## Deploy container images to an environment (ENV=dev|staging|prod|pre-revenue; SVC=… for a subset)
+#
+# DEPLOY_IMAGE_ONLY=1 ships only those services' images and nothing else: the
+# migration job and the review console are skipped, so the deploy's image tag is
+# the only thing that changes. Use it when the schema is already at head and the
+# console build is unchanged (see ci/deploy.sh for why it also keeps a release
+# off a tree carrying an unreleased migration).
+deploy: ## Deploy container images to an environment (ENV=dev|staging|prod|pre-revenue; SVC=… subset; DEPLOY_IMAGE_ONLY=1 images only)
 	@if [ -n "$(filter-out deploy,$(MAKECMDGOALS))" ]; then \
 		echo "error: 'make deploy' takes no positional service; name a subset with SVC=…, e.g. 'make deploy ENV=$(ENV) SVC=gateway'" >&2; \
 		exit 1; \
