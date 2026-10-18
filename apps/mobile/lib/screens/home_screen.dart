@@ -227,14 +227,19 @@ class _HomeScreenState extends State<HomeScreen> {
           onRetry: _load,
         );
       case _HomeStatus.empty:
+        // The enable step is offered only while the action is off, so Home
+        // never asks the reader to enable something that already is
+        // (`FEAT-001`, `FEAT-002`; `docs/Scenova/screens/01-onboarding.md` →
+        // Edge Cases).
+        final actionEnabled = _scope.settings.actionEnabled;
         return EmptyState(
           icon: AppIcons.seeIt,
           headline: 'Look up a word while you read',
           body:
               'Select a word in a reading app and open Scenova from the menu. '
               'You can also type or paste a word above.',
-          actionLabel: 'How to enable it',
-          onAction: widget.router.openPreferences,
+          actionLabel: actionEnabled ? null : 'How to enable it',
+          onAction: actionEnabled ? null : widget.router.openPreferences,
         );
       case _HomeStatus.loaded:
         return Column(

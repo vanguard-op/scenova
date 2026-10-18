@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:scenova_design/scenova_design.dart';
 
@@ -67,11 +69,35 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // The reader returns from the reader app's settings; pick the change up so
-    // the step advances without another tap.
+    // The reader returns from the platform's own settings; ask the platform
+    // again so the step advances without another tap when the action is on now.
     if (state == AppLifecycleState.resumed) {
-      _controller?.refreshActionEnabled();
+      unawaited(_refreshActionEnabled());
     }
+  }
+
+  /// Asks the platform whether the entry point is on, applies its answer, and
+  /// advances the step when it changed.
+  ///
+  /// The platform owns this and is the only one that can say (`FEAT-001`,
+  /// `FEAT-002`); an answer it cannot give leaves the enable step in place, the
+  /// safe default, since a step that is unnecessary is better than one that is
+  /// missing.
+  Future<void> _refreshActionEnabled() async {
+    final services = ScenovaScope.of(context);
+    final enabled = await services.captureChannel.entryPointEnabled();
+    if (!mounted) return;
+    services.settings.applyEntryPoint(enabled);
+    _controller?.refreshActionEnabled();
+  }
+
+  /// The reader says the action is on now. The platform is asked again before
+  /// the step is believed, so the app does not take the reader's word for a
+  /// state only the platform can confirm.
+  Future<void> _confirmActionEnabled() async {
+    await _refreshActionEnabled();
+    if (!mounted) return;
+    _controller?.checkActionEnabled();
   }
 
   Future<void> _finish() async {
@@ -271,7 +297,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               SizedBox(height: tokens.spacing.sm),
               ScenovaButton(
                 label: "I've turned it on",
-                onPressed: controller.checkActionEnabled,
+                onPressed: controller.submitting ? null : _confirmActionEnabled,
                 variant: ScenovaButtonVariant.secondary,
               ),
             ],

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scenova/app.dart';
 import 'package:scenova/screens/home_screen.dart';
 import 'package:scenova/screens/onboarding_controller.dart';
 import 'package:scenova/screens/onboarding_screen.dart';
+import 'package:scenova/services/capture_channel.dart';
 import 'package:scenova/services/settings_controller.dart';
 import 'package:scenova/widgets/enable_action_guide.dart';
 import 'package:scenova/widgets/first_run_walkthrough.dart';
@@ -16,6 +18,20 @@ import 'support/harness.dart';
 /// not on yet and setup has not run.
 SettingsController freshInstall() =>
     SettingsController(actionEnabled: false, onboardingComplete: false);
+
+/// Scripts the platform's answer for whether the entry point is on, the way the
+/// Android selection action and the iOS extension answer it on the capture
+/// channel. `null` is an answer the platform cannot give.
+void scriptEntryPoint(bool? enabled) {
+  const channel = MethodChannel(CaptureChannel.channelName);
+  final messenger =
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+  messenger.setMockMethodCallHandler(channel, (call) async {
+    if (call.method == CaptureChannel.methodEntryPointEnabled) return enabled;
+    return null;
+  });
+  addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+}
 
 /// Taps a control, scrolling it into view first: the setup column is taller than
 /// a phone window, so the buttons sit below the fold.
@@ -232,10 +248,12 @@ void main() {
   testWidgets('checking again while the action is still off shows a reminder', (
     tester,
   ) async {
+    scriptEntryPoint(false);
     await pumpOnboarding(tester, settings: freshInstall());
 
     await tapText(tester, 'Show me how');
     await tapText(tester, "I've turned it on");
+    await tester.pumpAndSettle();
 
     expect(find.textContaining('not showing in the menu yet'), findsOneWidget);
 
@@ -244,18 +262,54 @@ void main() {
 
   testWidgets('returning with the action on advances the step', (tester) async {
     final settings = freshInstall();
+    scriptEntryPoint(true);
     await pumpOnboarding(tester, settings: settings);
 
     await tapText(tester, 'Show me how');
 
     // The platform reports the action on while the reader is away.
-    settings.actionEnabled = true;
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(find.text('Turn Scenova on there, then come back.'), findsNothing);
     expect(find.byType(EnableActionGuide), findsNothing);
     expect(find.text('Step 2 of 2'), findsOneWidget);
+
+    await teardown(tester);
+  });
+
+  testWidgets('an answer the platform cannot give keeps the enable step', (
+    tester,
+  ) async {
+    // iOS cannot say whether its share extension is enabled, so the app does not
+    // assume it is: the enable step stays rather than being hidden on a guess.
+    scriptEntryPoint(null);
+    await pumpOnboarding(tester, settings: freshInstall());
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(EnableActionGuide), findsOneWidget);
+    expect(find.text('Step 1 of 2'), findsOneWidget);
+
+    await teardown(tester);
+  });
+
+  testWidgets('the platform saying the action is on skips the enable step', (
+    tester,
+  ) async {
+    // The reader enabled the action before opening Scenova; the platform is the
+    // one that says so, and only consent is asked
+    // (`docs/Scenova/screens/01-onboarding.md` → Edge Cases).
+    scriptEntryPoint(true);
+    await pumpOnboarding(tester, settings: freshInstall());
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(EnableActionGuide), findsNothing);
+    expect(find.text('Step 2 of 2'), findsOneWidget);
+    expect(find.text('Send the word to the model provider'), findsOneWidget);
 
     await teardown(tester);
   });

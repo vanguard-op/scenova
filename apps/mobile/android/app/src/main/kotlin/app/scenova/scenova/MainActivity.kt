@@ -1,6 +1,8 @@
 package app.scenova.scenova
 
+import android.content.ComponentName
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.android.FlutterActivityLaunchConfigs.BackgroundMode
@@ -61,6 +63,11 @@ class MainActivity : FlutterActivity() {
                         if (isSelectionAction()) ENTRY_POINT_SELECTION_ACTION
                         else ENTRY_POINT_APP
                     )
+                    // Dart asks whether the system will offer the selection
+                    // action. The platform is the only one that can say.
+                    METHOD_ENTRY_POINT_ENABLED -> result.success(
+                        isEntryPointEnabled()
+                    )
                     // Dart is done with the in-place clip view, so the reading
                     // app comes back.
                     METHOD_DISMISS -> {
@@ -103,6 +110,35 @@ class MainActivity : FlutterActivity() {
     private fun isSelectionAction(): Boolean =
         intent?.action == Intent.ACTION_PROCESS_TEXT
 
+    /**
+     * Whether the system will offer Scenova in the selection menu.
+     *
+     * The reader can turn the app off in the system settings, and the action is
+     * offered only while the app and its `ACTION_PROCESS_TEXT` component are
+     * enabled. The answer is the platform's own state, not the app's
+     * assumption, so Onboarding skips the enable step when the action is already
+     * on and Home does not ask the reader to enable something that is
+     * (`FEAT-001`). A build whose action does not resolve — the reader has
+     * turned it off — answers false, which shows the guide.
+     */
+    private fun isEntryPointEnabled(): Boolean {
+        val pm = packageManager
+        if (isDisabled(pm.getApplicationEnabledSetting(packageName))) return false
+        val component = ComponentName(this, MainActivity::class.java)
+        if (isDisabled(pm.getComponentEnabledSetting(component))) return false
+        // And confirm the system still resolves the action to Scenova, so a
+        // state the app cannot otherwise see is reported as not enabled.
+        val offered = Intent(Intent.ACTION_PROCESS_TEXT).setType("text/plain")
+        return pm.queryIntentActivities(offered, 0).any {
+            it.activityInfo.packageName == packageName && it.activityInfo.enabled
+        }
+    }
+
+    private fun isDisabled(state: Int): Boolean =
+        state == PackageManager.COMPONENT_ENABLED_STATE_DISABLED ||
+            state == PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER ||
+            state == PackageManager.COMPONENT_ENABLED_STATE_DISABLED_UNTIL_USED
+
     private fun selectionFrom(intent: Intent?): String? {
         if (intent == null || intent.action != Intent.ACTION_PROCESS_TEXT) return null
         return intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString()
@@ -114,6 +150,7 @@ class MainActivity : FlutterActivity() {
         private const val METHOD_READY = "ready"
         private const val METHOD_PENDING_SELECTION = "pendingSelection"
         private const val METHOD_ENTRY_POINT = "entryPoint"
+        private const val METHOD_ENTRY_POINT_ENABLED = "entryPointEnabled"
         private const val METHOD_DISMISS = "dismiss"
         private const val ENTRY_POINT_APP = "app"
         private const val ENTRY_POINT_SELECTION_ACTION = "selectionAction"

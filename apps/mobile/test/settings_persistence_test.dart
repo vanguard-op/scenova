@@ -105,6 +105,23 @@ void main() {
     expect(store.saved, hasLength(1));
     expect(store.saved.single.consentModelProcessing, isFalse);
   });
+
+  test('an answer the platform cannot give leaves the guide in place', () {
+    final controller = SettingsController(actionEnabled: true);
+
+    // The platform owns the entry point and is the only one that can say. An
+    // unknown answer is not an enabled one: the guide is the safe default, since
+    // a step that is unnecessary is better than one that is missing
+    // (`docs/Scenova/screens/01-onboarding.md` → Edge Cases).
+    controller.applyEntryPoint(null);
+    expect(controller.actionEnabled, isFalse);
+
+    controller.applyEntryPoint(true);
+    expect(controller.actionEnabled, isTrue);
+
+    controller.applyEntryPoint(false);
+    expect(controller.actionEnabled, isFalse);
+  });
 }
 
 /// A store whose first write fails, so a later write can prove it still lands.

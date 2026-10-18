@@ -30,6 +30,7 @@ final class CaptureBridge {
   private static let methodCapture = "capture"
   private static let methodReady = "ready"
   private static let methodPendingSelection = "pendingSelection"
+  private static let methodEntryPointEnabled = "entryPointEnabled"
 
   private var channel: FlutterMethodChannel?
   private var isReady = false
@@ -82,6 +83,11 @@ final class CaptureBridge {
       result(takePending())
     case Self.methodReady:
       isReady = true
+      result(nil)
+    case Self.methodEntryPointEnabled:
+      // iOS exposes no API for whether the share extension is enabled in the
+      // share sheet, so the app cannot say. An unknown answer is not an enabled
+      // one: Dart shows the enable guide, the safe default (`FEAT-002`).
       result(nil)
     default:
       result(FlutterMethodNotImplemented)

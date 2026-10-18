@@ -49,6 +49,9 @@ class CaptureChannel {
   /// Dart to native: which entry point launched this process.
   static const String methodEntryPoint = 'entryPoint';
 
+  /// Dart to native: whether the platform's entry point is enabled.
+  static const String methodEntryPointEnabled = 'entryPointEnabled';
+
   /// Dart to native: the reader is done with the in-place clip view, so the
   /// activity closes and the reading app comes back.
   static const String methodDismiss = 'dismiss';
@@ -75,6 +78,29 @@ class CaptureChannel {
       return CaptureEntryPoint.app;
     } on PlatformException {
       return CaptureEntryPoint.app;
+    }
+  }
+
+  /// Whether the platform's entry point — the Android selection action, the
+  /// iOS share or action extension — is enabled.
+  ///
+  /// `true` and `false` are the platform's own answer. `null` means the platform
+  /// cannot say: iOS exposes no API for whether the share extension is on in the
+  /// share sheet, and a build with no entry point has no host to ask. An unknown
+  /// answer is not the same as an enabled one — the caller shows the enable
+  /// guide, since a step that is unnecessary is better than a step that is
+  /// missing (`docs/Scenova/screens/01-onboarding.md` → Edge Cases).
+  ///
+  /// The platform owns this state; the app re-reads it each launch and on each
+  /// return to the foreground rather than storing it with the reader's
+  /// preferences.
+  Future<bool?> entryPointEnabled() async {
+    try {
+      return await _channel.invokeMethod<bool>(methodEntryPointEnabled);
+    } on MissingPluginException {
+      return null;
+    } on PlatformException {
+      return null;
     }
   }
 

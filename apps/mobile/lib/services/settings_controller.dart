@@ -167,4 +167,14 @@ class SettingsController extends ChangeNotifier {
     _actionEnabled = value;
     notifyListeners();
   }
+
+  /// Applies the platform's answer for whether the entry point is enabled.
+  ///
+  /// An answer the platform cannot give (`null`) reads as not enabled, so the
+  /// entry gate shows the guide: it is better to show a step that is
+  /// unnecessary than to hide one that is needed
+  /// (`docs/Scenova/screens/01-onboarding.md` → Edge Cases). The platform owns
+  /// the state, so nothing is written to the store; the app re-reads it each
+  /// launch and on each return to the foreground.
+  void applyEntryPoint(bool? enabled) => actionEnabled = enabled ?? false;
 }

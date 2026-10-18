@@ -5,6 +5,8 @@ import 'package:scenova/models/history_entry.dart';
 import 'package:scenova/screens/clip_view_screen.dart';
 import 'package:scenova/services/capture_intake.dart';
 import 'package:scenova/services/history_store.dart';
+import 'package:scenova/services/settings_controller.dart';
+import 'package:scenova/widgets/enable_action_guide.dart';
 import 'package:scenova_design/scenova_design.dart';
 
 import 'support/harness.dart';
@@ -174,4 +176,35 @@ void main() {
       await teardown(tester);
     },
   );
+
+  testWidgets('Home does not ask to enable the action when it is already on', (
+    tester,
+  ) async {
+    await pumpHarness(
+      tester,
+      settings: SettingsController()..actionEnabled = true,
+    );
+    await tester.pump();
+
+    // Neither the enable card nor the empty state's enable step is offered: the
+    // reader is not asked to turn on something the platform says is on
+    // (`FEAT-001`, `FEAT-002`).
+    expect(find.byType(EnableActionGuide), findsNothing);
+    expect(find.text('How to enable it'), findsNothing);
+    await teardown(tester);
+  });
+
+  testWidgets('Home shows how to enable the action when it is off', (
+    tester,
+  ) async {
+    await pumpHarness(
+      tester,
+      settings: SettingsController()..actionEnabled = false,
+    );
+    await tester.pump();
+
+    expect(find.byType(EnableActionGuide), findsOneWidget);
+    expect(find.text('How to enable it'), findsOneWidget);
+    await teardown(tester);
+  });
 }

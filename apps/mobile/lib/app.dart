@@ -114,6 +114,10 @@ class _ScenovaAppState extends State<ScenovaApp> with WidgetsBindingObserver {
         // elsewhere — a purchase on another device — is re-read.
         unawaited(widget.services.featureFlags.refresh());
         unawaited(widget.services.entitlements.refresh());
+        // The reader may have turned the entry point on or off while they were
+        // away (the Android app's settings, the iOS share sheet), so the app's
+        // belief is re-read from the platform (`FEAT-001`, `FEAT-002`).
+        unawaited(_refreshEntryPoint());
       case AppLifecycleState.hidden:
       case AppLifecycleState.paused:
       case AppLifecycleState.detached:
@@ -176,6 +180,17 @@ class _ScenovaAppState extends State<ScenovaApp> with WidgetsBindingObserver {
         .platformDispatcher
         .accessibilityFeatures
         .disableAnimations;
+  }
+
+  /// Re-reads whether the platform entry point is enabled, so the app's belief
+  /// follows the platform after the reader has been in its settings.
+  ///
+  /// The platform owns the state and is the only one that can say; an answer it
+  /// cannot give leaves the enable guide in place, the safe default.
+  Future<void> _refreshEntryPoint() async {
+    final enabled = await widget.services.captureChannel.entryPointEnabled();
+    if (!mounted) return;
+    widget.services.settings.applyEntryPoint(enabled);
   }
 
   void _refreshDeviceClass() {

@@ -146,6 +146,46 @@ void main() {
     expect(await capture.entryPoint(), CaptureEntryPoint.app);
   });
 
+  testWidgets('reads the platform answer for whether the entry point is on', (
+    tester,
+  ) async {
+    mockPlatform((call) async {
+      if (call.method == CaptureChannel.methodEntryPointEnabled) return true;
+      return null;
+    });
+
+    final capture = CaptureChannel();
+    addTearDown(capture.dispose);
+
+    expect(await capture.entryPointEnabled(), isTrue);
+  });
+
+  testWidgets('reads a disabled entry point as off', (tester) async {
+    mockPlatform((call) async {
+      if (call.method == CaptureChannel.methodEntryPointEnabled) return false;
+      return null;
+    });
+
+    final capture = CaptureChannel();
+    addTearDown(capture.dispose);
+
+    expect(await capture.entryPointEnabled(), isFalse);
+  });
+
+  testWidgets('an answer the platform cannot give reads as unknown', (
+    tester,
+  ) async {
+    // iOS exposes no API for the share-sheet toggle, and a build with no entry
+    // point has no host; both leave the app unable to say, and the guide is the
+    // safe default rather than an assumed "on".
+    mockPlatform((call) async => throw MissingPluginException());
+
+    final capture = CaptureChannel();
+    addTearDown(capture.dispose);
+
+    expect(await capture.entryPointEnabled(), isNull);
+  });
+
   testWidgets('closing the in-place view asks the platform to finish', (
     tester,
   ) async {

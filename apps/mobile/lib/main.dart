@@ -52,6 +52,13 @@ Future<void> main() async {
   // The entry point is read before the first frame too, so a launch from the
   // Android selection action opens the clip in place rather than flashing Home.
   final entryPoint = await services.captureChannel.entryPoint();
+  // Whether the entry point is already enabled is the platform's answer, read
+  // here so Onboarding skips the enable step when it is and Home does not ask
+  // the reader to enable an action that is (`FEAT-001`, `FEAT-002`). An answer
+  // the platform cannot give leaves the guide in place, the safe default.
+  services.settings.applyEntryPoint(
+    await services.captureChannel.entryPointEnabled(),
+  );
   runApp(ScenovaApp(services: services, entryPoint: entryPoint));
 }
 
