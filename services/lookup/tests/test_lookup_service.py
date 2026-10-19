@@ -14,6 +14,7 @@ from lookup.app.errors import (
     SelectionTooLongError,
 )
 from lookup.app.generation import (
+    MAX_WORD_JOB_ATTEMPTS,
     GenerationJobStatus,
     GenerationUnavailableError,
     word_job_id,
@@ -478,6 +479,73 @@ async def test_a_generation_another_lookup_already_started_is_not_an_error() -> 
 
     assert response.status == LookupStatus.GENERATING
     assert response.notice is None
+
+
+@pytest.mark.asyncio
+async def test_a_generation_that_ended_without_a_clip_is_attempted_again() -> None:
+    # A failed attempt holds its job id for good, so a later lookup must carry a
+    # fresh one rather than be read as still generating (FEAT-005).
+    generation = RecordingGenerationClient()
+    spent = word_job_id("come", "arrive", PartOfSpeech.VERB)
+    generation.statuses[spent] = GenerationJobStatus.FAILED
+
+    response = await _service(generation=generation).create_lookup(_request("coming"), "corr")
+
+    retry = word_job_id("come", "arrive", PartOfSpeech.VERB, attempt=1)
+    assert response.status == LookupStatus.GENERATING
+    assert [job.job_id for job in generation.jobs] == [retry]
+    assert generation.jobs[0].attempt == 1
+    assert generation.status_calls == [spent]
+
+
+@pytest.mark.asyncio
+async def test_a_generation_still_running_is_shared_not_attempted_again() -> None:
+    # The attempt already in flight is the one both lookups are served by; a
+    # second attempt would be a duplicate model call (FEAT-005 edge).
+    generation = RecordingGenerationClient()
+    running = word_job_id("come", "arrive", PartOfSpeech.VERB)
+    generation.statuses[running] = GenerationJobStatus.RUNNING
+
+    response = await _service(generation=generation).create_lookup(_request("coming"), "corr")
+
+    assert response.status == LookupStatus.GENERATING
+    assert generation.jobs == []
+    assert generation.status_calls == [running]
+
+
+@pytest.mark.asyncio
+async def test_a_shared_attempt_whose_state_cannot_be_read_stays_generating() -> None:
+    # A transient pipeline fault on the status consult must never drop the reader
+    # to the fallback while the generation may still be running (FEAT-005).
+    generation = RecordingGenerationClient(
+        shared=True, status_error=GenerationUnavailableError("unreachable")
+    )
+
+    response = await _service(generation=generation).create_lookup(_request("coming"), "corr")
+
+    assert response.status == LookupStatus.GENERATING
+    assert response.notice is None
+
+
+@pytest.mark.asyncio
+async def test_a_word_that_keeps_failing_settles_on_the_fallback() -> None:
+    # The retries are bounded, so a word that keeps failing stops spending model
+    # calls and settles on the fallback honestly (FEAT-005).
+    generation = RecordingGenerationClient()
+    for attempt in range(MAX_WORD_JOB_ATTEMPTS):
+        generation.statuses[word_job_id("come", "arrive", PartOfSpeech.VERB, attempt=attempt)] = (
+            GenerationJobStatus.DECLINED
+        )
+
+    response = await _service(generation=generation).create_lookup(_request("coming"), "corr")
+
+    assert response.status == LookupStatus.FALLBACK
+    assert response.notice == GENERATION_FAILED_NOTICE
+    assert generation.jobs == []
+    # The word and phrase still show; only the clip is unavailable.
+    assert response.normalisedLemma == "come"
+    assert response.senses[0].glossPhrase == "to move toward or reach a place"
+    assert response.senses[0].clip is None
 
 
 @pytest.mark.asyncio

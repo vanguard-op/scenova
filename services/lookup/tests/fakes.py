@@ -37,9 +37,11 @@ class RecordingGenerationClient:
 
     `error` stands in for an unavailable pipeline; `shared` stands in for the
     pipeline's 409 when another lookup already enqueued the same job. `statuses`
-    maps a job id to the state the pipeline reports for it (C-006); an unknown id
-    reports as still queued, and `status_error` stands in for an unreachable
-    pipeline on a status consult.
+    maps a job id to the state the pipeline reports for it (C-006), and also
+    stands in for the rows the pipeline already holds: enqueueing an id it names
+    is refused as already enqueued, the way the pipeline refuses a repeated id. An
+    unknown id reports as still queued, and `status_error` stands in for an
+    unreachable pipeline on a status consult.
     """
 
     def __init__(
@@ -60,7 +62,7 @@ class RecordingGenerationClient:
     async def enqueue(self, job: GenerationJob) -> None:
         if self.error is not None:
             raise self.error
-        if self.shared:
+        if self.shared or job.job_id in self.statuses:
             raise GenerationAlreadyEnqueuedError("This generation is already enqueued.")
         self.jobs.append(job)
 

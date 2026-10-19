@@ -16,6 +16,14 @@ personal data, so the id is an opaque digest of the key and never the word.
 A generation can also end without a clip. On a later lookup poll the service
 asks the pipeline for the job's state (C-006); a job that failed or was declined
 resolves the reader's lookup to the fallback (FEAT-005).
+
+A pipeline row is kept for good, so a job id that ended without a clip would
+block that word forever: every later lookup would compute the same id and be
+refused, and the word would never be served. A retry therefore carries its own
+id, salted with the attempt (`word_job_id`): the first attempt keeps the shared
+id, and a later one is a fresh job the pipeline accepts. The retries are bounded
+(`MAX_WORD_JOB_ATTEMPTS`), so a word that keeps failing settles on the fallback
+instead of spending a model call on every lookup (FEAT-005).
 """
 
 from __future__ import annotations
@@ -35,6 +43,12 @@ logger = logging.getLogger(__name__)
 
 # Clips are capped at four seconds, so a generation targets the cap.
 CLIP_TARGET_SECONDS = 4.0
+
+# How many times one missing word sense is handed to generation before it settles
+# on the fallback. Each attempt carries its own job id, so an attempt that ended
+# without a clip does not block the next one; the bound stops a word that keeps
+# failing from spending a model call on every later lookup (FEAT-005).
+MAX_WORD_JOB_ATTEMPTS = 3
 
 
 class GenerationUnavailableError(Exception):
@@ -109,18 +123,24 @@ def word_job_id(
     part_of_speech: PartOfSpeech,
     *,
     regeneration: str | None = None,
+    attempt: int = 0,
 ) -> str:
-    """A stable job id for one missing word sense, so lookups share its generation.
+    """A stable job id for one missing word sense's generation attempt.
 
     ``regeneration`` salts the id with the entry a miss superseded (a held or
-    retired one). The id stays stable while a generation is in flight — concurrent
-    lookups compute the same one and share it — but changes once that entry has
-    been replaced, so a retired clip can be regenerated (FEAT-006).
+    retired one), so a retired clip can be regenerated (FEAT-006). ``attempt``
+    salts it for a retry: the first attempt keeps the id concurrent lookups share
+    while a generation is in flight, and each later attempt carries its own id so
+    the pipeline accepts it rather than refusing it as already enqueued — a job
+    that ended without a clip holds its id for good (FEAT-005). The selection is
+    personal data, so the word never appears in the id.
     """
 
     key = f"word:{lemma.casefold()}:{sense_label}:{part_of_speech.value}"
     if regeneration is not None:
         key = f"{key}:{regeneration}"
+    if attempt > 0:
+        key = f"{key}:attempt:{attempt}"
     return _digest(key)
 
 

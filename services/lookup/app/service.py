@@ -16,6 +16,14 @@ first would name a lookup the database does not hold yet and be refused. When th
 pipeline cannot accept the job the reader still gets the word and phrase, marked
 as the fallback.
 
+A job that ended without a clip holds its id for good, so a later lookup for the
+same word must not be mistaken for one that is already generating. Each attempt
+carries its own job id, and a repeated id is read through C-006: an attempt still
+queued, running, or finished is shared, while one that failed or was declined
+gives way to the next attempt — bounded by `MAX_WORD_JOB_ATTEMPTS`, after which
+the reader settles on the fallback rather than the word being retried on every
+lookup forever (FEAT-005).
+
 FEAT-006 is wired here too. The shared library is read on the fast path: an
 active entry is served without a generation, a retired one is a miss whose id
 seeds the replacement, and an unreachable library falls back to generation
@@ -60,6 +68,7 @@ from .errors import (
 )
 from .generation import (
     CLIP_TARGET_SECONDS,
+    MAX_WORD_JOB_ATTEMPTS,
     GenerationAlreadyEnqueuedError,
     GenerationClient,
     GenerationJob,
@@ -142,17 +151,42 @@ class _MeterReading:
 
 
 @dataclass(frozen=True)
-class _Resolution:
-    """A lookup as it resolved, and the generation jobs it is waiting on.
+class _JobSlot:
+    """One generation slot: the same missing sense at each bounded attempt.
 
-    The jobs are held beside the record rather than enqueued as the lookup
+    A word's attempts carry their own job ids, so an attempt that ended without a
+    clip is not mistaken for one still running (FEAT-005); a phrase's job is keyed
+    by its lookup, so it has a single attempt.
+    """
+
+    attempts: tuple[GenerationJob, ...]
+
+
+@dataclass(frozen=True)
+class _GenerationHandoff:
+    """One slot as it resolved when the lookup was handed over.
+
+    ``job_id`` is the id the lookup records for the slot; ``in_flight`` says
+    whether a generation may still produce a clip. A slot whose bounded attempts
+    are all spent comes back with its last attempt's id and ``in_flight`` False.
+    """
+
+    job_id: str
+    in_flight: bool
+
+
+@dataclass(frozen=True)
+class _Resolution:
+    """A lookup as it resolved, and the generation slots it is waiting on.
+
+    The slots are held beside the record rather than enqueued as the lookup
     resolves: each job names this lookup and the pipeline's row holds a foreign
     key to it (schema "GenerationJob": `lookupId`), so the record must be durable
     before the hand-off (C-003).
     """
 
     stored: StoredLookup
-    jobs: tuple[GenerationJob, ...] = ()
+    slots: tuple[_JobSlot, ...] = ()
 
 
 class LookupService:
@@ -201,12 +235,21 @@ class LookupService:
             # enqueue that arrived first would name a lookup that is not there.
             stored = resolution.stored
             await self._store.add(stored)
-            if resolution.jobs and not await self._enqueue(resolution.jobs):
-                # The job was never accepted, so the record must not claim a
-                # generation: a poll of it would otherwise wait on a clip that
-                # no job will produce. The word and phrase still show.
-                stored = _generation_unavailable(stored)
-                await self._store.add(stored)
+            if resolution.slots:
+                handoffs = await self._enqueue_slots(resolution.slots)
+                if handoffs is None:
+                    # The job was never accepted, so the record must not claim a
+                    # generation: a poll of it would otherwise wait on a clip that
+                    # no job will produce. The word and phrase still show.
+                    updated = _generation_unavailable(stored)
+                else:
+                    # The id a slot resolved to can differ from the one recorded —
+                    # a retry past an attempt that ended without a clip — so the
+                    # record is rewritten rather than left naming a spent job.
+                    updated = _handed_off(stored, handoffs)
+                if updated is not stored:
+                    stored = updated
+                    await self._store.add(stored)
         return stored.to_create_response(correlation_id)
 
     async def get_lookup(self, lookup_id: str, subject: str, correlation_id: str) -> LookupResponse:
@@ -344,21 +387,23 @@ class LookupService:
         senses = tuple(resolution.sense for resolution in resolved_senses)
         status = _word_status(request.consentModelProcessing, senses)
         lookup_id = _new_id()
-        jobs: tuple[GenerationJob, ...] = ()
+        slots: tuple[_JobSlot, ...] = ()
         if status is LookupStatus.GENERATING:
             missing = [
                 (record, resolution.regeneration_seed)
                 for record, resolution in zip(records, resolved_senses, strict=True)
                 if resolution.sense.clip is None
             ]
-            jobs = tuple(
-                _word_jobs(
+            slots = tuple(
+                _word_slot(
                     lookup_id,
                     lemma,
-                    missing,
+                    record,
+                    seed,
                     model_pin=self._clip_model_pin,
                     target_duration=self._target_duration,
                 )
+                for record, seed in missing
             )
         return _Resolution(
             stored=_stored(
@@ -370,9 +415,9 @@ class LookupService:
                 status,
                 senses,
                 None,
-                generation_job_ids=tuple(job.job_id for job in jobs),
+                generation_job_ids=tuple(slot.attempts[0].job_id for slot in slots),
             ),
-            jobs=jobs,
+            slots=slots,
         )
 
     async def _phrase_lookup(
@@ -415,7 +460,7 @@ class LookupService:
                 None,
                 generation_job_ids=(job.job_id,),
             ),
-            jobs=(job,),
+            slots=(_JobSlot(attempts=(job,)),),
         )
 
     def _exhausted_lookup(
@@ -486,19 +531,61 @@ class LookupService:
             None,
         )
 
-    async def _enqueue(self, jobs: Sequence[GenerationJob]) -> bool:
-        """Hand jobs to the pipeline; False when one cannot be accepted."""
+    async def _enqueue_slots(
+        self, slots: Sequence[_JobSlot]
+    ) -> tuple[_GenerationHandoff, ...] | None:
+        """Hand each slot to the pipeline; None when a job cannot be accepted."""
 
-        for job in jobs:
+        handoffs = []
+        for slot in slots:
+            handoff = await self._enqueue_slot(slot)
+            if handoff is None:
+                return None
+            handoffs.append(handoff)
+        return tuple(handoffs)
+
+    async def _enqueue_slot(self, slot: _JobSlot) -> _GenerationHandoff | None:
+        """Hand one slot over, working past an attempt that ended without a clip.
+
+        Each attempt is tried in order. A repeated job id means the pipeline
+        already holds that attempt: it is shared when it may still serve, and
+        otherwise the next attempt is tried, up to the bound (FEAT-005). None
+        means the pipeline could not accept a job at all, so the reader gets the
+        unavailable notice; when every attempt is spent the last attempt's id
+        comes back unshared, so the lookup settles on the fallback.
+        """
+
+        last_job_id = slot.attempts[0].job_id
+        for job in slot.attempts:
+            last_job_id = job.job_id
             try:
                 await self._generation.enqueue(job)
             except GenerationAlreadyEnqueuedError:
-                # Another lookup for the same key already started this
-                # generation; both lookups are served by its result.
+                # Another lookup for the same key already started this attempt,
+                # or a spent one is still on record. Its state (C-006) decides
+                # whether to share it or move on to the next attempt.
+                if await self._attempt_may_still_serve(job.job_id):
+                    return _GenerationHandoff(job_id=job.job_id, in_flight=True)
                 continue
             except GenerationUnavailableError:
-                return False
-        return True
+                return None
+            return _GenerationHandoff(job_id=job.job_id, in_flight=True)
+        return _GenerationHandoff(job_id=last_job_id, in_flight=False)
+
+    async def _attempt_may_still_serve(self, job_id: str) -> bool:
+        """Whether an already-enqueued attempt can still produce a clip.
+
+        A job still queued or running, or one that finished successfully, may
+        still serve; one the pipeline reports failed or declined never will. A
+        status consult that cannot be reached is treated as still in flight, so a
+        transient fault never drops the reader to the fallback (FEAT-005).
+        """
+
+        try:
+            status = await self._generation.status(job_id)
+        except GenerationUnavailableError:
+            return True
+        return status is not None and status not in _STOPPED_WITHOUT_CLIP
 
     async def _refresh(self, stored: StoredLookup) -> StoredLookup:
         """Resolve a poll against the library and the pipeline's job states.
@@ -632,37 +719,45 @@ def build_default_service(settings: Settings | None = None) -> LookupService:
     )
 
 
-def _word_jobs(
+def _word_slot(
     lookup_id: str,
     lemma: str,
-    missing: list[tuple[SenseRecord, str | None]],
+    record: SenseRecord,
+    seed: str | None,
     *,
     model_pin: str,
     target_duration: float,
-) -> list[GenerationJob]:
+) -> _JobSlot:
     # A word job leaves the phrase null: the pipeline generates the gloss phrase
     # from the word, its part of speech, and the sense hint (C-003, C-004). A miss
     # that superseded a held or retired entry salts the job id with that entry, so
-    # the replacement is not refused as a duplicate generation (FEAT-006).
-    return [
-        GenerationJob(
-            job_id=word_job_id(
-                lemma,
-                record.sense_label,
-                record.part_of_speech,
-                regeneration=seed,
-            ),
-            lookup_id=lookup_id,
-            kind=Kind.WORD,
-            lemma=lemma,
-            phrase=None,
-            sense_label=record.sense_label,
-            part_of_speech=record.part_of_speech,
-            target_duration_seconds=target_duration,
-            model_pin=model_pin,
+    # the replacement is not refused as a duplicate generation (FEAT-006). Each
+    # bounded attempt carries its own job id, so an attempt that ended without a
+    # clip gives way to the next one rather than holding the word for good
+    # (FEAT-005).
+    return _JobSlot(
+        attempts=tuple(
+            GenerationJob(
+                job_id=word_job_id(
+                    lemma,
+                    record.sense_label,
+                    record.part_of_speech,
+                    regeneration=seed,
+                    attempt=attempt,
+                ),
+                lookup_id=lookup_id,
+                kind=Kind.WORD,
+                lemma=lemma,
+                phrase=None,
+                sense_label=record.sense_label,
+                part_of_speech=record.part_of_speech,
+                target_duration_seconds=target_duration,
+                model_pin=model_pin,
+                attempt=attempt,
+            )
+            for attempt in range(MAX_WORD_JOB_ATTEMPTS)
         )
-        for record, seed in missing
-    ]
+    )
 
 
 def _account_id(request: CreateLookupRequest, reading: _MeterReading) -> str | None:
@@ -727,6 +822,29 @@ def _clip(entry: LibraryEntry) -> Clip:
         resolution=entry.clip.resolution,
         hasAudio=entry.clip.has_audio,
     )
+
+
+def _handed_off(stored: StoredLookup, handoffs: tuple[_GenerationHandoff, ...]) -> StoredLookup:
+    """The lookup as its hand-off resolved: the jobs it waits on, or the fallback.
+
+    Every slot that reached the pipeline contributes its job id, including one
+    whose attempts are all spent: a later poll then reads that terminal failure
+    and stops generating too. When no slot is in flight no clip is coming, so the
+    lookup settles on the fallback rather than reporting a generation that is not
+    running (FEAT-005).
+    """
+
+    job_ids = tuple(handoff.job_id for handoff in handoffs)
+    if not any(handoff.in_flight for handoff in handoffs):
+        return replace(
+            stored,
+            status=LookupStatus.FALLBACK,
+            notice=GENERATION_FAILED_NOTICE,
+            generation_job_ids=job_ids,
+        )
+    if job_ids == stored.generation_job_ids:
+        return stored
+    return replace(stored, generation_job_ids=job_ids)
 
 
 def _generation_unavailable(stored: StoredLookup) -> StoredLookup:
