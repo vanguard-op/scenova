@@ -70,6 +70,7 @@ docs/           BPRD (product-shaper)
 - Run `make ci` in full before reporting: a scoped lint, type or test check is not the gate, and two typing slips have reached `dev` through checks narrowed to a directory.
 - A push cancels the branch's in-flight CI run (`cancel-in-progress`): read a run's result before pushing again, or the verification you were waiting on is the one you discarded.
 - `.delivery/**` and `.scratch/**` are gitignored.
+- Client build inputs live in a gitignored root `.env.<environment>` file named for the infra slot it targets (`.env.pre-revenue`, `.env.staging`, `.env.prod`); the root `.env` is local development only.
 
 ## Behavior Rules
 - Send only the selected word or phrase to the model provider; page content is never read or transmitted.
@@ -175,6 +176,7 @@ docs/           BPRD (product-shaper)
 | D-037 | A generation job carries exactly one origin — the reader lookup that started it, or the library entry a report or a curator regenerates — and the store records that origin | Report- and curator-started generation has no reader lookup behind it, so the store refused every such job and both paths wrote nothing on a store-backed deployment; settled in the schema via `product-shaper` at the user's direction, with C-003 and C-006 revised to match | user |
 | D-039 | The clip-view card is headed by the product lockup and reaches the report sheet from an icon in its action row, and the selection entry reads "Ask Scenova" | The word already appears in the word-and-phrase header under the clip, so the top line names the product instead of repeating it; the labelled Report button grew the card toward full screen, and it sat beside a rating drawn with the same flag, so the two were indistinguishable | user |
 | D-040 | A word whose generation ended without a clip is attempted again on a later lookup, bounded at three attempts | A word job's id is derived from the word and the pipeline never expires its row, so one failure held that id for good: every later attempt was refused as already enqueued and the reader was dropped to a fallback inviting them to try again, which could not work. The bound keeps a word that keeps failing from spending model credit on every later lookup | lead |
+| D-041 | The client's build inputs for a deployed environment live in a gitignored root `.env.<environment>` file named for the infra slot it targets, and the root `.env` stays one file for local development | The client is the only artifact whose build inputs differ per deployed environment, and the root `.env` also carries the local stack's config, so a build pointed at it compiled values the bundle has no business holding. Splitting that file per consumer would break the schema's one-name-one-meaning rule and the single file `make env` validates, so the deployed build inputs separate out instead | user |
 
 ## Definition of Done
 - **Task:** the acceptance criteria in the cited feature doc are met; the frozen contract is conformed; unit tests pass; format, lint, analyze, and build are clean; work is committed to the dev branch and confined to `Own`.
