@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 
 from gateway.app.api import create_app
@@ -183,9 +184,13 @@ def test_a_missing_token_is_unauthorized() -> None:
     assert response.json()["code"] == "unauthorized"
 
 
-def test_an_unknown_rating_is_a_bad_request() -> None:
+@pytest.mark.parametrize("rating", ["great", "wrong"])
+def test_an_unknown_rating_is_a_bad_request(rating: str) -> None:
+    # `wrong` is no longer a writable rating; it is refused here like any other
+    # unknown value, and the reader reports a wrong meaning through C-013
+    # (C-012 revision 1).
     with _client(_FakeFeedbackClient()) as client:
-        response = client.post("/v1/feedback", json={**_FEEDBACK, "rating": "great"}, headers=_AUTH)
+        response = client.post("/v1/feedback", json={**_FEEDBACK, "rating": rating}, headers=_AUTH)
 
     assert response.status_code == 400
     assert response.json()["code"] == "invalid_request"

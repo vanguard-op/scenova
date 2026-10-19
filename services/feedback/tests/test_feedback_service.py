@@ -19,7 +19,7 @@ from feedback.app.errors import (
 from feedback.app.models import (
     FeedbackRequest,
     LookupStatus,
-    Rating,
+    RatingChoice,
     ReportReason,
     ReportRequest,
     ReportStatus,
@@ -28,7 +28,7 @@ from feedback.tests.fakes import SUBJECT, entry_view, phrase_lookup, rig, word_l
 
 
 def _rating(
-    *, lookup_id: str = "lk_1", rating: Rating = Rating.HELPFUL, client_id: str = "cf_1"
+    *, lookup_id: str = "lk_1", rating: RatingChoice = RatingChoice.HELPFUL, client_id: str = "cf_1"
 ) -> FeedbackRequest:
     return FeedbackRequest(lookupId=lookup_id, rating=rating, clientFeedbackId=client_id)
 
@@ -63,7 +63,7 @@ async def test_a_helpful_rating_is_recorded_against_the_entry() -> None:
 async def test_a_negative_rating_flags_the_entry_below_the_threshold() -> None:
     rigged = rig(word_lookup(), threshold=3)
 
-    await rigged.service.record_feedback(_rating(rating=Rating.NOT_HELPFUL), SUBJECT)
+    await rigged.service.record_feedback(_rating(rating=RatingChoice.NOT_HELPFUL), SUBJECT)
 
     assert await rigged.store.is_flagged("le_1") is True
     # A single flag is not yet a queue item; only the threshold queues it.
@@ -74,8 +74,12 @@ async def test_a_negative_rating_flags_the_entry_below_the_threshold() -> None:
 async def test_the_threshold_queues_the_entry_for_review() -> None:
     rigged = rig(word_lookup(subjects=("reader-1", "reader-2")), threshold=2)
 
-    await rigged.service.record_feedback(_rating(rating=Rating.WRONG, client_id="cf_1"), "reader-1")
-    await rigged.service.record_feedback(_rating(rating=Rating.WRONG, client_id="cf_2"), "reader-2")
+    await rigged.service.record_feedback(
+        _rating(rating=RatingChoice.NOT_HELPFUL, client_id="cf_1"), "reader-1"
+    )
+    await rigged.service.record_feedback(
+        _rating(rating=RatingChoice.NOT_HELPFUL, client_id="cf_2"), "reader-2"
+    )
 
     item = await rigged.store.queue_item("le_1")
     assert item is not None
@@ -88,8 +92,12 @@ async def test_a_repeated_rating_replaces_the_readers_latest() -> None:
     # a reader who changes to helpful no longer counts against the entry.
     rigged = rig(word_lookup(), threshold=2)
 
-    await rigged.service.record_feedback(_rating(rating=Rating.WRONG, client_id="cf_1"), SUBJECT)
-    await rigged.service.record_feedback(_rating(rating=Rating.HELPFUL, client_id="cf_2"), SUBJECT)
+    await rigged.service.record_feedback(
+        _rating(rating=RatingChoice.NOT_HELPFUL, client_id="cf_1"), SUBJECT
+    )
+    await rigged.service.record_feedback(
+        _rating(rating=RatingChoice.HELPFUL, client_id="cf_2"), SUBJECT
+    )
 
     assert await rigged.store.negative_raters("le_1") == 0
     assert await rigged.store.is_flagged("le_1") is False
@@ -125,7 +133,7 @@ async def test_a_reused_key_with_a_different_rating_conflicts() -> None:
     await rigged.service.record_feedback(_rating(), SUBJECT)
 
     with pytest.raises(ClientFeedbackIdConflictError):
-        await rigged.service.record_feedback(_rating(rating=Rating.WRONG), SUBJECT)
+        await rigged.service.record_feedback(_rating(rating=RatingChoice.NOT_HELPFUL), SUBJECT)
 
 
 @pytest.mark.asyncio

@@ -64,6 +64,22 @@ def test_an_unknown_rating_is_a_bad_request() -> None:
     assert response.json()["code"] == "invalid_request"
 
 
+def test_the_wrong_rating_is_refused_as_unknown() -> None:
+    # `wrong` is no longer a writable rating: the reader reports a wrong meaning
+    # through C-013 instead, so a request carrying it is refused like any other
+    # unknown rating and records nothing (C-012 revision 1).
+    rigged = rig(word_lookup())
+
+    with make_client(service=rigged.service) as client:
+        response = client.post("/v1/feedback", headers=AUTH, json=feedback_body(rating="wrong"))
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "invalid_request"
+    # Refused before any lookup was read, so nothing was recorded for the reader.
+    assert rigged.lookups.calls == []
+    assert rigged.store._feedback_by_client == {}
+
+
 def test_a_missing_field_is_a_bad_request() -> None:
     body = feedback_body()
     body.pop("clientFeedbackId")
@@ -106,7 +122,9 @@ def test_a_reused_key_with_a_different_rating_conflicts() -> None:
 
     with make_client(service=rigged.service) as client:
         client.post("/v1/feedback", headers=AUTH, json=feedback_body())
-        response = client.post("/v1/feedback", headers=AUTH, json=feedback_body(rating="wrong"))
+        response = client.post(
+            "/v1/feedback", headers=AUTH, json=feedback_body(rating="not_helpful")
+        )
 
     assert response.status_code == 409
     assert response.json()["code"] == "client_feedback_id_conflict"

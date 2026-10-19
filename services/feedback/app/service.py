@@ -44,6 +44,7 @@ from .models import (
     FeedbackResponse,
     LookupKind,
     LookupStatus,
+    Rating,
     ReportRequest,
     ReportResponse,
     ReportStatus,
@@ -99,10 +100,13 @@ class FeedbackService:
         self._write_lock = asyncio.Lock()
 
     async def record_feedback(self, request: FeedbackRequest, subject: str) -> FeedbackResponse:
+        # A request carries only a writable rating; the record keeps the wider
+        # `Rating`, so a legacy `wrong` is read back as the reader gave it (C-015).
+        rating = Rating(request.rating.value)
         async with self._write_lock:
             existing = await self._store.feedback_for_client(subject, request.clientFeedbackId)
             if existing is not None:
-                if existing.rating is not request.rating or existing.lookup_id != request.lookupId:
+                if existing.rating is not rating or existing.lookup_id != request.lookupId:
                     raise ClientFeedbackIdConflictError(
                         "This clientFeedbackId was already used with a different rating."
                     )
@@ -114,13 +118,13 @@ class FeedbackService:
                 lookup_id=request.lookupId,
                 subject=subject,
                 client_feedback_id=request.clientFeedbackId,
-                rating=request.rating,
+                rating=rating,
                 entry_ids=record.served_entry_ids,
                 created_at=_now(),
             )
             await self._store.add_feedback(feedback)
             for entry_id in record.served_entry_ids:
-                await self._store.set_entry_rating(subject, entry_id, request.rating)
+                await self._store.set_entry_rating(subject, entry_id, rating)
                 await self._refresh_entry(entry_id)
         return FeedbackResponse(recorded=True)
 

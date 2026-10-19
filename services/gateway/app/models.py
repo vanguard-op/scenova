@@ -74,12 +74,16 @@ class RegisterPushRequest(BaseModel):
 
 
 class FeedbackRequest(BaseModel):
-    """The C-012 request body."""
+    """The C-012 request body.
+
+    `wrong` is refused here as an unknown rating; the reader reports a wrong
+    meaning through C-013 instead.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     lookupId: str
-    rating: Literal["helpful", "not_helpful", "wrong"]
+    rating: Literal["helpful", "not_helpful"]
     clientFeedbackId: str
 
 

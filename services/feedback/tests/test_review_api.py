@@ -6,8 +6,12 @@ the two halves are exercised through the same store as the deployed service.
 
 from __future__ import annotations
 
+import asyncio
+
 import httpx2
 
+from feedback.app.models import Rating
+from feedback.app.store import FeedbackRecord
 from feedback.tests.fakes import (
     AUTH,
     OPERATOR,
@@ -89,6 +93,33 @@ def test_a_reported_entry_appears_in_the_queue_and_opens() -> None:
     assert detail["candidate"] is None
     assert detail["reports"][0]["reason"] == "wrong_meaning"
     assert detail["state"] == "queued"
+
+
+def test_a_legacy_wrong_rating_is_still_reported() -> None:
+    # `wrong` can no longer be written (C-012 revision 1), but a rating recorded
+    # before that revision keeps its value and the curator still sees the
+    # judgement the reader actually gave (C-015 revision 2).
+    rigged = full_rig(word_lookup(), entries={"le_1": entry_view()})
+    asyncio.run(
+        rigged.store.add_feedback(
+            FeedbackRecord(
+                id="fb_legacy",
+                lookup_id="lk_1",
+                subject="reader-1",
+                client_feedback_id="cf_legacy",
+                rating=Rating.WRONG,
+                entry_ids=("le_1",),
+                created_at="2026-10-01T00:00:00+00:00",
+            )
+        )
+    )
+
+    with make_review_client(rigged) as client:
+        _report(client)
+        response = client.get("/internal/review/entries/le_1", headers=OPERATOR)
+
+    assert response.status_code == 200
+    assert [entry["rating"] for entry in response.json()["feedback"]] == ["wrong"]
 
 
 def test_the_queue_filters_by_reason_and_state() -> None:

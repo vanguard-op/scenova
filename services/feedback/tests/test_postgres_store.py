@@ -33,6 +33,7 @@ from feedback.app.models import (
     FeedbackRequest,
     ModerationActionName,
     Rating,
+    RatingChoice,
     ReportReason,
     ReportStatus,
     ReviewState,
@@ -450,7 +451,9 @@ async def test_an_unreachable_store_is_unavailable_through_the_intake() -> None:
     try:
         with pytest.raises(FeedbackStoreUnavailableError):
             await service.record_feedback(
-                FeedbackRequest(lookupId="lk_1", rating=Rating.HELPFUL, clientFeedbackId="cf_1"),
+                FeedbackRequest(
+                    lookupId="lk_1", rating=RatingChoice.HELPFUL, clientFeedbackId="cf_1"
+                ),
                 "reader-1",
             )
     finally:

@@ -24,11 +24,30 @@ MAX_ACTION_NOTES_LENGTH = 500
 
 
 class Rating(StrEnum):
-    """The reader's rating of a served clip (schema "Feedback")."""
+    """The reader's rating as the record holds it (schema "Feedback").
+
+    `wrong` is no longer a writable rating: a reader says a clip showed the wrong
+    meaning by reporting it with the `wrong_meaning` reason (C-013), and a request
+    carrying `wrong` is refused as an unknown rating (C-012). It stays in the set
+    the record and the curator's review surface read, so a rating given before that
+    change keeps its value and is still reported (C-015).
+    """
 
     HELPFUL = "helpful"
     NOT_HELPFUL = "not_helpful"
     WRONG = "wrong"
+
+
+class RatingChoice(StrEnum):
+    """The ratings a request may carry (C-012): helpful or not helpful.
+
+    The writable set is narrower than the recorded set. A request that carries
+    `wrong` — or anything else — is refused as an unknown rating, so only these two
+    reach the service; `wrong` is a read-only legacy value (C-015).
+    """
+
+    HELPFUL = "helpful"
+    NOT_HELPFUL = "not_helpful"
 
 
 class ReportReason(StrEnum):
@@ -66,12 +85,16 @@ class LookupStatus(StrEnum):
 
 
 class FeedbackRequest(BaseModel):
-    """The C-012 request body."""
+    """The C-012 request body.
+
+    `rating` is the narrowed writable set: `helpful` or `not_helpful`. A request
+    carrying `wrong` is an unknown rating and is refused.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     lookupId: str
-    rating: Rating
+    rating: RatingChoice
     clientFeedbackId: str
 
 
