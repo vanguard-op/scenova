@@ -310,16 +310,68 @@ def test_a_served_clip_can_be_marked_helpful(review_gateway: httpx2.Client) -> N
 def test_a_negative_rating_is_recorded_and_does_not_queue_on_its_own(
     review_gateway: httpx2.Client,
 ) -> None:
-    # FEAT-010 acceptance: marking a clip wrong records the response against the
-    # entry and flags it; the flag is not the queue — the queue holds the entry
-    # only once the repeated-negative-feedback threshold is reached.
+    # FEAT-010 acceptance: marking a clip not helpful records the response against
+    # the entry and flags it; the flag is not the queue — the queue holds the
+    # entry only once the repeated-negative-feedback threshold is reached.
     body = _serve_word(review_gateway, "brimbly")
 
-    response = _feedback(review_gateway, body["lookupId"], "wrong")
+    response = _feedback(review_gateway, body["lookupId"], "not_helpful")
 
     assert response.status_code == 202, response.text
     queued = _queue(review_gateway, word="brimbly").json()
     assert queued["items"] == [], "a single negative rating must not queue the entry"
+
+
+def test_the_wrong_rating_is_refused_as_unknown_and_records_nothing(
+    review_gateway: httpx2.Client, review_feedback: httpx2.Client
+) -> None:
+    # FEAT-010 acceptance: the rating is the one like/dislike question, so a clip
+    # that showed the wrong meaning is reported rather than rated ([FEAT-011]).
+    # `wrong` is therefore refused as an unknown rating — the gateway's shape
+    # check and the service both refuse it — and nothing is recorded (C-012).
+    body = _serve_word(review_gateway, "quorble")
+    entry_id = _served_entry_id(body)
+    key = f"fb-{uuid4().hex}"
+
+    refused = _feedback(review_gateway, body["lookupId"], "wrong", client_id=key)
+
+    assert refused.status_code == 400, refused.text
+
+    # The refusal comes before any lookup is read: a `wrong` write naming an id
+    # no lookup holds is refused the same way, while a rating that is still
+    # writable on the same id is not found. The check is therefore the rating's
+    # shape, not the lookup, so a refused rating cannot have touched the entry.
+    missing = f"lk_{uuid4().hex}"
+    unknown_lookup = _feedback(review_gateway, missing, "wrong")
+    missing_lookup = _feedback(review_gateway, missing, "helpful")
+    assert unknown_lookup.status_code == 400, unknown_lookup.text
+    assert missing_lookup.status_code == 404, missing_lookup.text
+
+    # Nothing was recorded: the service refuses `wrong` itself, and it too refuses
+    # an unknown id as the rating's shape rather than as a missing lookup, so the
+    # check precedes the read at both layers.
+    direct = review_feedback.post(
+        "/v1/feedback",
+        headers=_auth(),
+        json={"lookupId": body["lookupId"], "rating": "wrong", "clientFeedbackId": key},
+    )
+    direct_missing = review_feedback.post(
+        "/v1/feedback",
+        headers=_auth(),
+        json={"lookupId": missing, "rating": "wrong", "clientFeedbackId": f"fb-{uuid4().hex}"},
+    )
+    assert direct.status_code == 400, direct.text
+    assert direct_missing.status_code == 400, direct_missing.text
+
+    recorded = _feedback(review_gateway, body["lookupId"], "helpful", client_id=key)
+    assert recorded.status_code == 202, recorded.text
+    assert recorded.json() == {"recorded": True}
+
+    # The entry is where it was: still served, still unqueued.
+    reread = review_gateway.get(f"/v1/lookups/{body['lookupId']}", headers=_auth())
+    assert reread.status_code == 200, reread.text
+    assert _served_entry_id(reread.json()) == entry_id
+    assert _queue(review_gateway, word="quorble").json()["items"] == []
 
 
 def test_repeated_negative_feedback_queues_the_entry_at_the_threshold(
@@ -327,7 +379,8 @@ def test_repeated_negative_feedback_queues_the_entry_at_the_threshold(
 ) -> None:
     # FEAT-010 acceptance: when enough readers' latest ratings of an entry are
     # negative, the entry is queued for review. The threshold counts distinct
-    # readers' latest ratings, so three readers each rating it wrong queues it.
+    # readers' latest ratings, so three readers each rating it not helpful queues
+    # it.
     first = _serve_word(review_gateway, "plimber", subject="reader-1")
     entry_id = _served_entry_id(first)
 
@@ -350,9 +403,9 @@ def test_a_repeated_rating_from_one_reader_replaces_the_earlier_one(
     review_gateway: httpx2.Client,
 ) -> None:
     # FEAT-010 edge case: only one reader's latest rating of an entry counts. The
-    # first reader rates it wrong and then helpful; two more rate it wrong, so the
-    # threshold of three is not reached — the first reader's withdrawn negative is
-    # not counted.
+    # first reader rates it not helpful and then helpful; two more rate it not
+    # helpful, so the threshold of three is not reached — the first reader's
+    # withdrawn negative is not counted.
     first = _serve_word(review_gateway, "thwackle", subject="reader-1")
     assert _feedback(review_gateway, first["lookupId"], "not_helpful").status_code == 202
     assert _feedback(review_gateway, first["lookupId"], "helpful").status_code == 202
@@ -410,13 +463,14 @@ def test_a_replayed_rating_is_idempotent_and_a_changed_one_conflicts(
     review_gateway: httpx2.Client,
 ) -> None:
     # FEAT-010 edge case: feedback queued offline and resent is recorded once; the
-    # same client key with a different rating is a conflict (C-012 409).
+    # same client key with a different rating is a conflict (C-012 409). The
+    # conflict needs two ratings that are still writable to exercise it.
     body = _serve_word(review_gateway, "skrimble")
     key = f"fb-{uuid4().hex}"
 
     first = _feedback(review_gateway, body["lookupId"], "helpful", client_id=key)
     replay = _feedback(review_gateway, body["lookupId"], "helpful", client_id=key)
-    conflict = _feedback(review_gateway, body["lookupId"], "wrong", client_id=key)
+    conflict = _feedback(review_gateway, body["lookupId"], "not_helpful", client_id=key)
 
     assert first.status_code == 202, first.text
     assert replay.status_code == 202, replay.text
