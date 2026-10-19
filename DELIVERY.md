@@ -126,6 +126,7 @@ docs/           BPRD (product-shaper)
 | T-172 | FEAT-005, FEAT-006 | infra-engineer | Done | — |
 | T-170 | FEAT-011, FEAT-015 | infra-engineer | In Progress | C-003 |
 | T-171 | FEAT-011, FEAT-015 | backend-engineer | Backlog | C-003, C-006 |
+| T-173 | FEAT-001, FEAT-005, FEAT-010, FEAT-011 | frontend-engineer | Done | — |
 
 ## Decisions Log
 | # | Decision | Rationale | By |
@@ -164,9 +165,9 @@ docs/           BPRD (product-shaper)
 | D-032 | Readers sign in with email and password; no third-party sign-in | Keeps store review simple, since offering third-party sign-in would oblige Sign in with Apple alongside it; the identity provider is already Firebase and its providers are declared | user |
 | D-033 | The selection-action label ships in English only; the choice is stored and every other language reads that it is shown in English | No translated label set exists to ship, so the platform per-app-locale wiring waits for real translations rather than shipping a choice that does nothing | user |
 | D-034 | Pre-revenue the product runs on the free tiers with no always-on infrastructure: scale-to-zero services, the cheapest reachable Postgres, no Redis, no CDN, and Firebase's free tier — with the paid resources started, paused and destroyed on demand rather than left running | There are no readers yet, so the availability the production shape exists to meet buys nothing; every choice reverses by configuration because the stores sit behind ports, and the lifecycle action means the paid parts exist only during testing windows | user |
-| D-035 | The product is billed through Vanguard Billing, freeing its project slot by unlinking `waypoint-510216` | Vanguard is at its project quota and cannot take another project without a support request; Waypoint keeps its project and its data but loses its billing link, so any billable service there stops until it is re-linked | user |
 | D-036 | The product repository is public and the documentation submodule stays private | The public repository is what lets the Actions run and the environment protection rules attach; the specification is not published with the code, so a public cloner gets a build it cannot reproduce without the docs | user |
 | D-037 | A generation job carries exactly one origin — the reader lookup that started it, or the library entry a report or a curator regenerates — and the store records that origin | Report- and curator-started generation has no reader lookup behind it, so the store refused every such job and both paths wrote nothing on a store-backed deployment; settled in the schema via `product-shaper` at the user's direction, with C-003 and C-006 revised to match | user |
+| D-039 | The clip-view card is headed by the product lockup and reaches the report sheet from an icon in its action row, and the selection entry reads "Ask Scenova" | The word already appears in the word-and-phrase header under the clip, so the top line names the product instead of repeating it; the labelled Report button grew the card toward full screen, and it sat beside a rating drawn with the same flag, so the two were indistinguishable | user |
 
 ## Definition of Done
 - **Task:** the acceptance criteria in the cited feature doc are met; the frozen contract is conformed; unit tests pass; format, lint, analyze, and build are clean; work is committed to the dev branch and confined to `Own`.
