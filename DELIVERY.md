@@ -127,6 +127,10 @@ docs/           BPRD (product-shaper)
 | T-170 | FEAT-011, FEAT-015 | infra-engineer | In Progress | C-003 |
 | T-171 | FEAT-011, FEAT-015 | backend-engineer | Backlog | C-003, C-006 |
 | T-173 | FEAT-001, FEAT-005, FEAT-010, FEAT-011 | frontend-engineer | Done | — |
+| T-174 | FEAT-005, FEAT-010, FEAT-011 | frontend-engineer | Done | C-012 (revision 1) |
+| T-175 | FEAT-010 | backend-engineer | Done | C-012 (revision 1), C-015 (revision 2) |
+| T-176 | FEAT-010 | qa-engineer | Ready | C-012 (revision 1) |
+| T-177 | — | visual-artist | Backlog | — |
 
 ## Decisions Log
 | # | Decision | Rationale | By |
