@@ -90,7 +90,6 @@ docs/           BPRD (product-shaper)
 | Phase | Closed | Notes |
 |---|---|---|
 | Phase 3: Trust and Continuity | 2026-10-15 | C-012 to C-016 frozen and conformed at the gate; the moderation change (`D-030`) reworked and re-verified. The generation path's release still flagged (`D-023`) |
-| Phase 4: Polish and Account | 2026-10-16 | C-018 to C-022 frozen and conformed; the tier gates and the primary database landed; the generation path's release still flagged (`D-023`) |
 | — | — | The conditional closes of the first two phases are decisions-log entries (`D-020`, `D-023`). |
 
 ### Active Phase: Phase 4: Polish and Account
@@ -134,6 +133,7 @@ docs/           BPRD (product-shaper)
 | T-177 | — | visual-artist | Done | — |
 | T-178 | FEAT-003, FEAT-005 | backend-engineer | Done | C-003 (revision 2) |
 | T-179 | FEAT-003, FEAT-005 | infra-engineer | Done | C-003 (revision 2) |
+| T-180 | FEAT-008, FEAT-010, FEAT-011 | frontend-engineer | Done | — |
 
 ## Decisions Log
 | # | Decision | Rationale | By |
@@ -177,6 +177,7 @@ docs/           BPRD (product-shaper)
 | D-039 | The clip-view card is headed by the product lockup and reaches the report sheet from an icon in its action row, and the selection entry reads "Ask Scenova" | The word already appears in the word-and-phrase header under the clip, so the top line names the product instead of repeating it; the labelled Report button grew the card toward full screen, and it sat beside a rating drawn with the same flag, so the two were indistinguishable | user |
 | D-040 | A word whose generation ended without a clip is attempted again on a later lookup, bounded at three attempts | A word job's id is derived from the word and the pipeline never expires its row, so one failure held that id for good: every later attempt was refused as already enqueued and the reader was dropped to a fallback inviting them to try again, which could not work. The bound keeps a word that keeps failing from spending model credit on every later lookup | lead |
 | D-041 | The client's build inputs for a deployed environment live in a gitignored root `.env.<environment>` file named for the infra slot it targets, and the root `.env` stays one file for local development | The client is the only artifact whose build inputs differ per deployed environment, and the root `.env` also carries the local stack's config, so a build pointed at it compiled values the bundle has no business holding. Splitting that file per consumer would break the schema's one-name-one-meaning rule and the single file `make env` validates, so the deployed build inputs separate out instead | user |
+| D-042 | The clip view's overflow is a vertical-dots menu button opening the report action as a menu item anchored to it; the action row spreads its controls evenly across the card's width; the clip area carries no brand mark while the clip is being prepared; and the card no longer offers History | The row reads as one row filling the card rather than a cluster at its left; the report action belongs in a menu at the control that reveals it, where it does not grow the card under the row; the card's header already names the product, so the clip area need not repeat the mark while it waits, and the still-frame stand-in stays for a clip that cannot be streamed and for the History thumbnail; History is reachable from Home and from the view's own empty state | user |
 
 ## Definition of Done
 - **Task:** the acceptance criteria in the cited feature doc are met; the frozen contract is conformed; unit tests pass; format, lint, analyze, and build are clean; work is committed to the dev branch and confined to `Own`.
