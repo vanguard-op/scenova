@@ -23,8 +23,7 @@ enum ClipPresentation {
   /// A compact card shown in place over the reading app — the Android
   /// selection action's own surface, or the iOS share extension's sheet. The
   /// backdrop is transparent so the reading page stays visible behind the card,
-  /// the copy speaks to closing rather than returning to Home, and there is no
-  /// History destination to open.
+  /// and the copy speaks to closing rather than returning to Home.
   inPlace,
 }
 
@@ -33,7 +32,8 @@ enum ClipPresentation {
 /// Shows the selected word or phrase with its clip, in place over the reading
 /// app. The card sits near the top on mobile so the reading page stays visible
 /// behind it, and centres with a larger clip on tablet. It carries the shared
-/// Clip Player, the shared Word and Phrase Header, and the action row.
+/// Clip Player, the shared Word and Phrase Header, and the action row, whose
+/// overflow opens the report action at the control that reveals it.
 ///
 /// Every state from the screen spec is covered: loading, serving from the
 /// library, generating, sense choice, playing, fallback, allowance exhausted,
@@ -65,10 +65,6 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
 
   bool _hasPlayed = false;
   bool _noticeQueued = false;
-
-  /// Whether the reader has opened the action row's overflow, so the actions
-  /// the card holds beyond the row's four controls are on screen.
-  bool _actionsRevealed = false;
 
   /// The settings controller this screen is listening to, so a change to the
   /// clip's sound or the motion preference redraws the card.
@@ -121,9 +117,6 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
   void _onControllerChanged() {
     if (!mounted) return;
     if (_controller.playing) _hasPlayed = true;
-    // The revealed actions belong to the clip on screen: a lookup that settles
-    // some other way closes them with it.
-    if (_controller.phase != ClipPhase.playing) _actionsRevealed = false;
     setState(() {});
     // The clip has arrived (or the lookup settled some other way), so the
     // still-making notice has nothing left to wait on; it leaves with the wait.
@@ -465,6 +458,7 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
     Widget? action,
   }) {
     final tokens = ScenovaTokens.of(context);
+    final actions = _actions(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
@@ -482,8 +476,10 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
           SizedBox(height: tokens.spacing.lg),
           action,
         ],
-        SizedBox(height: tokens.spacing.lg),
-        _actions(context),
+        if (actions != null) ...<Widget>[
+          SizedBox(height: tokens.spacing.lg),
+          actions,
+        ],
       ],
     );
   }
@@ -494,6 +490,7 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
     final tokens = ScenovaTokens.of(context);
     final colors = ScenovaColors.of(context);
     final styles = ScenovaTextStyles.of(context);
+    final actions = _actions(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -511,8 +508,10 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
           'Clips are paused right now. The word and its meaning are still here.',
           style: styles.bodySmall.copyWith(color: colors.textSecondary),
         ),
-        SizedBox(height: tokens.spacing.lg),
-        _actions(context),
+        if (actions != null) ...<Widget>[
+          SizedBox(height: tokens.spacing.lg),
+          actions,
+        ],
       ],
     );
   }
@@ -537,111 +536,139 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
     );
   }
 
-  Widget _actions(BuildContext context) {
+  /// The card's action row, or null when the clip on screen offers no actions:
+  /// an action names the clip the reader saw, so a card with no clip carries no
+  /// controls either.
+  Widget? _actions(BuildContext context) {
     final tokens = ScenovaTokens.of(context);
     final settings = _settings;
     final clip = _controller.clip;
     // An action names the clip on screen, so the controls that act on one are
     // offered only while a clip is playing (`FEAT-010`, `FEAT-011`).
-    final canPlay = _controller.phase == ClipPhase.playing;
+    if (_controller.phase != ClipPhase.playing) return null;
     final feedback = _controller.feedback;
     final soundOn = settings.soundOn;
-    final showListen = canPlay && (clip?.hasAudio ?? false);
+    final showListen = clip?.hasAudio ?? false;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        if (canPlay) ...<Widget>[
-          // The row shows four controls — play or replay, listen or mute, and
-          // the two the reader judges the clip with — however many actions the
-          // card grows. Anything further is reached through the overflow beside
-          // them, so the row keeps its shape and Report stays reachable.
-          Wrap(
-            spacing: tokens.spacing.sm,
-            runSpacing: tokens.spacing.sm,
-            crossAxisAlignment: WrapCrossAlignment.center,
+        // The row shows four controls — play or replay, listen or mute, and
+        // the two the reader judges the clip with — spread across the card's
+        // width, so it reads as one row of the card rather than a cluster at
+        // its left. Anything further is reached from the menu beside them, so
+        // the row keeps its shape and Report stays reachable.
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: <Widget>[
+            ScenovaIconButton(
+              icon: _controller.playing
+                  ? AppIcons.pause
+                  : (_hasPlayed ? AppIcons.replay : AppIcons.play),
+              tooltip: _controller.playing
+                  ? 'Pause'
+                  : (_hasPlayed ? 'Replay' : 'Play'),
+              active: _controller.playing,
+              onPressed: _controller.togglePlay,
+            ),
+            if (showListen)
+              ScenovaIconButton(
+                // The icon names the clip's sound as it stands; the tooltip
+                // names what the control does about it.
+                icon: soundOn ? AppIcons.listen : AppIcons.mute,
+                tooltip: soundOn ? 'Mute' : 'Listen',
+                active: soundOn,
+                onPressed: () {
+                  settings.soundOn = !settings.soundOn;
+                  ScenovaScope.of(context).analytics.preferenceChanged(
+                    setting: AnalyticsSetting.sound,
+                    value: settings.soundOn,
+                  );
+                },
+              ),
+            // The reader's rating of the clip: whether it showed the meaning
+            // (`FEAT-010`). A clip that showed the wrong one is reported,
+            // not rated (`FEAT-011`).
+            ScenovaIconButton(
+              icon: AppIcons.helpful,
+              tooltip: 'This showed the meaning',
+              active: feedback == ClipRating.helpful,
+              onPressed: () =>
+                  unawaited(_controller.markFeedback(ClipRating.helpful)),
+            ),
+            ScenovaIconButton(
+              icon: AppIcons.notHelpful,
+              tooltip: 'This did not show the meaning',
+              active: feedback == ClipRating.notHelpful,
+              onPressed: () =>
+                  unawaited(_controller.markFeedback(ClipRating.notHelpful)),
+            ),
+            _overflowMenu(context),
+          ],
+        ),
+        SizedBox(height: tokens.spacing.sm),
+        _feedbackNote(context),
+      ],
+    );
+  }
+
+  /// The row's overflow: a menu button at the row's end, opening the actions
+  /// the row does not show at a glance as items anchored to it, so the row
+  /// stays at its four controls however many the card gains (`FEAT-011`).
+  ///
+  /// Report is reached only from here; the card carries no History destination
+  /// of its own (`FEAT-008`).
+  Widget _overflowMenu(BuildContext context) {
+    final colors = ScenovaColors.of(context);
+    final tokens = ScenovaTokens.of(context);
+    final styles = ScenovaTextStyles.of(context);
+    final tone = AppIconView.toneFor(colors, active: false);
+
+    return PopupMenuButton<_OverflowAction>(
+      tooltip: 'More actions',
+      // The menu hangs from the control that opened it rather than covering
+      // the row the reader is still looking at.
+      position: PopupMenuPosition.under,
+      icon: AppIconView(icon: AppIcons.more, size: tokens.sizing.iconMd),
+      iconColor: tone,
+      padding: EdgeInsets.all(tokens.spacing.sm),
+      // The button is shaped like the icon controls beside it, so the row reads
+      // as one run of controls.
+      style: IconButton.styleFrom(
+        minimumSize: Size.square(tokens.sizing.buttonHeight),
+        tapTargetSize: MaterialTapTargetSize.padded,
+        foregroundColor: tone,
+      ),
+      // The menu is the card's own surface, at the card's own radius, flat on
+      // the border the product's other menus carry rather than the framework's
+      // elevated sheet, so it reads as part of the card that opened it.
+      color: colors.surface,
+      surfaceTintColor: ScenovaPalette.transparent,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(ScenovaRadius.lg),
+        side: BorderSide(color: colors.border),
+      ),
+      onSelected: (action) => switch (action) {
+        _OverflowAction.report => unawaited(_openReportSheet()),
+      },
+      itemBuilder: (context) => <PopupMenuEntry<_OverflowAction>>[
+        PopupMenuItem<_OverflowAction>(
+          value: _OverflowAction.report,
+          child: Row(
             children: <Widget>[
-              ScenovaIconButton(
-                icon: _controller.playing
-                    ? AppIcons.pause
-                    : (_hasPlayed ? AppIcons.replay : AppIcons.play),
-                tooltip: _controller.playing
-                    ? 'Pause'
-                    : (_hasPlayed ? 'Replay' : 'Play'),
-                active: _controller.playing,
-                onPressed: _controller.togglePlay,
+              AppIconView(
+                icon: AppIcons.report,
+                size: tokens.sizing.iconSm,
+                color: tone,
               ),
-              if (showListen)
-                ScenovaIconButton(
-                  // The icon names the clip's sound as it stands; the tooltip
-                  // names what the control does about it.
-                  icon: soundOn ? AppIcons.listen : AppIcons.mute,
-                  tooltip: soundOn ? 'Mute' : 'Listen',
-                  active: soundOn,
-                  onPressed: () {
-                    settings.soundOn = !settings.soundOn;
-                    ScenovaScope.of(context).analytics.preferenceChanged(
-                      setting: AnalyticsSetting.sound,
-                      value: settings.soundOn,
-                    );
-                  },
-                ),
-              // The reader's rating of the clip: whether it showed the meaning
-              // (`FEAT-010`). A clip that showed the wrong one is reported,
-              // not rated (`FEAT-011`).
-              ScenovaIconButton(
-                icon: AppIcons.helpful,
-                tooltip: 'This showed the meaning',
-                active: feedback == ClipRating.helpful,
-                onPressed: () =>
-                    unawaited(_controller.markFeedback(ClipRating.helpful)),
-              ),
-              ScenovaIconButton(
-                icon: AppIcons.notHelpful,
-                tooltip: 'This did not show the meaning',
-                active: feedback == ClipRating.notHelpful,
-                onPressed: () =>
-                    unawaited(_controller.markFeedback(ClipRating.notHelpful)),
-              ),
-              ScenovaIconButton(
-                icon: AppIcons.more,
-                tooltip: _actionsRevealed
-                    ? 'Hide more actions'
-                    : 'More actions',
-                active: _actionsRevealed,
-                onPressed: () =>
-                    setState(() => _actionsRevealed = !_actionsRevealed),
+              SizedBox(width: tokens.spacing.sm),
+              Text(
+                'Report',
+                style: styles.body.copyWith(color: colors.textPrimary),
               ),
             ],
           ),
-          if (_actionsRevealed) ...<Widget>[
-            SizedBox(height: tokens.spacing.sm),
-            // Reporting names the clip the reader saw; it is the only way into
-            // the report sheet, so it is revealed rather than dropped.
-            ScenovaButton(
-              label: 'Report',
-              variant: ScenovaButtonVariant.secondary,
-              icon: AppIcons.report,
-              onPressed: () => unawaited(_openReportSheet()),
-            ),
-          ],
-          SizedBox(height: tokens.spacing.sm),
-          _feedbackNote(context),
-        ],
-        Wrap(
-          spacing: tokens.spacing.sm,
-          runSpacing: tokens.spacing.sm,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: <Widget>[
-            // History is an app destination; an in-place view has nowhere to
-            // open it, so the action is left out there.
-            if (widget.presentation != ClipPresentation.inPlace)
-              ScenovaButton(
-                label: 'History',
-                variant: ScenovaButtonVariant.ghost,
-                onPressed: widget.onOpenHistory,
-              ),
-          ],
         ),
       ],
     );
@@ -737,6 +764,7 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
     final colors = ScenovaColors.of(context);
     final styles = ScenovaTextStyles.of(context);
     final senses = _controller.result?.senses ?? const <Sense>[];
+    final actions = _actions(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -755,7 +783,7 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
           ),
           SizedBox(height: tokens.spacing.md),
         ],
-        _actions(context),
+        ?actions,
       ],
     );
   }
@@ -801,6 +829,10 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
 
   SettingsController get _settings => ScenovaScope.of(context).settings;
 }
+
+/// The actions the clip view's row holds beyond its four controls, reached from
+/// the row's overflow (`FEAT-011`).
+enum _OverflowAction { report }
 
 /// A one-sense option in the sense chooser: its clip with its phrase, for the
 /// reader to pick the meaning that fits.

@@ -1109,7 +1109,9 @@ void main() {
     await teardown(tester);
   });
 
-  testWidgets('the page presentation keeps the History action', (tester) async {
+  testWidgets('the card offers no History destination of its own', (
+    tester,
+  ) async {
     final services = buildServices(api: MockLookupApi());
     final controller = controllerFor(services, 'come');
     addTearDown(controller.dispose);
@@ -1118,7 +1120,34 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.text('History'), findsOneWidget);
+    // History is a destination of Home and of the view's own empty state; the
+    // card beside the clip does not carry one (`FEAT-008`).
+    expect(find.text('History'), findsNothing);
+    await teardown(tester);
+  });
+
+  testWidgets('the empty state still reaches History', (tester) async {
+    // With the card's own action gone, the clip view keeps its way to History
+    // where a lookup has nothing saved to replay.
+    var opened = false;
+    final services = buildServices(api: MockLookupApi(), online: false);
+    final controller = controllerFor(services, 'quixotic');
+    addTearDown(controller.dispose);
+
+    await pumpClipView(
+      tester,
+      services,
+      controller,
+      onOpenHistory: () => opened = true,
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(controller.phase, ClipPhase.offline);
+    await tester.tap(find.text('Open History'));
+    await tester.pump();
+
+    expect(opened, isTrue);
     await teardown(tester);
   });
 

@@ -22,8 +22,9 @@ abstract final class AppIcons {
   static const IconData history = Icons.history_rounded;
   static const IconData settings = Icons.settings_outlined;
 
-  /// The overflow: the actions a card holds beyond the few it shows.
-  static const IconData more = Icons.more_horiz_rounded;
+  /// The overflow: the actions a card holds beyond the few it shows. The
+  /// vertical dots name a menu that opens at the control itself.
+  static const IconData more = Icons.more_vert_rounded;
 
   // Reader chrome.
   static const IconData account = Icons.person_outline_rounded;

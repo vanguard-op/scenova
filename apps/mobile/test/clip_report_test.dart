@@ -39,15 +39,16 @@ ClipViewController _controllerFor(ScenovaServices services, String text) {
   );
 }
 
-/// Opens the Report sheet over a playing clip through the action row's
-/// overflow, and lets it settle in.
+/// Opens the Report sheet over a playing clip from the action row's overflow,
+/// and lets it settle in.
 Future<void> _openReportSheet(WidgetTester tester) async {
   await tester.ensureVisible(findIcon(AppIcons.more));
   await tester.pump();
+  // Report is reached from the row's overflow, as a menu item at the control
+  // that reveals it (`FEAT-011`).
   await tester.tap(findIcon(AppIcons.more));
   await tester.pump();
-  await tester.ensureVisible(find.text('Report'));
-  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 350));
   await tester.tap(find.text('Report'));
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 400));
@@ -331,40 +332,59 @@ void main() {
     await teardown(tester);
   });
 
-  testWidgets('the row holds four controls and reveals Report behind its '
-      'overflow', (tester) async {
-    final services = buildServices(api: MockLookupApi());
-    final controller = _controllerFor(services, 'come');
-    addTearDown(controller.dispose);
+  testWidgets(
+    'the row holds four controls and opens Report from its overflow',
+    (tester) async {
+      final services = buildServices(api: MockLookupApi());
+      final controller = _controllerFor(services, 'come');
+      addTearDown(controller.dispose);
 
-    usePhoneWindow(tester);
-    await pumpClipView(tester, services, controller);
-    await tester.pump();
-    await tester.pump();
-    expect(controller.phase, ClipPhase.playing);
+      usePhoneWindow(tester);
+      await pumpClipView(tester, services, controller);
+      await tester.pump();
+      await tester.pump();
+      expect(controller.phase, ClipPhase.playing);
 
-    // The four the row shows: play or replay, listen or mute when the clip
-    // carries sound, and the two the reader judges the clip with.
-    expect(findIcon(AppIcons.pause), findsOneWidget);
-    expect(findIcon(AppIcons.helpful), findsOneWidget);
-    expect(findIcon(AppIcons.notHelpful), findsOneWidget);
-    // This clip carries no sound, so its control is left out.
-    expect(findIcon(AppIcons.listen), findsNothing);
+      // The four the row shows: play or replay, listen or mute when the clip
+      // carries sound, and the two the reader judges the clip with.
+      expect(findIcon(AppIcons.pause), findsOneWidget);
+      expect(findIcon(AppIcons.helpful), findsOneWidget);
+      expect(findIcon(AppIcons.notHelpful), findsOneWidget);
+      // This clip carries no sound, so its control is left out.
+      expect(findIcon(AppIcons.listen), findsNothing);
 
-    // Report is the row's fifth control only when it is asked for, so the row
-    // keeps its shape however many actions the card grows.
-    expect(findIcon(AppIcons.more), findsOneWidget);
-    expect(find.text('Report'), findsNothing);
+      // Report is not on the card until the reader asks for it, so it never
+      // grows the card under the row (`FEAT-011`).
+      expect(findIcon(AppIcons.more), findsOneWidget);
+      expect(find.text('Report'), findsNothing);
 
-    await tester.tap(findIcon(AppIcons.more));
-    await tester.pump();
-    expect(find.text('Report'), findsOneWidget);
+      await tester.tap(findIcon(AppIcons.more));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
 
-    await tester.tap(findIcon(AppIcons.more));
-    await tester.pump();
-    expect(find.text('Report'), findsNothing);
-    await teardown(tester);
-  });
+      // Report is a menu item, anchored to the control that revealed it rather
+      // than a control on the card beside the row (`FEAT-011`).
+      final item = find.byWidgetPredicate((widget) => widget is PopupMenuItem);
+      expect(item, findsOneWidget);
+      expect(
+        find.descendant(of: item, matching: find.text('Report')),
+        findsOne,
+      );
+      final button = tester.getRect(findIcon(AppIcons.more));
+      final menu = tester.getRect(item);
+      // It hangs from the control, below the row rather than over it.
+      expect(menu.top, greaterThanOrEqualTo(button.bottom - button.height));
+      expect(menu.left, lessThan(button.right));
+      expect(menu.right, greaterThan(button.left));
+
+      // Dismissing the menu leaves the row as it was.
+      await tester.tapAt(const Offset(8, 8));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
+      expect(find.text('Report'), findsNothing);
+      await teardown(tester);
+    },
+  );
 
   testWidgets('reporting a clip registers for the regenerated clip notice', (
     tester,

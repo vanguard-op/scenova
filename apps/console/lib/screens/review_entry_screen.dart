@@ -387,6 +387,8 @@ class _EntryCardState extends State<_EntryCard> {
       caption: entry.lemma,
       clip: entry.clip,
       playing: _servingPlaying,
+      // The console has no reader to wait on; the frame says what it is doing.
+      preparingLabel: 'Loading the clip',
       reduceMotion: MediaQuery.disableAnimationsOf(context),
       onTogglePlay: () => setState(() => _servingPlaying = !_servingPlaying),
       onCompleted: () => setState(() => _servingPlaying = false),
@@ -403,6 +405,7 @@ class _EntryCardState extends State<_EntryCard> {
             caption: entry.lemma,
             clip: candidate,
             playing: _candidatePlaying,
+            preparingLabel: 'Loading the clip',
             reduceMotion: MediaQuery.disableAnimationsOf(context),
             onTogglePlay: () =>
                 setState(() => _candidatePlaying = !_candidatePlaying),

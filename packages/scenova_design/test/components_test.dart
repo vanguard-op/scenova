@@ -21,6 +21,21 @@ class _StillClip implements ClipSource {
   final bool hasAudio;
 }
 
+/// A clip the platform can stream: a playable source, so the player opens a
+/// stream for it instead of standing in with the still frame.
+class _StreamedClip implements ClipSource {
+  const _StreamedClip();
+
+  @override
+  String get url => 'https://clips.example/harbour.mp4';
+  @override
+  double get durationSeconds => 4;
+  @override
+  String get resolution => '360p';
+  @override
+  bool get hasAudio => false;
+}
+
 Future<void> pumpThemed(
   WidgetTester tester,
   Widget child, {
@@ -137,6 +152,44 @@ void main() {
 
       expect(find.byType(ClipStillFrame), findsOneWidget);
       expect(find.byType(VideoPlayer), findsNothing);
+    });
+
+    testWidgets('waits on a clip it can stream without the product\'s mark', (
+      tester,
+    ) async {
+      // The clip has arrived and its stream is opening: the frame says what it
+      // is doing, rather than repeating the mark the card around it already
+      // carries while it waits (`FEAT-008`).
+      await pumpThemed(
+        tester,
+        ClipPlayer(
+          status: ClipPlayerStatus.ready,
+          caption: 'harbour',
+          clip: const _StreamedClip(),
+          onTogglePlay: () {},
+        ),
+      );
+
+      expect(find.text('Opening your clip'), findsOneWidget);
+      expect(find.byType(ClipStillFrame), findsNothing);
+      expect(find.byType(BrandMark), findsNothing);
+    });
+
+    testWidgets('takes the host\'s own line while a clip is prepared', (
+      tester,
+    ) async {
+      await pumpThemed(
+        tester,
+        ClipPlayer(
+          status: ClipPlayerStatus.ready,
+          caption: 'harbour',
+          clip: const _StreamedClip(),
+          preparingLabel: 'Loading the clip',
+          onTogglePlay: () {},
+        ),
+      );
+
+      expect(find.text('Loading the clip'), findsOneWidget);
     });
 
     testWidgets('a tap on the frame asks the host to play', (tester) async {

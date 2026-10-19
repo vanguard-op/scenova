@@ -36,6 +36,12 @@ enum ClipPlayerStatus {
 /// saved placeholder, say — keeps the still frame instead, so the surface
 /// always shows something honest.
 ///
+/// While a clip it can stream is being prepared the frame says what it is doing
+/// and nothing else: the card a host draws it in already names the product, so
+/// the frame does not repeat the mark (`FEAT-008`). The still-frame stand-in is
+/// left to the sources the platform cannot stream and to the History thumbnail
+/// that shares it (`FEAT-009`).
+///
 /// The player is controlled: the host owns whether it is playing and whether
 /// sound is on, and is told when playback finishes. A host that also wants the
 /// player's own controls sets [controls]; a screen that carries its own action
@@ -54,6 +60,7 @@ class ClipPlayer extends StatefulWidget {
     this.reduceMotion = false,
     this.soundOn = false,
     this.unavailableMessage,
+    this.preparingLabel = 'Opening your clip',
     this.controls = false,
   });
 
@@ -84,6 +91,10 @@ class ClipPlayer extends StatefulWidget {
   /// Replaces the default "no clip" line when the clip is withheld for a
   /// reason other than the word having none.
   final String? unavailableMessage;
+
+  /// The line the frame carries while a clip it can stream is being prepared.
+  /// The host's own voice replaces the reader-facing default.
+  final String preparingLabel;
 
   /// Whether the player draws its own Play or Replay and Listen controls, and
   /// the clip's own facts, beneath the frame.
@@ -423,6 +434,12 @@ class _ClipPlayerState extends State<ClipPlayer>
                   message: 'This clip could not be loaded.',
                   onRetry: _retryVideo,
                 )
+              else if (_loading)
+                // The clip is being prepared: the stream is opening. The frame
+                // says what it is doing rather than carrying the product's
+                // mark, which the card around it already shows while it waits
+                // (`FEAT-008`).
+                _Message(label: widget.preparingLabel, showProgress: true)
               else
                 const Center(child: ClipStillFrame()),
               if (showPlayAffordance) Center(child: _playAffordance(context)),

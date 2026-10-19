@@ -106,6 +106,12 @@ void main() {
   });
 
   group('AppIcons', () {
+    test('the overflow is the pack\'s vertical dots', () {
+      // The clip view opens its remaining actions as a menu at the control
+      // that reveals them, which the vertical dots name (`FEAT-008`).
+      expect(AppIcons.more, Icons.more_vert_rounded);
+    });
+
     test('every icon the product draws belongs to the platform pack', () {
       // The product's own actions and the chrome around them come from the
       // platform's icon font; an icon pulled from a custom font or a bundled
