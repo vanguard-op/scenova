@@ -79,6 +79,26 @@ void main() {
     await teardown(tester);
   });
 
+  testWidgets('the card header carries the product name, not the word', (
+    tester,
+  ) async {
+    final services = buildServices(api: MockLookupApi());
+    final controller = controllerFor(services, 'come');
+    addTearDown(controller.dispose);
+
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+    await tester.pump();
+
+    // The top row is the card's own header, so the looked-up word reads once,
+    // in the word-and-phrase header under the clip, and is not repeated above
+    // it.
+    expect(find.byType(BrandLockup), findsOneWidget);
+    expect(find.text(BrandLockup.wordmark), findsOneWidget);
+    expect(find.text('come'), findsOneWidget);
+    await teardown(tester);
+  });
+
   testWidgets('a library hit plays at once and is saved to history', (
     tester,
   ) async {

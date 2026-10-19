@@ -41,7 +41,9 @@ ClipViewController _controllerFor(ScenovaServices services, String text) {
 
 /// Opens the Report sheet over a playing clip and lets it settle in.
 Future<void> _openReportSheet(WidgetTester tester) async {
-  await tester.tap(find.text('Report'));
+  await tester.ensureVisible(findIcon(AppIcons.report));
+  await tester.pump();
+  await tester.tap(findIcon(AppIcons.report));
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 400));
 }
@@ -314,11 +316,34 @@ void main() {
     await tester.pump();
     expect(controller.phase, ClipPhase.generating);
 
-    // A report names the clip the reader saw; there is none yet.
-    expect(find.text('Report'), findsNothing);
+    // A report names the clip the reader saw; there is none yet. It rides with
+    // the icon actions rather than as a labelled button (`FEAT-011`).
+    expect(findIcon(AppIcons.report), findsNothing);
 
     // The lookup is still generating, so stop its timers before the test ends.
     controller.dispose();
+    await teardown(tester);
+  });
+
+  testWidgets('reporting is distinct from the wrong-meaning rating', (
+    tester,
+  ) async {
+    final services = buildServices(api: MockLookupApi());
+    final controller = _controllerFor(services, 'come');
+    addTearDown(controller.dispose);
+
+    usePhoneWindow(tester);
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+    await tester.pump();
+    expect(controller.phase, ClipPhase.playing);
+
+    // The report control and the rating sit together as icon actions but draw
+    // different glyphs, so the reader never takes one for the other
+    // (`FEAT-010`, `FEAT-011`).
+    expect(findIcon(AppIcons.report), findsOneWidget);
+    expect(findIcon(AppIcons.error), findsOneWidget);
+    expect(findIcon(AppIcons.wrong), findsNothing);
     await teardown(tester);
   });
 

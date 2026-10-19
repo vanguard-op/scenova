@@ -74,7 +74,7 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    await tester.tap(findIcon(AppIcons.wrong));
+    await tester.tap(findIcon(AppIcons.error));
     await tester.pump();
     await tester.pump();
 
@@ -235,7 +235,7 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    await tester.tap(findIcon(AppIcons.wrong));
+    await tester.tap(findIcon(AppIcons.error));
     await tester.pump();
     await tester.pump();
 

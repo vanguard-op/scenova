@@ -238,14 +238,18 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            _heading(context),
+            _header(context),
             SizedBox(height: tokens.spacing.lg),
             ClipPlayer(
               status: ClipPlayerStatus.loading,
               caption: _controller.word,
             ),
+            SizedBox(height: tokens.spacing.lg),
+            // The word is known as soon as the selection is; the phrase it will
+            // be shown with is what the lookup is still resolving.
+            WordPhraseHeader(word: _controller.word, compact: true),
             SizedBox(height: tokens.spacing.md),
-            const SkeletonList(rows: 2),
+            const SkeletonList(rows: 1),
           ],
         );
 
@@ -422,8 +426,8 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
     }
   }
 
-  /// The shared shape for the phases that show a clip surface: the word
-  /// heading, the clip player, the shared Word and Phrase Header, and the
+  /// The shared shape for the phases that show a clip surface: the card
+  /// header, the clip player, the shared Word and Phrase Header, and the
   /// action row.
   Widget _withHeaderAndActions(
     BuildContext context, {
@@ -435,7 +439,7 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        _heading(context),
+        _header(context),
         SizedBox(height: tokens.spacing.lg),
         player,
         SizedBox(height: tokens.spacing.lg),
@@ -465,7 +469,7 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        _heading(context),
+        _header(context),
         SizedBox(height: tokens.spacing.lg),
         WordPhraseHeader(
           word: _controller.word,
@@ -484,22 +488,16 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
     );
   }
 
-  Widget _heading(BuildContext context) {
-    final colors = ScenovaColors.of(context);
+  /// The card's header: the product's own name, static, so the row reads as
+  /// the card's header rather than repeating the word already carried by the
+  /// Word and Phrase Header below. The close control aligns to it.
+  Widget _header(BuildContext context) {
     final styles = ScenovaTextStyles.of(context);
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: <Widget>[
         Expanded(
-          child: Semantics(
-            header: true,
-            child: Text(
-              _controller.word,
-              style: styles.h3.copyWith(color: colors.textPrimary),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
+          child: Semantics(header: true, child: BrandLockup(style: styles.h3)),
         ),
         ScenovaIconButton(
           icon: AppIcons.close,
@@ -570,11 +568,23 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
                   ),
                 ),
                 ScenovaIconButton(
-                  icon: AppIcons.wrong,
+                  // A distinct glyph from the report control's flag, so the
+                  // wrong-meaning rating is never read as reporting (`FEAT-010`,
+                  // `FEAT-011`).
+                  icon: AppIcons.error,
                   tooltip: 'This showed the wrong meaning',
                   active: feedback == ClipRating.wrong,
                   onPressed: () =>
                       unawaited(_controller.markFeedback(ClipRating.wrong)),
+                ),
+                // Reporting names the clip the reader saw, so it is offered
+                // while one is playing (`FEAT-011`); its own flag glyph keeps it
+                // apart from the rating beside it, and sitting with the icon
+                // actions keeps the card from growing to fill the screen.
+                ScenovaIconButton(
+                  icon: AppIcons.report,
+                  tooltip: 'Report',
+                  onPressed: () => unawaited(_openReportSheet()),
                 ),
               ],
             ],
@@ -589,15 +599,6 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
           runSpacing: tokens.spacing.sm,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: <Widget>[
-            // Reporting names the clip the reader saw, so it is offered while
-            // one is playing (`FEAT-011`).
-            if (canPlay)
-              ScenovaButton(
-                label: 'Report',
-                variant: ScenovaButtonVariant.ghost,
-                icon: AppIcons.report,
-                onPressed: () => unawaited(_openReportSheet()),
-              ),
             // History is an app destination; an in-place view has nowhere to
             // open it, so the action is left out there.
             if (widget.presentation != ClipPresentation.inPlace)
@@ -706,7 +707,7 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        _heading(context),
+        _header(context),
         SizedBox(height: tokens.spacing.sm),
         Text(
           'Which meaning fits here?',
