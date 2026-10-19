@@ -132,7 +132,7 @@ docs/           BPRD (product-shaper)
 | T-176 | FEAT-010 | qa-engineer | Done | C-012 (revision 1) |
 | T-177 | — | visual-artist | Done | — |
 | T-178 | FEAT-003, FEAT-005 | backend-engineer | Done | C-003 (revision 2) |
-| T-179 | FEAT-003, FEAT-005 | infra-engineer | In Progress | C-003 (revision 2) |
+| T-179 | FEAT-003, FEAT-005 | infra-engineer | Done | C-003 (revision 2) |
 
 ## Decisions Log
 | # | Decision | Rationale | By |
@@ -174,6 +174,7 @@ docs/           BPRD (product-shaper)
 | D-036 | The product repository is public and the documentation submodule stays private | The public repository is what lets the Actions run and the environment protection rules attach; the specification is not published with the code, so a public cloner gets a build it cannot reproduce without the docs | user |
 | D-037 | A generation job carries exactly one origin — the reader lookup that started it, or the library entry a report or a curator regenerates — and the store records that origin | Report- and curator-started generation has no reader lookup behind it, so the store refused every such job and both paths wrote nothing on a store-backed deployment; settled in the schema via `product-shaper` at the user's direction, with C-003 and C-006 revised to match | user |
 | D-039 | The clip-view card is headed by the product lockup and reaches the report sheet from an icon in its action row, and the selection entry reads "Ask Scenova" | The word already appears in the word-and-phrase header under the clip, so the top line names the product instead of repeating it; the labelled Report button grew the card toward full screen, and it sat beside a rating drawn with the same flag, so the two were indistinguishable | user |
+| D-040 | A word whose generation ended without a clip is attempted again on a later lookup, bounded at three attempts | A word job's id is derived from the word and the pipeline never expires its row, so one failure held that id for good: every later attempt was refused as already enqueued and the reader was dropped to a fallback inviting them to try again, which could not work. The bound keeps a word that keeps failing from spending model credit on every later lookup | lead |
 
 ## Definition of Done
 - **Task:** the acceptance criteria in the cited feature doc are met; the frozen contract is conformed; unit tests pass; format, lint, analyze, and build are clean; work is committed to the dev branch and confined to `Own`.
