@@ -445,7 +445,7 @@ class _ClipPlayerState extends State<ClipPlayer>
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
                           AppIconView(
-                            icon: AppIcons.listen,
+                            icon: AppIcons.mute,
                             size: tokens.sizing.iconSm,
                           ),
                           SizedBox(width: tokens.spacing.xs),
@@ -502,7 +502,7 @@ class _ClipPlayerState extends State<ClipPlayer>
       child: Center(
         child: AppIconView(
           icon: _finished ? AppIcons.replay : AppIcons.play,
-          state: ScenovaIconState.active,
+          active: true,
           size: tokens.sizing.iconMd,
         ),
       ),
@@ -594,7 +594,9 @@ class _ClipPlayerState extends State<ClipPlayer>
           ScenovaButton(
             label: widget.soundOn ? 'Mute' : 'Listen',
             variant: ScenovaButtonVariant.ghost,
-            icon: AppIcons.listen,
+            // The icon names the clip's sound as it stands; the label names what
+            // the control does about it.
+            icon: widget.soundOn ? AppIcons.listen : AppIcons.mute,
             semanticLabel: widget.soundOn
                 ? 'Mute the clip'
                 : 'Play the clip with sound',

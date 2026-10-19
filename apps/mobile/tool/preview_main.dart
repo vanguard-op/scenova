@@ -227,6 +227,18 @@ List<(String, Widget)> _frames() {
       _history(history: _freeLookups()),
     ),
     ('Clip — serving from library (playing)', _clip('come')),
+    (
+      'Clip — with sound (the row offers Listen)',
+      // A clip that carries audio: the row gains the sound control, which reads
+      // as Listen while the clip is muted and as Mute once the reader turns it
+      // on. Tooling only.
+      _clip(
+        'come',
+        online: false,
+        history: <HistoryEntry>[_savedLibraryHit(hasAudio: true)],
+        clips: _clips(),
+      ),
+    ),
     ('Clip — sense choice', _clip('bank')),
     ('Clip — rating noted', _clip('come', rating: ClipRating.helpful)),
     (
@@ -243,7 +255,7 @@ List<(String, Widget)> _frames() {
       'Clip — rating could not be saved',
       _clip(
         'come',
-        rating: ClipRating.wrong,
+        rating: ClipRating.helpful,
         feedbackApi: MockFeedbackApi()..failStatus = 400,
       ),
     ),
@@ -1331,7 +1343,7 @@ Widget _clip(
 
 /// A saved lookup the device holds with the service lookup it came from, so the
 /// offline frames replay it and can still rate it.
-HistoryEntry _savedLibraryHit() {
+HistoryEntry _savedLibraryHit({bool hasAudio = false}) {
   return HistoryEntry(
     id: 'come-1',
     word: 'come',
@@ -1341,6 +1353,7 @@ HistoryEntry _savedLibraryHit() {
     clipUrl: 'mock://clip/library-hit',
     clipLocalKey: 'come-1',
     lookupId: 'lookup-come',
+    hasAudio: hasAudio,
   );
 }
 

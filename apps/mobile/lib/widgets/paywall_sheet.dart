@@ -530,7 +530,7 @@ class _Callout extends StatelessWidget {
   });
 
   final ScenovaSemanticColors tone;
-  final AppIcon icon;
+  final IconData icon;
   final String message;
 
   @override

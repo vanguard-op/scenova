@@ -34,7 +34,7 @@ class ScenovaButton extends StatefulWidget {
   final String label;
   final VoidCallback? onPressed;
   final ScenovaButtonVariant variant;
-  final AppIcon? icon;
+  final IconData? icon;
   final String? semanticLabel;
   final bool expanded;
   final bool isSubmitting;
@@ -156,11 +156,12 @@ class ScenovaIconButton extends StatefulWidget {
     this.semanticLabel,
   });
 
-  final AppIcon icon;
+  final IconData icon;
   final String tooltip;
   final VoidCallback? onPressed;
 
-  /// The filled/active treatment from the iconography direction.
+  /// Whether the control is switched on or chosen, so its icon draws in the
+  /// primary accent.
   final bool active;
   final String? semanticLabel;
 
@@ -176,12 +177,11 @@ class _ScenovaIconButtonState extends State<ScenovaIconButton> {
     final colors = ScenovaColors.of(context);
     final tokens = ScenovaTokens.of(context);
     final enabled = widget.onPressed != null;
-    final state = !enabled
-        ? ScenovaIconState.disabled
-        : widget.active
-        ? ScenovaIconState.active
-        : ScenovaIconState.inactive;
-    final color = AppIconView.toneFor(colors, state);
+    final color = AppIconView.toneFor(
+      colors,
+      active: widget.active,
+      enabled: enabled,
+    );
 
     return FocusRing(
       visible: _focused,
@@ -196,7 +196,8 @@ class _ScenovaIconButtonState extends State<ScenovaIconButton> {
           tooltip: widget.tooltip,
           icon: AppIconView(
             icon: widget.icon,
-            state: state,
+            active: widget.active,
+            enabled: enabled,
             size: tokens.sizing.iconMd,
           ),
           style: IconButton.styleFrom(

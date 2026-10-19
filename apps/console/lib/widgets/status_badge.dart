@@ -38,7 +38,7 @@ class ReviewStatusBadge extends StatelessWidget {
     };
   }
 
-  static AppIcon _icon(ReviewState state) {
+  static IconData _icon(ReviewState state) {
     return switch (state) {
       ReviewState.queued => AppIcons.queued,
       ReviewState.reviewed => AppIcons.seeIt,
@@ -82,7 +82,7 @@ class EntryStatusBadge extends StatelessWidget {
     };
   }
 
-  static AppIcon _icon(EntryStatus status) {
+  static IconData _icon(EntryStatus status) {
     return switch (status) {
       EntryStatus.active => AppIcons.check,
       EntryStatus.retired => AppIcons.remove,

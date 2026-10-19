@@ -357,9 +357,9 @@ Future<ScenovaServices> pumpPreferences(
   return services;
 }
 
-/// Finds the widget drawing [icon], whether it is a custom-set glyph or a
-/// system icon, so a test asserts the app's own icon and not the platform's.
-Finder findIcon(AppIcon icon) => find.byWidgetPredicate(
+/// Finds the widget drawing [icon], so a test asserts the app's own icon and
+/// not a platform control's built-in one.
+Finder findIcon(IconData icon) => find.byWidgetPredicate(
   (widget) => widget is AppIconView && widget.icon == icon,
 );
 

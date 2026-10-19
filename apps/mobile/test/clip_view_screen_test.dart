@@ -120,6 +120,63 @@ void main() {
     await teardown(tester);
   });
 
+  testWidgets('the action row carries the two judgements and no rating for a '
+      'wrong meaning', (tester) async {
+    final services = buildServices(api: MockLookupApi());
+    final controller = controllerFor(services, 'come');
+    addTearDown(controller.dispose);
+
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+    await tester.pump();
+    expect(controller.phase, ClipPhase.playing);
+
+    // The reader says whether the clip showed the meaning (`FEAT-010`).
+    expect(find.byTooltip('This showed the meaning'), findsOneWidget);
+    expect(find.byTooltip('This did not show the meaning'), findsOneWidget);
+    // Judging a clip to have shown the wrong meaning is the report sheet's own
+    // reason, so it is not a rating on the reader's surface (`FEAT-011`).
+    expect(find.byTooltip('This showed the wrong meaning'), findsNothing);
+    await teardown(tester);
+  });
+
+  testWidgets('a clip that carries sound offers its listen control', (
+    tester,
+  ) async {
+    final services = buildServices(
+      api: MockLookupApi(),
+      online: false,
+      clips: InMemoryClipStore(
+        seed: <String, String>{'seed-come': 'file:///device/come.mp4'},
+      ),
+      history: InMemoryHistoryStore(
+        seed: <HistoryEntry>[
+          seededEntry(
+            word: 'come',
+            phrase: 'to move towards someone',
+            clipLocalKey: 'seed-come',
+            hasAudio: true,
+          ),
+        ],
+      ),
+    );
+    final controller = controllerFor(services, 'come');
+    addTearDown(controller.dispose);
+
+    await pumpClipView(tester, services, controller);
+    await tester.pump();
+    await tester.pump();
+    expect(controller.phase, ClipPhase.playing);
+
+    // Clips are muted by default and sound is explicit, so the control offers
+    // the sound; once it is on, the control offers the mute.
+    expect(find.byTooltip('Listen'), findsOneWidget);
+    await tester.tap(find.byTooltip('Listen'));
+    await tester.pump();
+    expect(find.byTooltip('Mute'), findsOneWidget);
+    await teardown(tester);
+  });
+
   testWidgets('a lookup that resolves keeps a poster frame with its entry', (
     tester,
   ) async {

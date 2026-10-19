@@ -62,26 +62,6 @@ void main() {
     await teardown(tester);
   });
 
-  testWidgets('a clip can be marked as showing the wrong meaning', (
-    tester,
-  ) async {
-    final api = MockFeedbackApi();
-    final services = buildServices(api: MockLookupApi(), feedbackApi: api);
-    final controller = _controllerFor(services, 'come');
-    addTearDown(controller.dispose);
-
-    await pumpClipView(tester, services, controller);
-    await tester.pump();
-    await tester.pump();
-
-    await tester.tap(findIcon(AppIcons.error));
-    await tester.pump();
-    await tester.pump();
-
-    expect(api.recorded.single.rating, ClipRating.wrong);
-    await teardown(tester);
-  });
-
   testWidgets('rating the same clip again replaces the earlier rating', (
     tester,
   ) async {
@@ -235,14 +215,29 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    await tester.tap(findIcon(AppIcons.error));
+    await tester.tap(findIcon(AppIcons.notHelpful));
     await tester.pump();
     await tester.pump();
 
     // The queue outlives the process, so the rating is not lost by a relaunch.
     final held = await store.load();
     expect(held.single.lookupId, 'lk_saved');
-    expect(held.single.rating, ClipRating.wrong);
+    expect(held.single.rating, ClipRating.notHelpful);
     await teardown(tester);
+  });
+
+  test('a stored rating the contract no longer takes is dropped, not read as '
+      'one of the ratings that remain', () async {
+    // A queue written before the rating set narrowed can hold a `wrong`
+    // judgement; `C-012` revision 1 refuses it, and it must not reach the
+    // service as the `helpful` rating it happens to sit beside in the store.
+    final restored = PendingFeedback.fromStoredJson(<String, dynamic>{
+      'lookupId': 'lk_old',
+      'rating': 'wrong',
+      'clientFeedbackId': 'cfb_old',
+      'createdAt': DateTime.now().toUtc().toIso8601String(),
+    });
+
+    expect(restored, isNull);
   });
 }

@@ -44,8 +44,8 @@ dependencies:
   # Talks to the gateway for lookups (C-001, C-002).
   http: ^1.2.0
 
-  # Inspects the SVG the design system draws for the mark and the custom icon
-  # set, so the app's tests can assert the art both apps share.
+  # Inspects the SVG the design system draws for the mark, so the app's tests
+  # can assert the art both apps share.
   flutter_svg: ^2.3.0
 
   # Authenticates the lookup path (C-001/C-002 auth): an anonymous ID token
@@ -139,9 +139,9 @@ flutter:
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg
 
-  # The custom icon set (A-008) and the brand mark (A-001) travel with the
-  # shared design system, so the app draws them from one bundle rather than
-  # carrying its own copy.
+  # The brand mark (A-001) travels with the shared design system, so the app
+  # draws it from one bundle rather than carrying its own copy; the product's
+  # icons come from the platform pack itself.
   #
   # The first-run walkthrough clip (A-010) is bundled for Onboarding. Only the
   # walkthrough is included: the store preview (A-009) belongs to the store

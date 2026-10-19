@@ -25,7 +25,7 @@ class StatusBadge extends StatelessWidget {
   /// The state's own words, such as "Queued" or "Serving".
   final String label;
 
-  final AppIcon icon;
+  final IconData icon;
 
   /// The semantic family the state reads in.
   final ScenovaSemanticColors family;

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scenova/theme/app_theme.dart';
@@ -20,102 +19,37 @@ Future<void> pumpIcon(WidgetTester tester, Widget child) {
 }
 
 void main() {
-  group('glyph assets', () {
-    test(
-      'the active state uses the filled form, the rest the outlined form',
-      () {
-        const glyph = ScenovaGlyph.play;
-
-        expect(
-          glyph.assetPath(ScenovaIconState.active),
-          'packages/scenova_design/assets/icons/filled/play.svg',
-        );
-        expect(
-          glyph.assetPath(ScenovaIconState.inactive),
-          'packages/scenova_design/assets/icons/outlined/play.svg',
-        );
-        // The disabled treatment is a tone change, not a different shape.
-        expect(
-          glyph.assetPath(ScenovaIconState.disabled),
-          'packages/scenova_design/assets/icons/outlined/play.svg',
-        );
-      },
-    );
-
-    test('every glyph in the custom set names a distinct asset', () {
-      final names = ScenovaGlyph.values.map((glyph) => glyph.assetName);
-      expect(names.toSet(), hasLength(ScenovaGlyph.values.length));
-    });
-
-    test('every glyph resolves through the bundled asset set', () async {
-      // Guards the asset paths the screens depend on, including the outlined
-      // form the default and disabled states share and the filled active form.
-      for (final glyph in ScenovaGlyph.values) {
-        for (final state in <ScenovaIconState>[
-          ScenovaIconState.inactive,
-          ScenovaIconState.active,
-        ]) {
-          final path = glyph.assetPath(state);
-          final data = await rootBundle.load(path);
-          expect(data.lengthInBytes, greaterThan(0), reason: path);
-        }
-      }
-    });
-  });
-
   group('AppIconView', () {
-    testWidgets('renders a custom-set glyph from its asset', (tester) async {
+    testWidgets('draws from the platform pack, never from an asset', (
+      tester,
+    ) async {
       await pumpIcon(tester, const AppIconView(icon: AppIcons.play));
       await tester.pumpAndSettle();
 
-      expect(find.byType(SvgPicture), findsOneWidget);
+      expect(find.byType(Icon), findsOneWidget);
+      expect(find.byType(SvgPicture), findsNothing);
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('loads the outlined asset for the default state', (
-      tester,
-    ) async {
-      await pumpIcon(tester, const AppIconView(icon: AppIcons.history));
-      await tester.pumpAndSettle();
-
-      final svg = tester.widget<SvgPicture>(find.byType(SvgPicture));
-      expect(
-        svg.bytesLoader.toString(),
-        contains('packages/scenova_design/assets/icons/outlined/history.svg'),
-      );
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('takes the default state tone from text-secondary', (
-      tester,
-    ) async {
+    testWidgets('takes the default tone from text-secondary', (tester) async {
       await pumpIcon(tester, const AppIconView(icon: AppIcons.seeIt));
       await tester.pumpAndSettle();
 
-      final svg = tester.widget<SvgPicture>(find.byType(SvgPicture));
-      expect(
-        svg.colorFilter,
-        ColorFilter.mode(ScenovaPalette.grey600Light, BlendMode.srcIn),
-      );
+      final icon = tester.widget<Icon>(find.byType(Icon));
+      expect(icon.color, ScenovaPalette.grey600Light);
     });
 
-    testWidgets('takes the active state tone from the primary accent', (
+    testWidgets('takes the active tone from the primary accent', (
       tester,
     ) async {
       await pumpIcon(
         tester,
-        const AppIconView(
-          icon: AppIcons.listen,
-          state: ScenovaIconState.active,
-        ),
+        const AppIconView(icon: AppIcons.listen, active: true),
       );
       await tester.pumpAndSettle();
 
-      final svg = tester.widget<SvgPicture>(find.byType(SvgPicture));
-      expect(
-        svg.colorFilter,
-        ColorFilter.mode(ScenovaPalette.primary500Light, BlendMode.srcIn),
-      );
+      final icon = tester.widget<Icon>(find.byType(Icon));
+      expect(icon.color, ScenovaPalette.primary500Light);
     });
 
     testWidgets('the disabled tone is a solid grey-400, never an opacity', (
@@ -129,18 +63,12 @@ void main() {
 
       await pumpIcon(
         tester,
-        const AppIconView(
-          icon: AppIcons.save,
-          state: ScenovaIconState.disabled,
-        ),
+        const AppIconView(icon: AppIcons.report, enabled: false),
       );
       await tester.pumpAndSettle();
 
-      final svg = tester.widget<SvgPicture>(find.byType(SvgPicture));
-      expect(
-        svg.colorFilter,
-        ColorFilter.mode(ScenovaPalette.grey400Light, BlendMode.srcIn),
-      );
+      final icon = tester.widget<Icon>(find.byType(Icon));
+      expect(icon.color, ScenovaPalette.grey400Light);
     });
 
     testWidgets('a caller tone overrides the state tone', (tester) async {
@@ -150,16 +78,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final svg = tester.widget<SvgPicture>(find.byType(SvgPicture));
-      expect(svg.colorFilter, ColorFilter.mode(Colors.red, BlendMode.srcIn));
-    });
-
-    testWidgets('a system icon renders as a platform Icon', (tester) async {
-      await pumpIcon(tester, const AppIconView(icon: AppIcons.search));
-      await tester.pumpAndSettle();
-
-      expect(find.byType(Icon), findsOneWidget);
-      expect(find.byType(SvgPicture), findsNothing);
+      final icon = tester.widget<Icon>(find.byType(Icon));
+      expect(icon.color, Colors.red);
     });
 
     testWidgets('the default size follows the device class scale', (
@@ -168,9 +88,8 @@ void main() {
       await pumpIcon(tester, const AppIconView(icon: AppIcons.play));
       await tester.pumpAndSettle();
 
-      final svg = tester.widget<SvgPicture>(find.byType(SvgPicture));
-      expect(svg.width, ScenovaSizing.mobile.iconMd);
-      expect(svg.height, ScenovaSizing.mobile.iconMd);
+      final icon = tester.widget<Icon>(find.byType(Icon));
+      expect(icon.size, ScenovaSizing.mobile.iconMd);
     });
 
     testWidgets('a screen-reader label is exposed only when asked for', (
@@ -178,33 +97,41 @@ void main() {
     ) async {
       await pumpIcon(
         tester,
-        const AppIconView(icon: AppIcons.save, semanticLabel: 'Save this word'),
+        const AppIconView(icon: AppIcons.helpful, semanticLabel: 'Helpful'),
       );
       await tester.pumpAndSettle();
 
-      expect(find.bySemanticsLabel('Save this word'), findsOneWidget);
+      expect(find.bySemanticsLabel('Helpful'), findsOneWidget);
     });
   });
 
   group('AppIcons', () {
-    test('covers every glyph in the custom set', () {
-      const set = <AppIcon>[
+    test('every icon the product draws belongs to the platform pack', () {
+      // The product's own actions and the chrome around them come from the
+      // platform's icon font; an icon pulled from a custom font or a bundled
+      // asset would not resolve here.
+      const drawn = <IconData>[
         AppIcons.seeIt,
         AppIcons.play,
         AppIcons.pause,
         AppIcons.replay,
         AppIcons.listen,
-        AppIcons.save,
+        AppIcons.mute,
         AppIcons.report,
         AppIcons.history,
         AppIcons.settings,
+        AppIcons.more,
+        AppIcons.helpful,
+        AppIcons.notHelpful,
+        AppIcons.offline,
+        AppIcons.retry,
       ];
 
-      expect(set, everyElement(isA<GlyphIcon>()));
-      expect(
-        set.cast<GlyphIcon>().map((icon) => icon.glyph).toSet(),
-        ScenovaGlyph.values.toSet(),
-      );
+      for (final icon in drawn) {
+        expect(icon.fontFamily, 'MaterialIcons', reason: '$icon');
+        expect(icon.fontPackage, isNull, reason: '$icon');
+        expect(icon.codePoint, greaterThan(0), reason: '$icon');
+      }
     });
   });
 }

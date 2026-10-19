@@ -11,7 +11,7 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # Renders the brand mark and the custom icon set from the delivered assets.
+  # Renders the brand mark from the delivered asset.
   flutter_svg: ^2.3.0
 
   # Streams a clip in the shared Clip Player, so the reader sees the clip
@@ -26,14 +26,11 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  # The brand mark (A-001) and the custom icon set (A-008) travel with the
-  # design system, so both apps draw the same art from one bundle rather than
-  # each carrying a copy. The mark ships as the master it was delivered as; the
-  # icon set's active state uses the filled form and the default and disabled
-  # states share the outlined form, since the disabled treatment is a tone
-  # change, not a different shape. The `assets/` directory is the repository's
-  # own, linked from here the way both apps link it.
+  # The brand mark (A-001) travels with the design system, so both apps draw
+  # the same art from one bundle rather than each carrying a copy. The mark
+  # ships as the master it was delivered as. The product's icons are the
+  # platform pack the apps already bundle, so no icon files are shipped here.
+  # The `assets/` directory is the repository's own, linked from here the way
+  # both apps link it.
   assets:
-    - assets/icons/outlined/
-    - assets/icons/filled/
     - assets/brand/scenova-mark.svg

@@ -84,11 +84,11 @@ Response 200: entryId: string, status: active|retired
 Errors: 400 (unknown status), 401 (not an internal caller), 404 (unknown entry), 503 (library unavailable).
 
 ### C-012: POST /v1/feedback
-Status: Frozen
+Status: Frozen (revision 1)
 Auth: Firebase ID token in `Authorization` (anonymous before sign-in); rate-limited at the gateway. The lookup must belong to the caller's token subject.
-Request: lookupId: string, rating: helpful|not_helpful|wrong, clientFeedbackId: string (idempotency key)
+Request: lookupId: string, rating: helpful|not_helpful, clientFeedbackId: string (idempotency key)
 Response 202: recorded: boolean
-Errors: 400 (unknown rating; a lookup with no clip served to the reader), 401 (missing or invalid token), 404 (unknown lookup, or not owned by the caller), 409 (clientFeedbackId reused with a different rating), 429 (rate limited), 503 (feedback store unavailable). One reader's rating of a lookup replaces their earlier rating for the same entry rather than adding to it; a rating on a phrase lookup is recorded against the lookup and never touches the shared library; a rating that crosses the negative-feedback threshold queues the entry for review.
+Errors: 400 (unknown rating; a lookup with no clip served to the reader), 401 (missing or invalid token), 404 (unknown lookup, or not owned by the caller), 409 (clientFeedbackId reused with a different rating), 429 (rate limited), 503 (feedback store unavailable). One reader's rating of a lookup replaces their earlier rating for the same entry rather than adding to it; a rating on a phrase lookup is recorded against the lookup and never touches the shared library; a rating that crosses the negative-feedback threshold queues the entry for review. A reader judges a clip to have shown the wrong meaning by reporting it with the `wrong_meaning` reason (C-013), which carries that judgement and opens the entry for review; the reader client therefore no longer offers a rating for it, and `wrong` is refused here as an unknown rating.
 
 ### C-013: POST /v1/reports
 Status: Frozen (revision 1)
@@ -105,10 +105,10 @@ Response 200: items: [{ entryId: string, lemma: string, senseLabel: string, reas
 Errors: 401 (no operator session), 403 (an operator without the curator role), 503 (review service unavailable). Newest report first, one item per entry however many reports it holds. An item queued by the negative-feedback threshold rather than by a report carries `feedback_threshold` as its reason; the `reason` filter takes the report reasons only.
 
 ### C-015: GET /internal/review/entries/{entryId}
-Status: Frozen (revision 1)
+Status: Frozen (revision 2)
 Auth: operator identity carrying the curator role, multi-factor authenticated; never reachable from the reader client.
 Request: entryId: string (path)
-Response 200: entry: { entryId: string, lemma: string, senseLabel: string, glossPhrase: string, status: active|retired, clip: { url: string, durationSeconds: number, resolution: "360p", hasAudio: boolean } }, candidate: { url: string, durationSeconds: number, resolution: "360p", hasAudio: boolean }|null (the clip regenerated for the reporting reader, held for the curator), reports: [{ reportId: string, reason: string, note: string|null, createdAt: string }], feedback: [{ rating: helpful|not_helpful|wrong, createdAt: string }], state: queued|reviewed|actioned
+Response 200: entry: { entryId: string, lemma: string, senseLabel: string, glossPhrase: string, status: active|retired, clip: { url: string, durationSeconds: number, resolution: "360p", hasAudio: boolean } }, candidate: { url: string, durationSeconds: number, resolution: "360p", hasAudio: boolean }|null (the clip regenerated for the reporting reader, held for the curator), reports: [{ reportId: string, reason: string, note: string|null, createdAt: string }], feedback: [{ rating: helpful|not_helpful|wrong, createdAt: string }], state: queued|reviewed|actioned. `wrong` is no longer writable (C-012 revision 1) but is still reported, so a rating recorded before that revision reads as the reader gave it.
 Errors: 401 (no operator session), 403 (an operator without the curator role), 404 (unknown entry, or an entry with nothing queued), 503 (review service unavailable).
 
 ### C-016: POST /internal/review/entries/{entryId}/actions

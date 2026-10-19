@@ -22,7 +22,8 @@ abstract interface class PendingFeedbackStore {
 ///
 /// The queue is stored as one JSON document under a single key. A document the
 /// app cannot parse resolves empty rather than throwing: a queue the reader
-/// cannot read is better started over than shown as a crash.
+/// cannot read is better started over than shown as a crash. A row carrying a
+/// rating the contract no longer takes is left out for the same reason.
 class SharedPreferencesPendingFeedbackStore implements PendingFeedbackStore {
   SharedPreferencesPendingFeedbackStore({
     SharedPreferencesAsync? preferencesOverride,
@@ -45,6 +46,7 @@ class SharedPreferencesPendingFeedbackStore implements PendingFeedbackStore {
       return decoded
           .whereType<Map<String, dynamic>>()
           .map(PendingFeedback.fromStoredJson)
+          .whereType<PendingFeedback>()
           .toList();
     } on FormatException {
       return <PendingFeedback>[];

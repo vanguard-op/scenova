@@ -2,14 +2,15 @@ import 'package:flutter/foundation.dart';
 
 /// The reader's rating of a clip, as `POST /v1/feedback` takes it (`C-012`).
 ///
-/// `helpful` and `notHelpful` answer whether the clip showed the meaning;
-/// `wrong` flags a clip that showed the wrong meaning. A negative rating
-/// (`notHelpful`, `wrong`) flags the entry for review, and repeated negative
-/// ratings from different readers queue it (`FEAT-010`).
+/// `helpful` and `notHelpful` answer whether the clip showed the meaning. Both
+/// are recorded against the entry, and a negative one flags it for review, while
+/// repeated negative ratings from different readers queue it (`FEAT-010`). A
+/// reader who judges the clip to show the wrong meaning reports it instead
+/// (`FEAT-011`), so the rating set is these two: `wrong` is refused on the wire
+/// and is not offered on the reader's surface.
 enum ClipRating {
   helpful('helpful'),
-  notHelpful('not_helpful'),
-  wrong('wrong');
+  notHelpful('not_helpful');
 
   const ClipRating(this.wire);
 
@@ -20,7 +21,6 @@ enum ClipRating {
     return switch (value) {
       'helpful' => ClipRating.helpful,
       'not_helpful' => ClipRating.notHelpful,
-      'wrong' => ClipRating.wrong,
       _ => null,
     };
   }
@@ -81,10 +81,18 @@ class PendingFeedback {
     'createdAt': createdAt.toUtc().toIso8601String(),
   };
 
-  factory PendingFeedback.fromStoredJson(Map<String, dynamic> json) {
+  /// Reads one stored rating, or null when its rating is not one the contract
+  /// takes any more.
+  ///
+  /// A queue written before the rating set narrowed can still hold a rating the
+  /// service now refuses; it is dropped rather than read as one of the ratings
+  /// that remain, so a reader's old judgement is never sent as a different one.
+  static PendingFeedback? fromStoredJson(Map<String, dynamic> json) {
+    final rating = ClipRating.fromWire(json['rating']);
+    if (rating == null) return null;
     return PendingFeedback(
       lookupId: json['lookupId'] as String? ?? '',
-      rating: ClipRating.fromWire(json['rating']) ?? ClipRating.helpful,
+      rating: rating,
       clientFeedbackId: json['clientFeedbackId'] as String? ?? '',
       createdAt:
           DateTime.tryParse(json['createdAt'] as String? ?? '')?.toLocal() ??

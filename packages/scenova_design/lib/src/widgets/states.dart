@@ -26,7 +26,7 @@ class EmptyState extends StatelessWidget {
     this.maxWidth = _defaultStateMaxWidth,
   });
 
-  final AppIcon icon;
+  final IconData icon;
   final String headline;
   final String body;
   final String? actionLabel;

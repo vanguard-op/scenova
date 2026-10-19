@@ -39,11 +39,16 @@ ClipViewController _controllerFor(ScenovaServices services, String text) {
   );
 }
 
-/// Opens the Report sheet over a playing clip and lets it settle in.
+/// Opens the Report sheet over a playing clip through the action row's
+/// overflow, and lets it settle in.
 Future<void> _openReportSheet(WidgetTester tester) async {
-  await tester.ensureVisible(findIcon(AppIcons.report));
+  await tester.ensureVisible(findIcon(AppIcons.more));
   await tester.pump();
-  await tester.tap(findIcon(AppIcons.report));
+  await tester.tap(findIcon(AppIcons.more));
+  await tester.pump();
+  await tester.ensureVisible(find.text('Report'));
+  await tester.pump();
+  await tester.tap(find.text('Report'));
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 400));
 }
@@ -316,18 +321,18 @@ void main() {
     await tester.pump();
     expect(controller.phase, ClipPhase.generating);
 
-    // A report names the clip the reader saw; there is none yet. It rides with
-    // the icon actions rather than as a labelled button (`FEAT-011`).
-    expect(findIcon(AppIcons.report), findsNothing);
+    // A report names the clip the reader saw; there is none yet, so the row
+    // that reaches it is not on the card at all (`FEAT-011`).
+    expect(findIcon(AppIcons.more), findsNothing);
+    expect(find.text('Report'), findsNothing);
 
     // The lookup is still generating, so stop its timers before the test ends.
     controller.dispose();
     await teardown(tester);
   });
 
-  testWidgets('reporting is distinct from the wrong-meaning rating', (
-    tester,
-  ) async {
+  testWidgets('the row holds four controls and reveals Report behind its '
+      'overflow', (tester) async {
     final services = buildServices(api: MockLookupApi());
     final controller = _controllerFor(services, 'come');
     addTearDown(controller.dispose);
@@ -338,12 +343,26 @@ void main() {
     await tester.pump();
     expect(controller.phase, ClipPhase.playing);
 
-    // The report control and the rating sit together as icon actions but draw
-    // different glyphs, so the reader never takes one for the other
-    // (`FEAT-010`, `FEAT-011`).
-    expect(findIcon(AppIcons.report), findsOneWidget);
-    expect(findIcon(AppIcons.error), findsOneWidget);
-    expect(findIcon(AppIcons.wrong), findsNothing);
+    // The four the row shows: play or replay, listen or mute when the clip
+    // carries sound, and the two the reader judges the clip with.
+    expect(findIcon(AppIcons.pause), findsOneWidget);
+    expect(findIcon(AppIcons.helpful), findsOneWidget);
+    expect(findIcon(AppIcons.notHelpful), findsOneWidget);
+    // This clip carries no sound, so its control is left out.
+    expect(findIcon(AppIcons.listen), findsNothing);
+
+    // Report is the row's fifth control only when it is asked for, so the row
+    // keeps its shape however many actions the card grows.
+    expect(findIcon(AppIcons.more), findsOneWidget);
+    expect(find.text('Report'), findsNothing);
+
+    await tester.tap(findIcon(AppIcons.more));
+    await tester.pump();
+    expect(find.text('Report'), findsOneWidget);
+
+    await tester.tap(findIcon(AppIcons.more));
+    await tester.pump();
+    expect(find.text('Report'), findsNothing);
     await teardown(tester);
   });
 

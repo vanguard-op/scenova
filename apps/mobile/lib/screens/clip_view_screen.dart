@@ -66,6 +66,14 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
   bool _hasPlayed = false;
   bool _noticeQueued = false;
 
+  /// Whether the reader has opened the action row's overflow, so the actions
+  /// the card holds beyond the row's four controls are on screen.
+  bool _actionsRevealed = false;
+
+  /// The settings controller this screen is listening to, so a change to the
+  /// clip's sound or the motion preference redraws the card.
+  SettingsController? _listenedSettings;
+
   /// Whether the still-making notice is on screen, so it can be taken down the
   /// moment the clip arrives rather than lingering over the clip.
   bool _generatingNoticeVisible = false;
@@ -88,13 +96,34 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
 
   @override
   void dispose() {
+    _listenedSettings?.removeListener(_onSettingsChanged);
     _controller.removeListener(_onControllerChanged);
     super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // The card draws the clip's sound and the reader's motion preference from
+    // the settings, so a change to either redraws it: the Listen control has to
+    // become Mute the moment it is pressed. The scope is read here rather than
+    // in initState, where it is not yet safe to depend on.
+    final settings = _settings;
+    if (identical(settings, _listenedSettings)) return;
+    _listenedSettings?.removeListener(_onSettingsChanged);
+    _listenedSettings = settings..addListener(_onSettingsChanged);
+  }
+
+  void _onSettingsChanged() {
+    if (mounted) setState(() {});
   }
 
   void _onControllerChanged() {
     if (!mounted) return;
     if (_controller.playing) _hasPlayed = true;
+    // The revealed actions belong to the clip on screen: a lookup that settles
+    // some other way closes them with it.
+    if (_controller.phase != ClipPhase.playing) _actionsRevealed = false;
     setState(() {});
     // The clip has arrived (or the lookup settled some other way), so the
     // still-making notice has nothing left to wait on; it leaves with the wait.
@@ -512,35 +541,43 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
     final tokens = ScenovaTokens.of(context);
     final settings = _settings;
     final clip = _controller.clip;
+    // An action names the clip on screen, so the controls that act on one are
+    // offered only while a clip is playing (`FEAT-010`, `FEAT-011`).
     final canPlay = _controller.phase == ClipPhase.playing;
     final feedback = _controller.feedback;
+    final soundOn = settings.soundOn;
     final showListen = canPlay && (clip?.hasAudio ?? false);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        if (canPlay || showListen) ...<Widget>[
+        if (canPlay) ...<Widget>[
+          // The row shows four controls — play or replay, listen or mute, and
+          // the two the reader judges the clip with — however many actions the
+          // card grows. Anything further is reached through the overflow beside
+          // them, so the row keeps its shape and Report stays reachable.
           Wrap(
             spacing: tokens.spacing.sm,
             runSpacing: tokens.spacing.sm,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: <Widget>[
-              if (canPlay)
-                ScenovaIconButton(
-                  icon: _controller.playing
-                      ? AppIcons.pause
-                      : (_hasPlayed ? AppIcons.replay : AppIcons.play),
-                  tooltip: _controller.playing
-                      ? 'Pause'
-                      : (_hasPlayed ? 'Replay' : 'Play'),
-                  active: _controller.playing,
-                  onPressed: _controller.togglePlay,
-                ),
+              ScenovaIconButton(
+                icon: _controller.playing
+                    ? AppIcons.pause
+                    : (_hasPlayed ? AppIcons.replay : AppIcons.play),
+                tooltip: _controller.playing
+                    ? 'Pause'
+                    : (_hasPlayed ? 'Replay' : 'Play'),
+                active: _controller.playing,
+                onPressed: _controller.togglePlay,
+              ),
               if (showListen)
                 ScenovaIconButton(
-                  icon: AppIcons.listen,
-                  tooltip: settings.soundOn ? 'Mute' : 'Listen',
-                  active: settings.soundOn,
+                  // The icon names the clip's sound as it stands; the tooltip
+                  // names what the control does about it.
+                  icon: soundOn ? AppIcons.listen : AppIcons.mute,
+                  tooltip: soundOn ? 'Mute' : 'Listen',
+                  active: soundOn,
                   onPressed: () {
                     settings.soundOn = !settings.soundOn;
                     ScenovaScope.of(context).analytics.preferenceChanged(
@@ -549,50 +586,47 @@ class _ClipViewScreenState extends State<ClipViewScreen> {
                     );
                   },
                 ),
-              // The reader's rating of the clip: whether it showed the meaning,
-              // or that it showed the wrong one (`FEAT-010`).
-              if (canPlay) ...<Widget>[
-                ScenovaIconButton(
-                  icon: AppIcons.helpful,
-                  tooltip: 'This showed the meaning',
-                  active: feedback == ClipRating.helpful,
-                  onPressed: () =>
-                      unawaited(_controller.markFeedback(ClipRating.helpful)),
-                ),
-                ScenovaIconButton(
-                  icon: AppIcons.notHelpful,
-                  tooltip: 'This did not show the meaning',
-                  active: feedback == ClipRating.notHelpful,
-                  onPressed: () => unawaited(
-                    _controller.markFeedback(ClipRating.notHelpful),
-                  ),
-                ),
-                ScenovaIconButton(
-                  // A distinct glyph from the report control's flag, so the
-                  // wrong-meaning rating is never read as reporting (`FEAT-010`,
-                  // `FEAT-011`).
-                  icon: AppIcons.error,
-                  tooltip: 'This showed the wrong meaning',
-                  active: feedback == ClipRating.wrong,
-                  onPressed: () =>
-                      unawaited(_controller.markFeedback(ClipRating.wrong)),
-                ),
-                // Reporting names the clip the reader saw, so it is offered
-                // while one is playing (`FEAT-011`); its own flag glyph keeps it
-                // apart from the rating beside it, and sitting with the icon
-                // actions keeps the card from growing to fill the screen.
-                ScenovaIconButton(
-                  icon: AppIcons.report,
-                  tooltip: 'Report',
-                  onPressed: () => unawaited(_openReportSheet()),
-                ),
-              ],
+              // The reader's rating of the clip: whether it showed the meaning
+              // (`FEAT-010`). A clip that showed the wrong one is reported,
+              // not rated (`FEAT-011`).
+              ScenovaIconButton(
+                icon: AppIcons.helpful,
+                tooltip: 'This showed the meaning',
+                active: feedback == ClipRating.helpful,
+                onPressed: () =>
+                    unawaited(_controller.markFeedback(ClipRating.helpful)),
+              ),
+              ScenovaIconButton(
+                icon: AppIcons.notHelpful,
+                tooltip: 'This did not show the meaning',
+                active: feedback == ClipRating.notHelpful,
+                onPressed: () =>
+                    unawaited(_controller.markFeedback(ClipRating.notHelpful)),
+              ),
+              ScenovaIconButton(
+                icon: AppIcons.more,
+                tooltip: _actionsRevealed
+                    ? 'Hide more actions'
+                    : 'More actions',
+                active: _actionsRevealed,
+                onPressed: () =>
+                    setState(() => _actionsRevealed = !_actionsRevealed),
+              ),
             ],
           ),
-          if (canPlay) ...<Widget>[
+          if (_actionsRevealed) ...<Widget>[
             SizedBox(height: tokens.spacing.sm),
-            _feedbackNote(context),
+            // Reporting names the clip the reader saw; it is the only way into
+            // the report sheet, so it is revealed rather than dropped.
+            ScenovaButton(
+              label: 'Report',
+              variant: ScenovaButtonVariant.secondary,
+              icon: AppIcons.report,
+              onPressed: () => unawaited(_openReportSheet()),
+            ),
           ],
+          SizedBox(height: tokens.spacing.sm),
+          _feedbackNote(context),
         ],
         Wrap(
           spacing: tokens.spacing.sm,

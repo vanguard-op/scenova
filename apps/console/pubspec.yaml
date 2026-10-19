@@ -50,9 +50,10 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  # The brand mark (A-001) and the icon set (A-008) travel with the shared
-  # design system, so the console draws them from one bundle rather than
-  # carrying its own copy.
+  # The brand mark (A-001) travels with the shared design
+  # system, so the console draws it from one bundle rather than
+  # carrying its own copy. The product's icons come from the platform pack the
+  # design system names, so no icon files travel with it.
   #
   # The delivered app icon (A-006) is the one exception. It is the console's
   # browser chrome — the favicon and install icon `web/index.html` and

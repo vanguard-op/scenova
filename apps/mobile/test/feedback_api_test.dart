@@ -26,11 +26,21 @@ void main() {
     });
 
     test('keeps its key and rating through the stored form', () {
-      final stored = _rating(ClipRating.wrong).toStoredJson();
+      final stored = _rating(ClipRating.notHelpful).toStoredJson();
       final restored = PendingFeedback.fromStoredJson(stored);
-      expect(restored.lookupId, 'lk_1');
-      expect(restored.rating, ClipRating.wrong);
+      expect(restored!.lookupId, 'lk_1');
+      expect(restored.rating, ClipRating.notHelpful);
       expect(restored.clientFeedbackId, 'cf_1');
+    });
+
+    test('the rating set is what the contract takes', () {
+      // `C-012` revision 1 takes the two judgements on whether the clip showed
+      // the meaning and refuses `wrong`, which is the report sheet's reason.
+      expect(ClipRating.values, <ClipRating>[
+        ClipRating.helpful,
+        ClipRating.notHelpful,
+      ]);
+      expect(ClipRating.fromWire('wrong'), isNull);
     });
   });
 

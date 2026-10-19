@@ -75,7 +75,7 @@ void main() {
     final store = InMemoryPendingFeedbackStore();
     final first = _Fixture(online: false, store: store);
     addTearDown(first.dispose);
-    await first.outbox.submit(lookupId: 'lk_1', rating: ClipRating.wrong);
+    await first.outbox.submit(lookupId: 'lk_1', rating: ClipRating.notHelpful);
 
     // A fresh process over the same device store: the rating is still there.
     final second = _Fixture(store: store);
@@ -83,7 +83,7 @@ void main() {
     await second.outbox.flush();
 
     expect(second.api.recorded.single.lookupId, 'lk_1');
-    expect(second.api.recorded.single.rating, ClipRating.wrong);
+    expect(second.api.recorded.single.rating, ClipRating.notHelpful);
     expect(second.outbox.pendingCount, 0);
   });
 
@@ -91,21 +91,21 @@ void main() {
     final fixture = _Fixture(online: false);
     addTearDown(fixture.dispose);
 
+    await fixture.outbox.submit(lookupId: 'lk_1', rating: ClipRating.helpful);
     await fixture.outbox.submit(
       lookupId: 'lk_1',
       rating: ClipRating.notHelpful,
     );
-    await fixture.outbox.submit(lookupId: 'lk_1', rating: ClipRating.wrong);
 
     // Only the reader's latest rating counts (C-012), so one is held, not two.
     expect(fixture.outbox.pendingCount, 1);
-    expect(fixture.outbox.pending.single.rating, ClipRating.wrong);
+    expect(fixture.outbox.pending.single.rating, ClipRating.notHelpful);
 
     fixture.connectivity.setOnline(true);
     await pumpEventQueue();
 
     expect(fixture.api.recorded, hasLength(1));
-    expect(fixture.api.recorded.single.rating, ClipRating.wrong);
+    expect(fixture.api.recorded.single.rating, ClipRating.notHelpful);
   });
 
   test('a retry keeps the key the rating was minted with', () async {

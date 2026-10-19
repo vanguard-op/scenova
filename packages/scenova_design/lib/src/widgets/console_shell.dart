@@ -208,7 +208,7 @@ class _SidebarLink extends StatefulWidget {
     required this.onTap,
   });
 
-  final AppIcon icon;
+  final IconData icon;
   final String label;
   final int? count;
   final bool selected;
@@ -255,9 +255,7 @@ class _SidebarLinkState extends State<_SidebarLink> {
                   children: <Widget>[
                     AppIconView(
                       icon: widget.icon,
-                      state: widget.selected
-                          ? ScenovaIconState.active
-                          : ScenovaIconState.inactive,
+                      active: widget.selected,
                       size: tokens.sizing.iconMd,
                     ),
                     SizedBox(width: tokens.spacing.sm),
